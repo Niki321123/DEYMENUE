@@ -559,7 +559,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=13;
+const DM_BUILD=14;
 const DM_UPDATE_URL="https://niki321123.github.io/day-menu/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1439,8 +1439,8 @@ function renderAccount(){
 }
 
 /* ================= KONTO W CHMURZE (Supabase) — synchronizacja PC <-> telefon ================= */
-const SB_URL="https://ohaeqozswszudejxtwcb.supabase.co";
-const SB_KEY="sb_publishable_Xj3K46ULRL7mWoXo05fPmQ_T8LJKL48";
+const SB_URL="https://jkpwboekztpkfxivueql.supabase.co";
+const SB_KEY="sb_publishable_hq2-GCoJtHstXRVSCSh95g_3omuQDCd";
 const SB_SESS_KEY="daymenu_sb_session";
 let sbSession=null;
 try{sbSession=JSON.parse(localStorage.getItem(SB_SESS_KEY))}catch(e){}

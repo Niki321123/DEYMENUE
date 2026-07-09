@@ -131,6 +131,18 @@ label.fld{display:block;font-size:var(--fs-1);font-weight:600;color:var(--text-2
 .mastery-pick button.on{background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
 .mat-active-pomo{border:2px solid var(--primary);background:var(--primary-soft)}
 
+/* wykres produktywności (styl krypto) + czat AI */
+.prod-val{font-size:var(--fs-6);font-weight:700;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.prod-chg{font-weight:700;font-size:var(--fs-3)}
+.prod-chg.up{color:var(--good)}
+.prod-chg.down{color:var(--bad)}
+#prodChart svg{width:100%;height:auto;display:block}
+.ai-note{background:var(--surface-2);border-radius:var(--radius-s);padding:var(--sp-3) var(--sp-4);margin-top:var(--sp-3);white-space:pre-wrap;font-size:var(--fs-2)}
+.chat-log{max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-3)}
+.chat-msg{max-width:85%;padding:var(--sp-2) var(--sp-3);border-radius:var(--radius-s);white-space:pre-wrap;font-size:var(--fs-2)}
+.chat-msg.me{align-self:flex-end;background:var(--primary);color:var(--primary-text)}
+.chat-msg.ai{align-self:flex-start;background:var(--surface-2)}
+
 .stars button{background:none;border:none;font-size:20px;padding:2px;color:var(--text-3)}
 .stars button.on{color:var(--warn)}
 
@@ -336,11 +348,24 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <h2 style="margin:0">Plan nauki</h2>
-        <button class="btn accent" id="matGen">Generuj plan</button>
+        <button class="btn accent" id="matGen">✨ Generuj plan</button>
+      </div>
+      <div style="margin-top:var(--sp-3)">
+        <label class="fld">Preferencje dla AI (opcjonalnie)</label>
+        <input type="text" id="matPrefs" placeholder="Np. w piątki się nie uczę, matematykę wolę rano, max 2h dziennie…">
       </div>
       <p class="muted" id="matPlanHint" style="margin:var(--sp-2) 0 var(--sp-3)"></p>
       <div class="mat-grid-wrap"><div class="mat-grid" id="matPlanGrid"></div></div>
       <div class="mat-legend" id="matLegend"></div>
+    </div>
+    <div class="card">
+      <h2>Czat z AI — zmiany w planie</h2>
+      <p class="muted" style="margin-bottom:var(--sp-3)">Napisz np. „mam dziś imprezę od 18, przełóż naukę na rano” — AI zaktualizuje plan tygodnia. Wymaga zalogowania do konta w chmurze.</p>
+      <div class="chat-log" id="matChatLog"></div>
+      <div class="row">
+        <input type="text" id="matChatInput" class="field" placeholder="Wiadomość do AI…">
+        <button class="btn" id="matChatSend">Wyślij</button>
+      </div>
     </div>
   </div>
 
@@ -369,7 +394,28 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 
 <!-- ============ TIME ANALYSIS ============ -->
 <section class="view" id="view-time">
-  <h1>Analiza czasu</h1><p class="sub">Gdzie znika Twój czas? Dane z ukończonych sesji nauki.</p>
+  <h1>Analiza czasu</h1><p class="sub">Twoja produktywność jak wykres giełdowy — nauka, sen i nastrój w jednym indeksie.</p>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">Indeks produktywności</h2>
+      <div class="tabs" id="prodTabs" style="margin:0">
+        <button data-pr="7" class="on">Tydzień</button>
+        <button data-pr="30">Miesiąc</button>
+        <button data-pr="365">Rok</button>
+        <button data-pr="0">Całość</button>
+      </div>
+    </div>
+    <div class="row" style="margin:var(--sp-3) 0 var(--sp-2);align-items:baseline">
+      <span class="prod-val" id="prodVal">—</span>
+      <span class="prod-chg" id="prodChg"></span>
+      <span class="muted">nauka (50%) + sen (30%) + nastrój (20%), skala 0–100</span>
+    </div>
+    <div id="prodChart"></div>
+    <div class="row" style="margin-top:var(--sp-3)">
+      <button class="btn small ghost" id="prodAiBtn">✨ Analiza AI</button>
+    </div>
+    <div class="ai-note" id="prodAiNote" hidden></div>
+  </div>
   <div class="tabs" id="timeTabs">
     <button data-r="7" class="on">Ostatnie 7 dni</button>
     <button data-r="30">Ostatnie 30 dni</button>
@@ -513,7 +559,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=13;
+const DM_BUILD=14;
 const DM_UPDATE_URL="https://niki321123.github.io/day-menu/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -571,7 +617,7 @@ const DM_UPDATE_URL="https://niki321123.github.io/day-menu/";
 "use strict";
 /* ================= DATA ================= */
 const KEY="daymenu_v1";
-const defaults={theme:"light",moods:[],goals:[],books:[],timelog:[],sleep:[],appearance:null,habits:[],vaultPath:null,autoNote:true,autoBackup:true,lastBackup:null,account:null,lastCloudSync:null,matura:{grid:{},topics:[],plan:[],sessions:[],pomo:{work:25,break:5}}};
+const defaults={theme:"light",moods:[],goals:[],books:[],timelog:[],sleep:[],appearance:null,habits:[],vaultPath:null,autoNote:true,autoBackup:true,lastBackup:null,account:null,lastCloudSync:null,matura:{grid:{},topics:[],plan:[],sessions:[],pomo:{work:25,break:5},prefs:""}};
 let S=load();
 function load(){try{const d=JSON.parse(localStorage.getItem(KEY));return Object.assign({},defaults,d||{})}catch(e){return {...defaults}}}
 function save(){localStorage.setItem(KEY,JSON.stringify(S));cloudQueuePush()}
@@ -893,13 +939,103 @@ function matGeneratePlan(){
   }
   return{blocks,msg:`Wygenerowano ${blocks.length} bloków nauki na ${slots.length} wolnych godzin w tygodniu.`};
 }
-$("#matGen").onclick=()=>{
-  const{blocks,msg}=matGeneratePlan();
-  S.matura.plan=blocks;save();
-  $("#matPlanHint").textContent=msg;
-  renderMatPlanGrid();
-  toast(blocks.length?"Plan wygenerowany ✓":"Nie udało się wygenerować planu");
+/* ---- AI (Haiku 4.5 przez funkcję serwerową — klucz nie opuszcza serwera) ---- */
+async function aiCall(system,messages,maxTokens){
+  const tok=await sbToken();
+  if(!tok)throw new Error("NOLOGIN");
+  const r=await fetch(SB_URL+"/functions/v1/daymenu-ai",{
+    method:"POST",
+    headers:{"Content-Type":"application/json",Authorization:"Bearer "+tok,apikey:SB_KEY},
+    body:JSON.stringify({system,messages,max_tokens:maxTokens||1500})
+  });
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(j.error||("Błąd AI ("+r.status+")"));
+  return j.text||"";
+}
+function aiJson(text){
+  const a=text.indexOf("{"),b=text.lastIndexOf("}");
+  if(a<0||b<=a)throw new Error("Nieprawidłowa odpowiedź AI");
+  return JSON.parse(text.slice(a,b+1));
+}
+const MAT_AI_RULES=`Jesteś planerem nauki w aplikacji Day Menu. Dni tygodnia: 0=Pon, 1=Wt, 2=Śr, 3=Czw, 4=Pt, 5=Sob, 6=Nd. Godziny 6-22, każdy blok trwa 1h ("hour" = godzina rozpoczęcia). Zasady planowania: bloki WYŁĄCZNIE w wolnych slotach użytkownika; więcej czasu tematom o wyższym priorytecie i niższym opanowaniu; rozkładaj każdy temat na różne dni zamiast kumulować; rób przerwy między sesjami tego samego tematu; bezwzględnie szanuj preferencje użytkownika. Odpowiadasz WYŁĄCZNIE poprawnym JSON, bez markdown i bez komentarzy.`;
+function matAiContext(){
+  return {
+    topics:S.matura.topics.map(t=>({id:t.id,nazwa:t.name,priorytet:["","wysoki","średni","niski"][t.priority],opanowanie:MAT_MASTERY[t.mastery]})),
+    slots:matFreeSlots()
+  };
+}
+function matSanitizeBlocks(blocks){
+  const seen=new Set();const out=[];
+  for(const b of blocks||[]){
+    const d=+b.day,h=+b.hour,k=matKey(d,h);
+    if(!S.matura.grid[k]||seen.has(k))continue;
+    if(!S.matura.topics.some(t=>t.id===b.topicId))continue;
+    seen.add(k);out.push({day:d,hour:h,topicId:b.topicId});
+  }
+  return out;
+}
+async function aiPlan(prefs){
+  const ctx=matAiContext();
+  const text=await aiCall(
+    MAT_AI_RULES+' Format odpowiedzi: {"blocks":[{"day":0,"hour":18,"topicId":"..."}]}',
+    [{role:"user",content:`Wolne sloty (day/hour): ${JSON.stringify(ctx.slots)}\nTematy: ${JSON.stringify(ctx.topics)}\nPreferencje użytkownika: ${prefs||"brak"}\nUłóż plan nauki na tydzień.`}],
+    2500
+  );
+  const out=matSanitizeBlocks(aiJson(text).blocks);
+  if(!out.length)throw new Error("AI zwróciło pusty plan");
+  return out;
+}
+$("#matGen").onclick=async()=>{
+  S.matura.prefs=$("#matPrefs").value.trim();save();
+  if(!S.matura.topics.length){$("#matPlanHint").textContent="Dodaj przynajmniej jeden temat w zakładce „Tematy”.";return}
+  if(!matFreeSlots().length){$("#matPlanHint").textContent="Zaznacz wolne godziny w siatce powyżej.";return}
+  $("#matGen").disabled=true;$("#matPlanHint").textContent="AI układa plan…";
+  try{
+    const blocks=await aiPlan(S.matura.prefs);
+    S.matura.plan=blocks;save();
+    $("#matPlanHint").textContent=`AI ułożyło ${blocks.length} bloków nauki.`;
+    renderMatPlanGrid();toast("Plan wygenerowany przez AI ✓");
+  }catch(e){
+    const{blocks,msg}=matGeneratePlan();
+    S.matura.plan=blocks;save();
+    $("#matPlanHint").textContent=msg+(e.message==="NOLOGIN"
+      ?" (Zaloguj się do konta w chmurze, aby plan układało AI — użyto planera lokalnego.)"
+      :" (AI niedostępne — użyto planera lokalnego.)");
+    renderMatPlanGrid();toast(blocks.length?"Plan wygenerowany ✓":"Nie udało się wygenerować planu");
+  }finally{$("#matGen").disabled=false}
 };
+
+/* ---- czat AI (zmiany w planie) ---- */
+let matChat=[];
+function matChatRender(){
+  $("#matChatLog").innerHTML=matChat.map(m=>`<div class="chat-msg ${m.role==="user"?"me":"ai"}">${esc(m.text)}</div>`).join("");
+  $("#matChatLog").scrollTop=1e9;
+}
+$("#matChatSend").onclick=async()=>{
+  const msg=$("#matChatInput").value.trim();if(!msg)return;
+  $("#matChatInput").value="";$("#matChatSend").disabled=true;
+  matChat.push({role:"user",text:msg});
+  matChat.push({role:"ai",text:"…"});matChatRender();
+  try{
+    const ctx=matAiContext();
+    const now=new Date();const todayDay=(now.getDay()+6)%7;
+    const sys=MAT_AI_RULES+` Dziś jest ${MAT_DAYS[todayDay]} (day=${todayDay}), godzina ${now.getHours()}:00. Aktualny plan tygodnia: ${JSON.stringify(S.matura.plan)}. Wolne sloty: ${JSON.stringify(ctx.slots)}. Tematy: ${JSON.stringify(ctx.topics)}. Użytkownik prosi o zmiany w planie lub zadaje pytania o naukę. Format odpowiedzi: {"reply":"krótka odpowiedź po polsku","blocks":[...]} — "blocks" to CAŁY nowy plan tygodnia (wszystkie bloki, nie tylko zmienione); jeśli plan ma zostać bez zmian, ustaw "blocks":null.`;
+    const hist=matChat.filter(m=>m.text!=="…").slice(-8).map(m=>({role:m.role==="user"?"user":"assistant",content:m.text}));
+    while(hist.length&&hist[0].role!=="user")hist.shift();
+    const j=aiJson(await aiCall(sys,hist,2500));
+    matChat[matChat.length-1]={role:"ai",text:j.reply||"OK"};
+    if(Array.isArray(j.blocks)){
+      S.matura.plan=matSanitizeBlocks(j.blocks);save();renderMatPlanGrid();
+      matChat[matChat.length-1].text+="\n(plan zaktualizowany ✓)";
+    }
+  }catch(e){
+    matChat[matChat.length-1]={role:"ai",text:e.message==="NOLOGIN"
+      ?"Zaloguj się do konta w chmurze (zakładka Konto), aby korzystać z czatu AI."
+      :"Błąd AI: "+e.message};
+  }finally{$("#matChatSend").disabled=false}
+  matChatRender();
+};
+$("#matChatInput").onkeydown=e=>{if(e.key==="Enter")$("#matChatSend").click()};
 function renderMatPlanGrid(){
   let html='<div class="hd"></div>'+MAT_DAYS.map(d=>`<div class="hd">${d}</div>`).join("");
   for(const h of MAT_HOURS){
@@ -1001,14 +1137,118 @@ $$("#matTabs button").forEach(b=>b.onclick=()=>{
   $("#matStats").hidden=b.dataset.mt!=="stats";
 });
 function renderMatura(){
-  renderMatGrid();renderMatPlanGrid();renderMatTopics();renderMatStats();
+  $("#matPrefs").value=S.matura.prefs||"";
+  renderMatGrid();renderMatPlanGrid();renderMatTopics();renderMatStats();matChatRender();
 }
+
+/* ================= INDEKS PRODUKTYWNOŚCI (wykres w stylu krypto) ================= */
+let prodRange=7;
+function prodDayScore(ds){
+  const study=S.matura.sessions.filter(s=>s.date===ds).reduce((a,s)=>a+s.minutes,0);
+  const sl=S.sleep.find(x=>x.date===ds);
+  const m=S.moods.find(x=>x.date===ds);
+  if(!study&&!sl&&!m)return null;
+  const sStudy=Math.min(study/120,1)*50; // 2h nauki = pełne 50 pkt
+  const sSleep=sl?Math.max(0,1-Math.abs(sleepMin(sl)-480)/240)*30:0; // optimum 8h
+  const sMood=m?m.mood/4*20:0;
+  return Math.round(sStudy+sSleep+sMood);
+}
+function prodSeries(){
+  let start;
+  if(prodRange){start=new Date();start.setDate(start.getDate()-prodRange+1)}
+  else{const all=allDates();start=all.length?new Date(all[0]+"T00:00"):new Date()}
+  const end=new Date();
+  const days=[];
+  for(const d=new Date(start);d<=end;d.setDate(d.getDate()+1))
+    days.push({ds:d.toISOString().slice(0,10),v:prodDayScore(d.toISOString().slice(0,10))});
+  if(days.length>60){ // dłuższe zakresy: średnia tygodniowa
+    const buckets=[];
+    for(let i=0;i<days.length;i+=7){
+      const chunk=days.slice(i,i+7).filter(x=>x.v!=null);
+      buckets.push({ds:days[i].ds,v:chunk.length?Math.round(chunk.reduce((a,x)=>a+x.v,0)/chunk.length):null});
+    }
+    return buckets;
+  }
+  return days;
+}
+function renderProd(){
+  const s=prodSeries();
+  const pts=s.map((x,i)=>({i,ds:x.ds,v:x.v}));
+  const vals=pts.filter(p=>p.v!=null);
+  const cur=vals.length?vals[vals.length-1].v:null;
+  const first=vals.length?vals[0].v:null;
+  $("#prodVal").textContent=cur!=null?cur:"—";
+  const chg=cur!=null&&first!=null&&first>0?Math.round((cur-first)/first*100):null;
+  const up=chg==null?true:chg>=0;
+  $("#prodChg").textContent=chg!=null?`${chg>=0?"▲":"▼"} ${Math.abs(chg)}%`:"";
+  $("#prodChg").className="prod-chg "+(up?"up":"down");
+  if(!vals.length){
+    $("#prodChart").innerHTML=`<div class="empty">Zapisuj naukę, sen i nastrój, aby zobaczyć wykres produktywności.</div>`;
+    $("#prodAiNote").hidden=true;return;
+  }
+  const W=720,H=200,P=10,n=pts.length;
+  const x=i=>P+(n>1?i/(n-1):0.5)*(W-2*P);
+  const y=v=>H-P-(v/100)*(H-2*P);
+  const col=up?"var(--good)":"var(--bad)";
+  let path="",started=false;
+  for(const p of pts){
+    if(p.v==null)continue;
+    path+=`${started?"L":"M"}${x(p.i).toFixed(1)},${y(p.v).toFixed(1)} `;
+    started=true;
+  }
+  const area=path+`L${x(vals[vals.length-1].i).toFixed(1)},${H-P} L${x(vals[0].i).toFixed(1)},${H-P} Z`;
+  const grid=[0,25,50,75,100].map(v=>`<line x1="${P}" x2="${W-P}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border)" stroke-dasharray="3 5" stroke-width="1"/><text x="${W-P}" y="${y(v)-3}" text-anchor="end" font-size="10" fill="var(--text-3)">${v}</text>`).join("");
+  const last=vals[vals.length-1];
+  $("#prodChart").innerHTML=`
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Wykres indeksu produktywności">
+      <defs><linearGradient id="prodG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${up?"#2e9e5b":"#d24f4f"}" stop-opacity="0.28"/>
+        <stop offset="100%" stop-color="${up?"#2e9e5b":"#d24f4f"}" stop-opacity="0"/>
+      </linearGradient></defs>
+      ${grid}
+      <path d="${area}" fill="url(#prodG)"/>
+      <path d="${path}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="${x(last.i)}" cy="${y(last.v)}" r="4" fill="${col}"/>
+    </svg>
+    <div class="row" style="justify-content:space-between"><span class="muted">${fmtDate(s[0].ds)}</span><span class="muted">${fmtDate(s[s.length-1].ds)}</span></div>`;
+  $("#prodAiNote").hidden=true;
+}
+$$("#prodTabs button").forEach(b=>b.onclick=()=>{prodRange=+b.dataset.pr;$$("#prodTabs button").forEach(x=>x.classList.toggle("on",x===b));renderProd()});
+$("#prodAiBtn").onclick=async()=>{
+  const s=prodSeries().filter(x=>x.v!=null);
+  if(!s.length)return toast("Brak danych do analizy");
+  $("#prodAiBtn").disabled=true;$("#prodAiNote").hidden=false;$("#prodAiNote").textContent="AI analizuje dane…";
+  try{
+    // podsumowanie zakresu dla AI
+    const from=prodSeries()[0].ds;
+    const studyTotal=S.matura.sessions.filter(x=>x.date>=from).reduce((a,x)=>a+x.minutes,0);
+    const sleeps=S.sleep.filter(x=>x.date>=from);
+    const moods=S.moods.filter(x=>x.date>=from);
+    const summary={
+      indeks:s.map(x=>({data:x.ds,wartosc:x.v})),
+      naukaLacznieMin:studyTotal,
+      sredniSenMin:sleeps.length?Math.round(sleeps.reduce((a,x)=>a+sleepMin(x),0)/sleeps.length):null,
+      sredniNastroj:moods.length?+(moods.reduce((a,x)=>a+x.mood+1,0)/moods.length).toFixed(1)+"/5":null
+    };
+    const text=await aiCall(
+      "Jesteś analitykiem produktywności w aplikacji Day Menu. Indeks 0-100 = nauka (50%, pełne punkty za 2h dziennie) + sen (30%, optimum 8h) + nastrój (20%). Odpowiadasz po polsku, zwięźle (3-5 zdań): trend, co ciągnie wynik w górę/dół, jedna konkretna rada. Bez markdown, bez nagłówków.",
+      [{role:"user",content:"Dane z wybranego zakresu: "+JSON.stringify(summary)}],
+      700
+    );
+    $("#prodAiNote").textContent=text.trim();
+  }catch(e){
+    $("#prodAiNote").textContent=e.message==="NOLOGIN"
+      ?"Zaloguj się do konta w chmurze (zakładka Konto), aby korzystać z analizy AI."
+      :"Błąd AI: "+e.message;
+  }finally{$("#prodAiBtn").disabled=false}
+};
 
 /* ================= TIME ANALYSIS ================= */
 let timeRange=7;
 $$("#timeTabs button").forEach(b=>b.onclick=()=>{timeRange=+b.dataset.r;$$("#timeTabs button").forEach(x=>x.classList.toggle("on",x===b));renderTime()});
 const CAT_COLORS={Praca:"var(--primary)",Nauka:"var(--accent)",Pomodoro:"#c0564f",Dom:"var(--good)",Zdrowie:"#3aa0b8",Hobby:"#9b6dd6",Inne:"var(--text-3)"};
 function renderTime(){
+  renderProd();
   let entries=S.timelog.filter(t=>(t.actual||0)>0);
   if(timeRange){const d=new Date();d.setDate(d.getDate()-timeRange);const ds=d.toISOString().slice(0,10);entries=entries.filter(t=>t.date>=ds);}
   const total=entries.reduce((a,t)=>a+t.actual,0);
@@ -1199,8 +1439,8 @@ function renderAccount(){
 }
 
 /* ================= KONTO W CHMURZE (Supabase) — synchronizacja PC <-> telefon ================= */
-const SB_URL="https://ohaeqozswszudejxtwcb.supabase.co";
-const SB_KEY="sb_publishable_Xj3K46ULRL7mWoXo05fPmQ_T8LJKL48";
+const SB_URL="https://jkpwboekztpkfxivueql.supabase.co";
+const SB_KEY="sb_publishable_hq2-GCoJtHstXRVSCSh95g_3omuQDCd";
 const SB_SESS_KEY="daymenu_sb_session";
 let sbSession=null;
 try{sbSession=JSON.parse(localStorage.getItem(SB_SESS_KEY))}catch(e){}
