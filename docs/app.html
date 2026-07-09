@@ -407,7 +407,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     <div class="row" style="margin:var(--sp-3) 0 var(--sp-2);align-items:baseline">
       <span class="prod-val" id="prodVal">—</span>
       <span class="prod-chg" id="prodChg"></span>
-      <span class="muted">sen (50%) + efektywność nauki (50%, godziny zrealizowane danego dnia), skala 0–100</span>
+      <span class="muted">sen (50%, zdrowy zakres 7–9h) + efektywność nauki (50%, cel 4h zrealizowane dziennie), skala 0–100</span>
     </div>
     <div id="prodChart"></div>
     <div class="row" style="margin-top:var(--sp-3)">
@@ -428,7 +428,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     <div class="row" style="margin:var(--sp-3) 0 var(--sp-2);align-items:baseline">
       <span class="prod-val" id="nastrojVal">—</span>
       <span class="prod-chg" id="nastrojChg"></span>
-      <span class="muted">sen (50%) + nastrój (50%), skala 0–100</span>
+      <span class="muted">sen (50%, zdrowy zakres 7–9h) + nastrój (50%), skala 0–100</span>
     </div>
     <div id="nastrojChart"></div>
     <div class="row" style="margin-top:var(--sp-3)">
@@ -547,7 +547,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=19;
+const DM_BUILD=20;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1136,27 +1136,34 @@ function renderMatura(){
 }
 
 /* ================= INDEKS PRODUKTYWNOŚCI (wykres w stylu krypto) ================= */
+/* Parametry oceny (do strojenia): dzienny cel nauki i zdrowy zakres snu. */
+const STUDY_GOAL_H=4;          // godzin zrealizowanej nauki dziennie = pełne 50 pkt
+const SLEEP_OK_LO=7,SLEEP_OK_HI=9; // zdrowy zakres snu (h) — całość zakresu = 100%
+const SLEEP_MIN_H=3.5,SLEEP_MAX_H=13; // poniżej/powyżej tego = 0 pkt
+
 function studyHours(ds){return S.matura.sessions.filter(s=>s.date===ds).reduce((a,s)=>a+s.minutes,0)/60}
-function sleepScore(ds){ // 0-1, optimum 8h
+function studyScore(ds){ // 0-1: zrealizowane godziny wzgl. dziennego celu (liczy się wolumen, 3h>1.5h)
+  return Math.min(studyHours(ds)/STUDY_GOAL_H,1);
+}
+function sleepScore(ds){ // 0-1: zdrowy zakres 7-9h = 100%; niedosypianie karane mocniej niż przesypianie
   const sl=S.sleep.find(x=>x.date===ds);
-  return sl?Math.max(0,1-Math.abs(sleepMin(sl)-480)/240):null;
+  if(!sl)return null;
+  const h=sleepMin(sl)/60;
+  if(h>=SLEEP_OK_LO&&h<=SLEEP_OK_HI)return 1;
+  if(h<SLEEP_OK_LO)return Math.max(0,(h-SLEEP_MIN_H)/(SLEEP_OK_LO-SLEEP_MIN_H)); // 3.5h→0, 7h→1
+  return Math.max(0,(SLEEP_MAX_H-h)/(SLEEP_MAX_H-SLEEP_OK_HI));                   // 9h→1, 13h→0
 }
-function prodDayScore(ds){
-  const study=studyHours(ds);
-  const sSleepFrac=sleepScore(ds);
-  const hasStudy=S.matura.sessions.some(s=>s.date===ds);
-  if(!hasStudy&&sSleepFrac==null)return null;
-  const sStudy=Math.min(study/2,1)*50; // 2h nauki = pełne 50 pkt (efektywność nauki)
-  const sSleep=(sSleepFrac!=null?sSleepFrac:0)*50;
-  return Math.round(sStudy+sSleep);
+function prodDayScore(ds){ // sen 50% + efektywność nauki 50%
+  const studied=S.matura.sessions.some(s=>s.date===ds);
+  const slept=S.sleep.some(x=>x.date===ds);
+  if(!studied&&!slept)return null;
+  return Math.round((sleepScore(ds)||0)*50+studyScore(ds)*50);
 }
-function nastrojDayScore(ds){
+function nastrojDayScore(ds){ // sen 50% + nastrój 50%
   const m=S.moods.find(x=>x.date===ds);
-  const sSleepFrac=sleepScore(ds);
-  if(!m&&sSleepFrac==null)return null;
-  const sMood=m?m.mood/4*50:0;
-  const sSleep=(sSleepFrac!=null?sSleepFrac:0)*50;
-  return Math.round(sMood+sSleep);
+  const slept=S.sleep.some(x=>x.date===ds);
+  if(!m&&!slept)return null;
+  return Math.round((sleepScore(ds)||0)*50+(m?m.mood/4:0)*50);
 }
 /* fabryka wykresu indeksu (produktywność / nastrój) — dzielą layout SVG i logikę zakresu/AI */
 function makeIndexChart(cfg){
@@ -1242,7 +1249,7 @@ const renderProd=makeIndexChart({
   scoreFn:prodDayScore,valId:"#prodVal",chgId:"#prodChg",chartId:"#prodChart",tabsSel:"#prodTabs",
   aiBtnId:"#prodAiBtn",aiNoteId:"#prodAiNote",gradId:"prodG",chartLabel:"Wykres indeksu produktywności",
   emptyMsg:"Zapisuj naukę i sen, aby zobaczyć wykres produktywności.",
-  aiSystem:"Jesteś analitykiem produktywności w aplikacji Day Menu. Indeks 0-100 = sen (50%, optimum 8h) + efektywność nauki (50%, pełne punkty za 2h zrealizowanych danego dnia). Odpowiadasz po polsku, zwięźle (3-5 zdań): trend, co ciągnie wynik w górę/dół, jedna konkretna rada. Bez markdown, bez nagłówków.",
+  aiSystem:"Jesteś analitykiem produktywności w aplikacji Day Menu. Indeks 0-100 = sen (50%, zdrowy zakres 7-9h daje pełne punkty, niedosypianie karane mocniej niż przesypianie) + efektywność nauki (50%, cel 4h zrealizowanej nauki dziennie = pełne punkty, liczy się absolutny wolumen godzin). Odpowiadasz po polsku, zwięźle (3-5 zdań): trend, co ciągnie wynik w górę/dół, jedna konkretna rada. Bez markdown, bez nagłówków.",
   aiContext:(s,from)=>{
     const studyTotal=S.matura.sessions.filter(x=>x.date>=from).reduce((a,x)=>a+x.minutes,0);
     const sleeps=S.sleep.filter(x=>x.date>=from);
@@ -1257,7 +1264,7 @@ const renderNastroj=makeIndexChart({
   scoreFn:nastrojDayScore,valId:"#nastrojVal",chgId:"#nastrojChg",chartId:"#nastrojChart",tabsSel:"#nastrojTabs",
   aiBtnId:"#nastrojAiBtn",aiNoteId:"#nastrojAiNote",gradId:"nastrojG",chartLabel:"Wykres indeksu nastroju",
   emptyMsg:"Zapisuj nastrój i sen, aby zobaczyć wykres indeksu nastroju.",
-  aiSystem:"Jesteś analitykiem samopoczucia w aplikacji Day Menu. Indeks 0-100 = sen (50%, optimum 8h) + nastrój (50%). Odpowiadasz po polsku, zwięźle (3-5 zdań): trend, co ciągnie wynik w górę/dół, jedna konkretna rada. Bez markdown, bez nagłówków.",
+  aiSystem:"Jesteś analitykiem samopoczucia w aplikacji Day Menu. Indeks 0-100 = sen (50%, zdrowy zakres 7-9h daje pełne punkty, niedosypianie karane mocniej niż przesypianie) + nastrój (50%). Odpowiadasz po polsku, zwięźle (3-5 zdań): trend, co ciągnie wynik w górę/dół, jedna konkretna rada. Bez markdown, bez nagłówków.",
   aiContext:(s,from)=>{
     const sleeps=S.sleep.filter(x=>x.date>=from);
     const moods=S.moods.filter(x=>x.date>=from);
