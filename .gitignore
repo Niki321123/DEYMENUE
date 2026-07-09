@@ -6,5 +6,6 @@ android-app/android/app/build/
 android-app/android/.gradle/
 android-app/android/build/
 *.apk
+!docs/DayMenu.apk
 .env
 .env.*
