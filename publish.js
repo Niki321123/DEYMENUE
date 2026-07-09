@@ -23,12 +23,12 @@ run(`node "${path.join(root, "build-android.js")}"`);
 // 3) opublikuj na GitHub Pages
 // Uwaga: plik nazywa sie app.html (nie DayMenu.html) - stare wersje (build 1-4)
 // mialy wadliwy mechanizm podmiany; brak DayMenu.html chroni je przed zepsuciem.
-const site = path.join(root, "site");
+const site = path.join(root, "docs");
 fs.copyFileSync(htmlPath, path.join(site, "app.html"));
 if (fs.existsSync(path.join(site, "DayMenu.html"))) fs.unlinkSync(path.join(site, "DayMenu.html"));
 fs.copyFileSync(path.join(root, "DayMenu.apk"), path.join(site, "DayMenu.apk"));
 fs.writeFileSync(path.join(site, "version.json"), `{"build":${build}}`);
-run("git add -A", site);
-run(`git commit -m "build ${build}"`, site);
-run("git push", site);
+run("git add -A");
+run(`git commit -m "build ${build}"`);
+run("git push");
 console.log(`\nOpublikowano build ${build} - aplikacje zaktualizuja sie same przy uruchomieniu.`);

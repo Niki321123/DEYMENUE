@@ -45,10 +45,13 @@ Repozytorium GitHub: https://github.com/Niki321123/DEYMENUE (pierwszy push zrobi
 - [x] Przetestowano end-to-end na jednorazowym koncie (`dmtest_...@daymenu.local`):
       signup → login → `daymenu-ai` (realna odpowiedź z Claude) → push/pull
       `daymenu_data` przez REST — wszystko działa. Konto i wiersz danych skasowane po teście.
-- [ ] Zweryfikować, czy `main.js`/`preload.js`/`site/app.html`/`android-app` mają gdzieś
-      osobno zaszyty stary `SB_URL` (sprawdzono tylko `DayMenu.html`)
-- [ ] Opublikować aktualizację na PC i telefon (po pozytywnym teście AI) — proces
-      gotowy do użycia: `npm run publish` (patrz niżej)
+- [x] Opublikowano build 14 (`npm run publish`) — commit `c809adb`, push na
+      `main` (https://github.com/Niki321123/DEYMENUE). Kopie starego `SB_URL` w
+      `android-app/www`, `dist/`, `site/app.html` to artefakty builda — nadpisane
+      świeżym `DayMenu.html` automatycznie przy publikacji, nie trzeba ich ruszać ręcznie.
+- [ ] Użytkownik: założyć jedno konto w zakładce „Konto" (po aktualizacji apki do
+      build 14 na obu urządzeniach) i zalogować się nim na PC i telefonie, żeby
+      potwierdzić realną synchronizację danych (nie tylko test API skryptem)
 
 ### Proces publikacji (zweryfikowany w tej sesji, czeka na użycie)
 
