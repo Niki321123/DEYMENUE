@@ -132,18 +132,11 @@ label.fld{display:block;font-size:var(--fs-1);font-weight:600;color:var(--text-2
 .mat-active-pomo{border:2px solid var(--primary);background:var(--primary-soft)}
 .mat-cell.avail{background:var(--good-soft);border-color:var(--good)}
 .mat-cell.school{background:var(--primary-soft);border-color:var(--primary)}
+.mat-cell.plan{display:flex;align-items:center;justify-content:center;gap:2px;font-size:10px;font-weight:700;color:var(--good);overflow:hidden;text-align:center;line-height:1.05;padding:1px 3px;white-space:nowrap;text-overflow:ellipsis}
+.mat-cell.plan.done{opacity:.5;text-decoration:line-through}
 .mat-grid .hd.clk,.mat-grid .hr.clk{cursor:pointer;user-select:none}
 .mat-grid .hd.clk:hover,.mat-grid .hr.clk:hover{color:var(--primary)}
 .brush-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
-.mat-plan-day{font-weight:700;margin:var(--sp-4) 0 var(--sp-2);color:var(--text-2);font-size:var(--fs-1);text-transform:uppercase;letter-spacing:.5px}
-.mat-plan-day:first-child{margin-top:0}
-.mat-plan-item{display:flex;align-items:center;gap:var(--sp-3);padding:10px var(--sp-3);border:1px solid var(--border);border-radius:var(--radius-s);margin-bottom:var(--sp-2);background:var(--surface);cursor:pointer}
-.mat-plan-item.done{opacity:.55}
-.mat-plan-item.done .mpi-name{text-decoration:line-through}
-.mat-plan-item input[type=checkbox]{width:20px;height:20px;min-height:0;flex:none;accent-color:var(--good);cursor:pointer}
-.mat-plan-item .mpi-h{font-variant-numeric:tabular-nums;color:var(--text-2);width:48px;font-size:var(--fs-1)}
-.mat-plan-item .mpi-dot{width:12px;height:12px;border-radius:4px;flex:none}
-.mat-plan-item .mpi-name{flex:1}
 
 /* wykres produktywności (styl krypto) + czat AI */
 .prod-val{font-size:var(--fs-6);font-weight:700;letter-spacing:-1px;font-variant-numeric:tabular-nums}
@@ -359,9 +352,12 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     <div class="card">
       <div class="row" style="justify-content:space-between;margin-bottom:var(--sp-3)">
         <h2 style="margin:0">Harmonogram tygodnia</h2>
-        <button class="btn ghost small" id="matGridClear">Wyczyść</button>
+        <div class="row" style="gap:var(--sp-2);width:auto">
+          <button class="btn accent" id="matGen">✨ Generuj plan</button>
+          <button class="btn ghost small" id="matGridClear">Wyczyść</button>
+        </div>
       </div>
-      <p class="muted" style="margin-bottom:var(--sp-3)">Wybierz tryb i zaznacz godziny — ten sam harmonogram obowiązuje w każdym tygodniu. Kliknij nagłówek dnia, aby pomalować cały dzień, albo godzinę po lewej, aby pomalować cały wiersz.</p>
+      <p class="muted" style="margin-bottom:var(--sp-3)">Wybierz tryb i zaznacz godziny — ten sam harmonogram obowiązuje co tydzień. Klik nagłówka dnia maluje cały dzień, klik godziny po lewej — cały wiersz. Po „Generuj plan” w zielonych okienkach pojawią się przedmioty; <strong>kliknij okienko, aby odhaczyć zrobioną godzinę</strong>, a podwójny klik uruchamia pomodoro.</p>
       <div class="row" style="margin-bottom:var(--sp-3)">
         <div class="mastery-pick" id="matBrush">
           <button data-b="avail" class="on"><span class="brush-dot" style="background:var(--good)"></span>Dostępny</button>
@@ -369,19 +365,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
           <button data-b="unavail"><span class="brush-dot" style="background:var(--text-3)"></span>Niedostępny</button>
         </div>
       </div>
-      <div class="mat-grid-wrap"><div class="mat-grid" id="matGrid"></div></div>
-      <div class="mat-legend">
-        <span><i style="background:var(--good)"></i>Dostępny — można się uczyć</span>
-        <span><i style="background:var(--primary)"></i>W szkole — nauka dopiero po szkole</span>
-        <span><i style="background:var(--surface-2);border:1px solid var(--border)"></i>Niedostępny</span>
-      </div>
-    </div>
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <h2 style="margin:0">Plan nauki</h2>
-        <button class="btn accent" id="matGen">✨ Generuj plan</button>
-      </div>
-      <div style="margin-top:var(--sp-3)">
+      <div>
         <label class="fld">Preferencje dla AI (opcjonalnie)</label>
         <input type="text" id="matPrefs" placeholder="Np. w piątki się nie uczę, matematykę wolę rano, max 2h dziennie…">
       </div>
@@ -390,8 +374,12 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
         <div class="row" style="justify-content:space-between;margin-bottom:4px"><strong id="matProgLbl">Zrobione godziny w tym tygodniu</strong><span class="muted" id="matProgPct"></span></div>
         <div class="progress"><div class="g-good" id="matProgBar" style="width:0%"></div></div>
       </div>
-      <div id="matPlanList"></div>
-      <div class="mat-legend" id="matLegend"></div>
+      <div class="mat-grid-wrap"><div class="mat-grid" id="matGrid"></div></div>
+      <div class="mat-legend">
+        <span><i style="background:var(--good)"></i>Dostępny / zaplanowany przedmiot</span>
+        <span><i style="background:var(--primary)"></i>W szkole — nauka dopiero po szkole</span>
+        <span><i style="background:var(--surface-2);border:1px solid var(--border)"></i>Niedostępny</span>
+      </div>
     </div>
     <div class="card">
       <h2>Czat z AI — zmiany w planie</h2>
@@ -560,7 +548,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=21;
+const DM_BUILD=22;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -867,28 +855,72 @@ function matMigrate(){
 }
 matMigrate();
 
-/* ---- harmonogram tygodnia: 3 stany (dostępny / w szkole / niedostępny) ---- */
+/* ---- harmonogram tygodnia: 3 stany (dostępny / w szkole / niedostępny), plan wpisany w dostępne okienka ---- */
 let matBrush="avail";
+let matCellTimer=null;
 $$("#matBrush button").forEach(b=>b.onclick=()=>{matBrush=b.dataset.b;$$("#matBrush button").forEach(x=>x.classList.toggle("on",x===b))});
+/* maluje dostępność wg pędzla; malowanie stanu innego niż „avail” usuwa blok planu z tej komórki */
+function matPaint(d,h){
+  const k=matKey(d,h);
+  if(matBrush==="avail"){S.matura.grid[k]="avail";return;}
+  const blk=S.matura.plan.find(b=>b.day===d&&b.hour===h);
+  if(blk){matUnmarkDone(blk);S.matura.plan=S.matura.plan.filter(b=>!(b.day===d&&b.hour===h));}
+  if(matBrush==="unavail")delete S.matura.grid[k];else S.matura.grid[k]=matBrush;
+}
+function matCellToggleDone(d,h){
+  const blk=S.matura.plan.find(b=>b.day===d&&b.hour===h);
+  if(!blk)return;
+  if(blk.doneWeek===weekId())matUnmarkDone(blk);else matMarkDone(blk);
+}
 function renderMatGrid(){
+  const wk=weekId();
   let html='<div class="hd"></div>'+MAT_DAYS.map((d,i)=>`<div class="hd clk" data-col="${i}" title="Pomaluj cały ${MAT_DAYS_FULL[i]}">${d}</div>`).join("");
   for(const h of MAT_HOURS){
     const hs=String(h).padStart(2,"0")+":00";
     html+=`<div class="hr clk" data-row="${h}" title="Pomaluj ${hs} we wszystkie dni">${hs}</div>`;
     for(let d=0;d<7;d++){
       const st=S.matura.grid[matKey(d,h)];
-      const cls=st==="avail"?"avail":st==="school"?"school":"";
-      const lbl=st==="avail"?"Dostępny":st==="school"?"W szkole":"Niedostępny";
-      html+=`<div class="mat-cell ${cls}" data-gd="${d}" data-gh="${h}" title="${lbl}"></div>`;
+      let cls=st==="avail"?"avail":st==="school"?"school":"";
+      let inner="",lbl=st==="avail"?"Dostępny":st==="school"?"W szkole":"Niedostępny";
+      if(st==="avail"){
+        const blk=S.matura.plan.find(b=>b.day===d&&b.hour===h);
+        const t=blk&&S.matura.topics.find(x=>x.id===blk.topicId);
+        if(t){
+          const done=blk.doneWeek===wk;
+          cls+=" plan"+(done?" done":"");
+          inner=(done?"✓ ":"")+esc(t.name);
+          lbl=`${t.name} — ${done?"zrobione (kliknij, aby cofnąć)":"kliknij, aby odhaczyć • podwójny klik = pomodoro"}`;
+        }
+      }
+      html+=`<div class="mat-cell ${cls}" data-gd="${d}" data-gh="${h}" title="${lbl}">${inner}</div>`;
     }
   }
   $("#matGrid").innerHTML=html;
-  const paint=(d,h)=>{const k=matKey(d,h);if(matBrush==="unavail")delete S.matura.grid[k];else S.matura.grid[k]=matBrush;};
-  $$("#matGrid [data-gd]").forEach(c=>c.onclick=()=>{paint(+c.dataset.gd,+c.dataset.gh);save();renderMatGrid()});
-  $$("#matGrid [data-col]").forEach(c=>c.onclick=()=>{const d=+c.dataset.col;for(const h of MAT_HOURS)paint(d,h);save();renderMatGrid()});
-  $$("#matGrid [data-row]").forEach(c=>c.onclick=()=>{const h=+c.dataset.row;for(let d=0;d<7;d++)paint(d,h);save();renderMatGrid()});
+  $$("#matGrid [data-gd]").forEach(c=>{
+    const d=+c.dataset.gd,h=+c.dataset.gh;
+    c.onclick=()=>{
+      const planned=S.matura.grid[matKey(d,h)]==="avail"&&S.matura.plan.some(b=>b.day===d&&b.hour===h);
+      if(matBrush==="avail"&&planned){
+        clearTimeout(matCellTimer);
+        matCellTimer=setTimeout(()=>{matCellToggleDone(d,h);save();renderMatSched()},220);
+      }else{matPaint(d,h);save();renderMatSched()}
+    };
+    c.ondblclick=()=>{
+      clearTimeout(matCellTimer);
+      const blk=S.matura.plan.find(b=>b.day===d&&b.hour===h);
+      if(blk&&S.matura.grid[matKey(d,h)]==="avail"&&S.matura.topics.some(t=>t.id===blk.topicId))matStartPomo(blk);
+    };
+  });
+  $$("#matGrid [data-col]").forEach(c=>c.onclick=()=>{const d=+c.dataset.col;for(const h of MAT_HOURS)matPaint(d,h);save();renderMatSched()});
+  $$("#matGrid [data-row]").forEach(c=>c.onclick=()=>{const h=+c.dataset.row;for(let d=0;d<7;d++)matPaint(d,h);save();renderMatSched()});
 }
-$("#matGridClear").onclick=()=>{if(confirm("Wyczyścić cały harmonogram?")){S.matura.grid={};save();renderMatGrid()}};
+function renderMatPlanProgress(){
+  const wk=weekId(),plan=S.matura.plan;
+  const total=plan.length,done=plan.filter(b=>b.doneWeek===wk).length;
+  if(total){$("#matPlanProg").hidden=false;$("#matProgPct").textContent=`${done}/${total}`;$("#matProgBar").style.width=(done/total*100)+"%";}
+  else $("#matPlanProg").hidden=true;
+}
+$("#matGridClear").onclick=()=>{if(confirm("Wyczyścić cały harmonogram i plan?")){S.matura.grid={};S.matura.plan=[];save();renderMatSched()}};
 
 /* ---- przedmioty z priorytetem procentowym ---- */
 function renderMatSubjects(){
@@ -918,7 +950,7 @@ function renderMatSubjects(){
     S.matura.topics=S.matura.topics.filter(t=>t.id!==id);
     S.matura.plan=S.matura.plan.filter(bl=>bl.topicId!==id);
     S.matura.sessions=S.matura.sessions.filter(s=>s.topicId!==id);
-    save();renderMatSubjects();renderMatPlan();renderMatStats();
+    save();renderMatSubjects();renderMatSched();renderMatStats();
   });
   $$("#matTopicList [data-mtpct]").forEach(inp=>inp.onchange=()=>{
     const t=S.matura.topics.find(x=>x.id===inp.dataset.mtpct);
@@ -1026,15 +1058,15 @@ $("#matGen").onclick=async()=>{
   try{
     const blocks=await aiPlan(S.matura.prefs);
     S.matura.plan=blocks;save();
-    $("#matPlanHint").textContent=`AI ułożyło ${blocks.length} godzin nauki. Odhaczaj je poniżej, gdy je zrobisz.`;
-    renderMatPlan();toast("Plan wygenerowany przez AI ✓");
+    $("#matPlanHint").textContent=`AI ułożyło ${blocks.length} godzin nauki — pojawiły się w zielonych okienkach. Kliknij okienko, aby odhaczyć zrobioną godzinę.`;
+    renderMatSched();toast("Plan wygenerowany przez AI ✓");
   }catch(e){
     const{blocks,msg}=matGeneratePlan();
     S.matura.plan=blocks;save();
     $("#matPlanHint").textContent=msg+(e.message==="NOLOGIN"
       ?" (Zaloguj się do konta w chmurze, aby plan układało AI — użyto planera lokalnego.)"
       :" (AI niedostępne — użyto planera lokalnego.)");
-    renderMatPlan();toast(blocks.length?"Plan wygenerowany ✓":"Nie udało się wygenerować planu");
+    renderMatSched();toast(blocks.length?"Plan wygenerowany ✓":"Nie udało się wygenerować planu");
   }finally{$("#matGen").disabled=false}
 };
 
@@ -1089,48 +1121,6 @@ function matUnmarkDone(blk){
   if(blk.sessionId)S.matura.sessions=S.matura.sessions.filter(s=>s.id!==blk.sessionId);
   delete blk.doneWeek;delete blk.sessionId;
 }
-function renderMatPlan(){
-  const plan=[...S.matura.plan].sort((a,b)=>a.day-b.day||a.hour-b.hour);
-  const wk=weekId();
-  const total=plan.length,done=plan.filter(b=>b.doneWeek===wk).length;
-  if(total){
-    $("#matPlanProg").hidden=false;
-    $("#matProgPct").textContent=`${done}/${total}`;
-    $("#matProgBar").style.width=(done/total*100)+"%";
-  }else $("#matPlanProg").hidden=true;
-  if(!plan.length){
-    $("#matPlanList").innerHTML=`<div class="empty">Kliknij „Generuj plan”, aby ułożyć naukę na podstawie harmonogramu i przedmiotów.</div>`;
-    $("#matLegend").innerHTML="";return;
-  }
-  let html="",curDay=-1;
-  for(const b of plan){
-    if(b.day!==curDay){curDay=b.day;html+=`<div class="mat-plan-day">${MAT_DAYS_FULL[b.day]}</div>`;}
-    const t=S.matura.topics.find(x=>x.id===b.topicId);
-    const isDone=b.doneWeek===wk;
-    html+=`<div class="mat-plan-item ${isDone?"done":""}">
-      <input type="checkbox" data-pd="${b.day}" data-ph="${b.hour}" ${isDone?"checked":""} title="Odhacz jako zrobione">
-      <span class="mpi-h">${String(b.hour).padStart(2,"0")}:00</span>
-      <span class="mpi-dot" style="background:${matTopicColor(b.topicId)}"></span>
-      <span class="mpi-name">${t?esc(t.name):"(usunięty przedmiot)"}</span>
-      ${t?`<button class="icon-btn" data-pomo="${b.day}_${b.hour}" title="Uruchom pomodoro">▶</button>`:""}
-    </div>`;
-  }
-  $("#matPlanList").innerHTML=html;
-  $$("#matPlanList input[type=checkbox]").forEach(c=>c.onchange=()=>{
-    const blk=S.matura.plan.find(b=>b.day===+c.dataset.pd&&b.hour===+c.dataset.ph);
-    if(!blk)return;
-    if(c.checked)matMarkDone(blk);else matUnmarkDone(blk);
-    save();renderMatPlan();renderMatStats();
-  });
-  $$("#matPlanList [data-pomo]").forEach(btn=>btn.onclick=()=>{
-    const p=btn.dataset.pomo.split("_");const d=+p[0],h=+p[1];
-    const blk=S.matura.plan.find(b=>b.day===d&&b.hour===h);
-    if(blk&&S.matura.topics.some(t=>t.id===blk.topicId))matStartPomo(blk);
-  });
-  const used=[...new Set(plan.map(b=>b.topicId))].filter(id=>S.matura.topics.some(t=>t.id===id));
-  $("#matLegend").innerHTML=used.map(id=>`<span><i style="background:${matTopicColor(id)}"></i>${esc(S.matura.topics.find(t=>t.id===id).name)}</span>`).join("");
-}
-
 /* ---- pomodoro powiązane z blokiem z planu (ukończenie pracy odhacza godzinę) ---- */
 let matPomo={topicId:null,day:null,hour:null,mode:"work",left:25*60,total:25*60,running:false,iv:null};
 function matPomoLen(m){return(m==="work"?S.matura.pomo.work:S.matura.pomo.break)*60}
@@ -1155,7 +1145,7 @@ function matPomoToggle(){
         else S.matura.sessions.push({id:uid(),topicId:matPomo.topicId,date:today(),minutes:min,completed:true});
         if(t)S.timelog.push({id:uid(),name:"Nauka: "+t.name,category:"Nauka",estimate:null,actual:min,date:today()});
         save();toast("Sesja ukończona! Godzina odhaczona.");notify("Pomodoro ukończone",t?`${t.name} — dobra robota.`:"Dobra robota — czas na przerwę.");
-        renderMatStats();renderMatPlan();
+        renderMatStats();renderMatSched();
         matPomo.mode="break";matPomo.left=matPomo.total=matPomoLen("break");matPomoDraw();
       }else{
         toast("Przerwa skończona — wróć do nauki!");notify("Koniec przerwy","Wracamy do nauki.");
@@ -1204,7 +1194,7 @@ function renderMatStats(){
 }
 
 /* ---- zakładki ---- */
-function renderMatSched(){renderMatGrid();renderMatPlan();}
+function renderMatSched(){renderMatGrid();renderMatPlanProgress();}
 $$("#matTabs button").forEach(b=>b.onclick=()=>{
   $$("#matTabs button").forEach(x=>x.classList.toggle("on",x===b));
   $("#matSched").hidden=b.dataset.mt!=="sched";
@@ -1213,7 +1203,7 @@ $$("#matTabs button").forEach(b=>b.onclick=()=>{
 });
 function renderMatura(){
   $("#matPrefs").value=S.matura.prefs||"";
-  renderMatGrid();renderMatPlan();renderMatSubjects();renderMatStats();matChatRender();
+  renderMatGrid();renderMatPlanProgress();renderMatSubjects();renderMatStats();matChatRender();
 }
 
 /* ================= WYKRES (multi-linia: produktywność, sen, nauka, nastrój, humor) ================= */

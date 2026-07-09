@@ -140,12 +140,18 @@ sprzed tej sesji, już nieużywany przez apkę, można zignorować/skasować.
         się można dopiero po szkole)
       - **Przedmioty** (zamiast Tematów): nazwa + priorytet w procentach; plan dzieli
         czas proporcjonalnie (80/20 → 4× więcej). `S.matura.topics=[{id,name,percent}]`
-      - **Plan** jako lista pogrupowana po dniach z checkboxami „zrobione" +
-        pasek postępu; odhaczenia trzymane per tydzień (`block.doneWeek=weekId()`),
-        resetują się automatycznie z nowym tygodniem; odhaczenie tworzy sesję 60 min
-        (statystyki/streak/pulpit), odznaczenie ją usuwa
-      - **Pomodoro zostaje** — startowane przyciskiem ▶ przy pozycji planu; ukończenie
-        pracy odhacza daną godzinę i loguje wpis w Analizie czasu
+      - **Plan wpisany bezpośrednio w siatkę** (nie ma osobnej karty „Plan nauki"):
+        wygenerowane godziny pojawiają się w zielonych okienkach „Dostępny" jako nazwa
+        przedmiotu (`.mat-cell.plan`). Klik zaplanowanego okienka (przy pędzlu
+        „Dostępny") = odhaczenie „zrobione" (✓ + wyszarzenie, debounce 220 ms, żeby nie
+        kolidowało z podwójnym klikiem); pasek postępu „Zrobione X/Y" nad siatką.
+        Odhaczenia per tydzień (`block.doneWeek=weekId()`), reset z nowym tygodniem;
+        odhaczenie tworzy sesję 60 min (statystyki/streak/pulpit), cofnięcie ją usuwa.
+        „Generuj plan" przeniesiony do nagłówka karty Harmonogram
+      - **Pomodoro zostaje** — start **podwójnym klikiem** zaplanowanego okienka;
+        ukończenie pracy odhacza tę godzinę i loguje wpis w Analizie czasu
+      - malowanie pędzlem „W szkole"/„Niedostępny" na zaplanowanym okienku usuwa z niego
+        blok planu; „Wyczyść" czyści harmonogram i plan
       - Czat AI może teraz zmieniać też harmonogram (zwraca `grid` + nowy `blocks`)
       - migracja starych danych w `matMigrate()` (grid bool→"avail",
         priorytet/mastery→percent). **Do zrobienia przez użytkownika:** `npm run publish`
@@ -211,10 +217,11 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
   usunięto siatkę wolnych godzin i zakładkę Tematy; dodano Harmonogram z 3 stanami
   (Dostępny / W szkole / Niedostępny, malowanie komórki/dnia/wiersza), Przedmioty z
   priorytetem procentowym (proporcjonalny podział czasu), plan jako listę z
-  odhaczaniem zrobionych godzin (reset co tydzień). Pomodoro zachowane (start ▶ przy
-  pozycji planu, ukończenie odhacza godzinę). Czat AI może zmieniać też harmonogram.
+  odhaczaniem zrobionych godzin (reset co tydzień). Po uwadze użytkownika plan NIE jest
+  osobną kartą-listą, tylko wpisuje się bezpośrednio w zielone okienka „Dostępny"
+  (klik = odhacz, podwójny klik = pomodoro). Czat AI może zmieniać też harmonogram.
   Zmiany tylko w `DayMenu.html` (źródło) — czeka `npm run publish`. Składnia JS
-  zweryfikowana (oba bloki `<script>` parsują się bez błędów).
+  zweryfikowana (oba bloki `<script>` parsują się bez błędów, wszystkie ID obecne).
 - **2026-07-09 (sesja 5)**: Dodano auto-pull w tle (build 16). Naprawiono
   `.gitignore` blokujący `docs/DayMenu.apk` (link do APK dawał 404 mimo poprawnego
   `DM_UPDATE_URL`). Usunięto zakładkę Obsidian i całą jej integrację (main.js/
