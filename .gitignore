@@ -1,0 +1,10 @@
+node_modules/
+dist/
+build/
+android-app/node_modules/
+android-app/android/app/build/
+android-app/android/.gradle/
+android-app/android/build/
+*.apk
+.env
+.env.*

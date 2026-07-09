@@ -1,0 +1,8 @@
+{
+  "appId": "pl.user.daymenu",
+  "appName": "Day Menu",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  }
+}
