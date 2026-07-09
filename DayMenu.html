@@ -559,7 +559,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=15;
+const DM_BUILD=16;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1526,7 +1526,7 @@ function cloudCard(){
       <button class="btn ghost" id="sbPull">Pobierz z chmury</button>
       <button class="btn danger" id="sbLogout">Wyloguj</button>
     </div>
-    <p class="muted" style="margin-top:var(--sp-2)">Zmiany wysyłają się same kilka sekund po każdym zapisie.</p>
+    <p class="muted" style="margin-top:var(--sp-2)">Zmiany wysyłają się same kilka sekund po każdym zapisie, a dane z innych urządzeń pobierają się same w tle — bez klikania.</p>
   </div>`;
 }
 function wireCloud(){
@@ -1546,7 +1546,7 @@ function wireCloud(){
     };
     $("#sbLogout").onclick=()=>{
       if(!confirm("Wylogować z chmury? Dane pozostaną na tym urządzeniu, ale przestaną się synchronizować."))return;
-      sbSaveSession(null);renderAccount();toast("Wylogowano");
+      stopCloudPolling();sbSaveSession(null);renderAccount();toast("Wylogowano");
     };
   }
 }
@@ -1567,11 +1567,12 @@ async function sbDoAuth(signup){
         return;
       }
       const j=await sbAuth("token?grant_type=password",{email,password:pass});
-      sbSaveSession(j);await firstSync();renderAccount();toast("Konto utworzone — zalogowano");
+      sbSaveSession(j);await firstSync();startCloudPolling();renderAccount();toast("Konto utworzone — zalogowano");
     }else{
       const j=await sbAuth("token?grant_type=password",{email,password:pass});
       sbSaveSession(j);
       await firstSync();
+      startCloudPolling();
       renderAccount();toast("Zalogowano do chmury");
     }
   }catch(e){
@@ -1590,9 +1591,14 @@ async function firstSync(){
     await cloudPush(false);
   }catch(e){}
 }
-/* przy starcie: jeśli zalogowano, pobierz nowsze dane z chmury */
-setTimeout(async()=>{
-  if(!sbSession)return;
+/* auto-pull: co jakiś czas w tle sprawdź, czy w chmurze jest nowsza wersja (np. z drugiego
+   urządzenia) i zastosuj ją bez klikania "Pobierz z chmury". Pomijamy, gdy user właśnie coś
+   wpisuje w pole tekstowe, żeby mu nie podmienić danych w trakcie edycji. */
+let cloudPollTimer=null;
+async function cloudAutoPull(){
+  if(!sbSession||cloudBusy)return;
+  const ae=document.activeElement;
+  if(ae&&(ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"))return;
   try{
     const row=await cloudPull();
     if(row&&row.updated_at&&(!S.lastCloudSync||new Date(row.updated_at)>new Date(S.lastCloudSync))){
@@ -1600,7 +1606,17 @@ setTimeout(async()=>{
       toast("Dane zaktualizowane z chmury");
     }
   }catch(e){}
-},2500);
+}
+function startCloudPolling(){
+  if(cloudPollTimer)return;
+  cloudPollTimer=setInterval(cloudAutoPull,15000);
+}
+function stopCloudPolling(){
+  clearInterval(cloudPollTimer);cloudPollTimer=null;
+}
+setTimeout(cloudAutoPull,2500);
+if(sbSession)startCloudPolling();
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)cloudAutoPull()});
 
 /* ================= EXPORT / IMPORT ================= */
 function doExport(){
