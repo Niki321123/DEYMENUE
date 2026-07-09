@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-07-09 (sesja 6)_
+_Ostatnia aktualizacja: 2026-07-10 (sesja 7 — porządki w plikach)_
 
 ## Czym jest projekt
 
@@ -186,6 +186,14 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-07-10 (sesja 7)**: Porządki w plikach. Usunięto 8 pustych plików-śmieci
+  z katalogu głównego (`{,+`, `100%`, `300`, `4`, `a+t.actual`, `day-menu@1.0.0`,
+  `node`, `npm` — artefakty źle przekierowanych komend w shellu, były śledzone
+  przez git) oraz nieużywany katalog `site/` (relikt sprzed migracji publikacji
+  na `docs/` w sesji 4; zawierał tylko starego APK-a). Zweryfikowano, że `build/`
+  (ikony dla electron-packager/tray) i główny `DayMenu.apk` (używany przez
+  `publish.js`) są potrzebne — zostają. Kodu nie zmieniano.
 
 - **2026-07-09**: Push initial commit do nowego repo GitHub. Próba dodania sekretu
   `ANTHROPIC_API_KEY` — test funkcji `daymenu-ai` zwrócił `missing_api_key_secret`.
