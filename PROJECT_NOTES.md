@@ -60,6 +60,17 @@ Redirect URLs dla Auth — bez tego link w mailu może przekierować pod nieskon
 adres zamiast `https://niki321123.github.io/DEYMENUE/app.html`. Do sprawdzenia/ustawienia
 ręcznie przez użytkownika w Supabase Dashboard → Authentication → URL Configuration.
 
+**Limit wysyłki maili (`email rate limit exceeded`):** wbudowany SMTP Supabase ma
+bardzo niski domyślny limit (rzędu 2-4 maile/h) — użytkownik trafił na niego po
+kilku próbach zakładania kont (w tym moich testowych). Zaproponowałem custom SMTP
+przez Resend (100/dzień za darmo) — użytkownik **świadomie zrezygnował**, woli
+poczekać na reset limitu niż konfigurować SMTP. Zaproponowałem też Google OAuth jako
+alternatywę (eliminuje mailowe potwierdzenia w ogóle), ale **odrzucone** — wymagałoby
+przywrócenia `preload.js`, deep-linków w Electron (`daymenu://` protocol) i
+Androidzie (Capacitor + AndroidManifest), czyli realnie więcej roboty niż SMTP.
+**Decyzja: zostajemy przy e-mail+hasło z domyślnym SMTP Supabase, nie wracać do
+tematu OAuth/SMTP, chyba że user sam podniesie temat ponownie.**
+
 Uwaga: projekt **nie używa Stripe** — wcześniejszy wpis o funkcjach płatniczych
 (`create-checkout-session`, `stripe-webhook` itd.) i `redeem-promo-code` był błędny
 (zgadywany na podstawie nazw, nie potwierdzony w kodzie) — w repo nie ma po nich

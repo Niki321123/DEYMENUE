@@ -393,7 +393,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 
 <!-- ============ TIME ANALYSIS ============ -->
 <section class="view" id="view-time">
-  <h1>Analiza czasu</h1><p class="sub">Twoja produktywność jak wykres giełdowy — nauka, sen i nastrój w jednym indeksie.</p>
+  <h1>Analiza czasu</h1><p class="sub">Twoja produktywność i nastrój jak wykres giełdowy — sen, nauka i samopoczucie w dwóch indeksach.</p>
   <div class="card">
     <div class="row" style="justify-content:space-between">
       <h2 style="margin:0">Indeks produktywności</h2>
@@ -407,13 +407,34 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     <div class="row" style="margin:var(--sp-3) 0 var(--sp-2);align-items:baseline">
       <span class="prod-val" id="prodVal">—</span>
       <span class="prod-chg" id="prodChg"></span>
-      <span class="muted">nauka (50%) + sen (30%) + nastrój (20%), skala 0–100</span>
+      <span class="muted">sen (50%) + efektywność nauki (50%, godziny zrealizowane danego dnia), skala 0–100</span>
     </div>
     <div id="prodChart"></div>
     <div class="row" style="margin-top:var(--sp-3)">
       <button class="btn small ghost" id="prodAiBtn">✨ Analiza AI</button>
     </div>
     <div class="ai-note" id="prodAiNote" hidden></div>
+  </div>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">Indeks nastroju</h2>
+      <div class="tabs" id="nastrojTabs" style="margin:0">
+        <button data-pr="7" class="on">Tydzień</button>
+        <button data-pr="30">Miesiąc</button>
+        <button data-pr="365">Rok</button>
+        <button data-pr="0">Całość</button>
+      </div>
+    </div>
+    <div class="row" style="margin:var(--sp-3) 0 var(--sp-2);align-items:baseline">
+      <span class="prod-val" id="nastrojVal">—</span>
+      <span class="prod-chg" id="nastrojChg"></span>
+      <span class="muted">sen (50%) + nastrój (50%), skala 0–100</span>
+    </div>
+    <div id="nastrojChart"></div>
+    <div class="row" style="margin-top:var(--sp-3)">
+      <button class="btn small ghost" id="nastrojAiBtn">✨ Analiza AI</button>
+    </div>
+    <div class="ai-note" id="nastrojAiNote" hidden></div>
   </div>
   <div class="tabs" id="timeTabs">
     <button data-r="7" class="on">Ostatnie 7 dni</button>
@@ -526,7 +547,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=18;
+const DM_BUILD=19;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1115,106 +1136,138 @@ function renderMatura(){
 }
 
 /* ================= INDEKS PRODUKTYWNOŚCI (wykres w stylu krypto) ================= */
-let prodRange=7;
-function prodDayScore(ds){
-  const study=S.matura.sessions.filter(s=>s.date===ds).reduce((a,s)=>a+s.minutes,0);
+function studyHours(ds){return S.matura.sessions.filter(s=>s.date===ds).reduce((a,s)=>a+s.minutes,0)/60}
+function sleepScore(ds){ // 0-1, optimum 8h
   const sl=S.sleep.find(x=>x.date===ds);
+  return sl?Math.max(0,1-Math.abs(sleepMin(sl)-480)/240):null;
+}
+function prodDayScore(ds){
+  const study=studyHours(ds);
+  const sSleepFrac=sleepScore(ds);
+  const hasStudy=S.matura.sessions.some(s=>s.date===ds);
+  if(!hasStudy&&sSleepFrac==null)return null;
+  const sStudy=Math.min(study/2,1)*50; // 2h nauki = pełne 50 pkt (efektywność nauki)
+  const sSleep=(sSleepFrac!=null?sSleepFrac:0)*50;
+  return Math.round(sStudy+sSleep);
+}
+function nastrojDayScore(ds){
   const m=S.moods.find(x=>x.date===ds);
-  if(!study&&!sl&&!m)return null;
-  const sStudy=Math.min(study/120,1)*50; // 2h nauki = pełne 50 pkt
-  const sSleep=sl?Math.max(0,1-Math.abs(sleepMin(sl)-480)/240)*30:0; // optimum 8h
-  const sMood=m?m.mood/4*20:0;
-  return Math.round(sStudy+sSleep+sMood);
+  const sSleepFrac=sleepScore(ds);
+  if(!m&&sSleepFrac==null)return null;
+  const sMood=m?m.mood/4*50:0;
+  const sSleep=(sSleepFrac!=null?sSleepFrac:0)*50;
+  return Math.round(sMood+sSleep);
 }
-function prodSeries(){
-  let start;
-  if(prodRange){start=new Date();start.setDate(start.getDate()-prodRange+1)}
-  else{const all=allDates();start=all.length?new Date(all[0]+"T00:00"):new Date()}
-  const end=new Date();
-  const days=[];
-  for(const d=new Date(start);d<=end;d.setDate(d.getDate()+1))
-    days.push({ds:d.toISOString().slice(0,10),v:prodDayScore(d.toISOString().slice(0,10))});
-  if(days.length>60){ // dłuższe zakresy: średnia tygodniowa
-    const buckets=[];
-    for(let i=0;i<days.length;i+=7){
-      const chunk=days.slice(i,i+7).filter(x=>x.v!=null);
-      buckets.push({ds:days[i].ds,v:chunk.length?Math.round(chunk.reduce((a,x)=>a+x.v,0)/chunk.length):null});
+/* fabryka wykresu indeksu (produktywność / nastrój) — dzielą layout SVG i logikę zakresu/AI */
+function makeIndexChart(cfg){
+  let range=7;
+  function series(){
+    let start;
+    if(range){start=new Date();start.setDate(start.getDate()-range+1)}
+    else{const all=allDates();start=all.length?new Date(all[0]+"T00:00"):new Date()}
+    const end=new Date();
+    const days=[];
+    for(const d=new Date(start);d<=end;d.setDate(d.getDate()+1))
+      days.push({ds:d.toISOString().slice(0,10),v:cfg.scoreFn(d.toISOString().slice(0,10))});
+    if(days.length>60){ // dłuższe zakresy: średnia tygodniowa
+      const buckets=[];
+      for(let i=0;i<days.length;i+=7){
+        const chunk=days.slice(i,i+7).filter(x=>x.v!=null);
+        buckets.push({ds:days[i].ds,v:chunk.length?Math.round(chunk.reduce((a,x)=>a+x.v,0)/chunk.length):null});
+      }
+      return buckets;
     }
-    return buckets;
+    return days;
   }
-  return days;
+  function render(){
+    const s=series();
+    const pts=s.map((x,i)=>({i,ds:x.ds,v:x.v}));
+    const vals=pts.filter(p=>p.v!=null);
+    const cur=vals.length?vals[vals.length-1].v:null;
+    const first=vals.length?vals[0].v:null;
+    $(cfg.valId).textContent=cur!=null?cur:"—";
+    const chg=cur!=null&&first!=null&&first>0?Math.round((cur-first)/first*100):null;
+    const up=chg==null?true:chg>=0;
+    $(cfg.chgId).textContent=chg!=null?`${chg>=0?"▲":"▼"} ${Math.abs(chg)}%`:"";
+    $(cfg.chgId).className="prod-chg "+(up?"up":"down");
+    if(!vals.length){
+      $(cfg.chartId).innerHTML=`<div class="empty">${cfg.emptyMsg}</div>`;
+      $(cfg.aiNoteId).hidden=true;return;
+    }
+    const W=720,H=200,P=10,n=pts.length;
+    const x=i=>P+(n>1?i/(n-1):0.5)*(W-2*P);
+    const y=v=>H-P-(v/100)*(H-2*P);
+    const col=up?"var(--good)":"var(--bad)";
+    let path="",started=false;
+    for(const p of pts){
+      if(p.v==null)continue;
+      path+=`${started?"L":"M"}${x(p.i).toFixed(1)},${y(p.v).toFixed(1)} `;
+      started=true;
+    }
+    const area=path+`L${x(vals[vals.length-1].i).toFixed(1)},${H-P} L${x(vals[0].i).toFixed(1)},${H-P} Z`;
+    const grid=[0,25,50,75,100].map(v=>`<line x1="${P}" x2="${W-P}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border)" stroke-dasharray="3 5" stroke-width="1"/><text x="${W-P}" y="${y(v)-3}" text-anchor="end" font-size="10" fill="var(--text-3)">${v}</text>`).join("");
+    const last=vals[vals.length-1];
+    $(cfg.chartId).innerHTML=`
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${cfg.chartLabel}">
+        <defs><linearGradient id="${cfg.gradId}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${up?"#2e9e5b":"#d24f4f"}" stop-opacity="0.28"/>
+          <stop offset="100%" stop-color="${up?"#2e9e5b":"#d24f4f"}" stop-opacity="0"/>
+        </linearGradient></defs>
+        ${grid}
+        <path d="${area}" fill="url(#${cfg.gradId})"/>
+        <path d="${path}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="${x(last.i)}" cy="${y(last.v)}" r="4" fill="${col}"/>
+      </svg>
+      <div class="row" style="justify-content:space-between"><span class="muted">${fmtDate(s[0].ds)}</span><span class="muted">${fmtDate(s[s.length-1].ds)}</span></div>`;
+    $(cfg.aiNoteId).hidden=true;
+  }
+  $$(cfg.tabsSel+" button").forEach(b=>b.onclick=()=>{range=+b.dataset.pr;$$(cfg.tabsSel+" button").forEach(x=>x.classList.toggle("on",x===b));render()});
+  $(cfg.aiBtnId).onclick=async()=>{
+    const s=series().filter(x=>x.v!=null);
+    if(!s.length)return toast("Brak danych do analizy");
+    $(cfg.aiBtnId).disabled=true;$(cfg.aiNoteId).hidden=false;$(cfg.aiNoteId).textContent="AI analizuje dane…";
+    try{
+      const from=series()[0].ds;
+      const text=await aiCall(cfg.aiSystem,[{role:"user",content:"Dane z wybranego zakresu: "+JSON.stringify(cfg.aiContext(s,from))}],700);
+      $(cfg.aiNoteId).textContent=text.trim();
+    }catch(e){
+      $(cfg.aiNoteId).textContent=e.message==="NOLOGIN"
+        ?"Zaloguj się do konta w chmurze (zakładka Konto), aby korzystać z analizy AI."
+        :"Błąd AI: "+e.message;
+    }finally{$(cfg.aiBtnId).disabled=false}
+  };
+  return render;
 }
-function renderProd(){
-  const s=prodSeries();
-  const pts=s.map((x,i)=>({i,ds:x.ds,v:x.v}));
-  const vals=pts.filter(p=>p.v!=null);
-  const cur=vals.length?vals[vals.length-1].v:null;
-  const first=vals.length?vals[0].v:null;
-  $("#prodVal").textContent=cur!=null?cur:"—";
-  const chg=cur!=null&&first!=null&&first>0?Math.round((cur-first)/first*100):null;
-  const up=chg==null?true:chg>=0;
-  $("#prodChg").textContent=chg!=null?`${chg>=0?"▲":"▼"} ${Math.abs(chg)}%`:"";
-  $("#prodChg").className="prod-chg "+(up?"up":"down");
-  if(!vals.length){
-    $("#prodChart").innerHTML=`<div class="empty">Zapisuj naukę, sen i nastrój, aby zobaczyć wykres produktywności.</div>`;
-    $("#prodAiNote").hidden=true;return;
-  }
-  const W=720,H=200,P=10,n=pts.length;
-  const x=i=>P+(n>1?i/(n-1):0.5)*(W-2*P);
-  const y=v=>H-P-(v/100)*(H-2*P);
-  const col=up?"var(--good)":"var(--bad)";
-  let path="",started=false;
-  for(const p of pts){
-    if(p.v==null)continue;
-    path+=`${started?"L":"M"}${x(p.i).toFixed(1)},${y(p.v).toFixed(1)} `;
-    started=true;
-  }
-  const area=path+`L${x(vals[vals.length-1].i).toFixed(1)},${H-P} L${x(vals[0].i).toFixed(1)},${H-P} Z`;
-  const grid=[0,25,50,75,100].map(v=>`<line x1="${P}" x2="${W-P}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border)" stroke-dasharray="3 5" stroke-width="1"/><text x="${W-P}" y="${y(v)-3}" text-anchor="end" font-size="10" fill="var(--text-3)">${v}</text>`).join("");
-  const last=vals[vals.length-1];
-  $("#prodChart").innerHTML=`
-    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Wykres indeksu produktywności">
-      <defs><linearGradient id="prodG" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="${up?"#2e9e5b":"#d24f4f"}" stop-opacity="0.28"/>
-        <stop offset="100%" stop-color="${up?"#2e9e5b":"#d24f4f"}" stop-opacity="0"/>
-      </linearGradient></defs>
-      ${grid}
-      <path d="${area}" fill="url(#prodG)"/>
-      <path d="${path}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-      <circle cx="${x(last.i)}" cy="${y(last.v)}" r="4" fill="${col}"/>
-    </svg>
-    <div class="row" style="justify-content:space-between"><span class="muted">${fmtDate(s[0].ds)}</span><span class="muted">${fmtDate(s[s.length-1].ds)}</span></div>`;
-  $("#prodAiNote").hidden=true;
-}
-$$("#prodTabs button").forEach(b=>b.onclick=()=>{prodRange=+b.dataset.pr;$$("#prodTabs button").forEach(x=>x.classList.toggle("on",x===b));renderProd()});
-$("#prodAiBtn").onclick=async()=>{
-  const s=prodSeries().filter(x=>x.v!=null);
-  if(!s.length)return toast("Brak danych do analizy");
-  $("#prodAiBtn").disabled=true;$("#prodAiNote").hidden=false;$("#prodAiNote").textContent="AI analizuje dane…";
-  try{
-    // podsumowanie zakresu dla AI
-    const from=prodSeries()[0].ds;
+const renderProd=makeIndexChart({
+  scoreFn:prodDayScore,valId:"#prodVal",chgId:"#prodChg",chartId:"#prodChart",tabsSel:"#prodTabs",
+  aiBtnId:"#prodAiBtn",aiNoteId:"#prodAiNote",gradId:"prodG",chartLabel:"Wykres indeksu produktywności",
+  emptyMsg:"Zapisuj naukę i sen, aby zobaczyć wykres produktywności.",
+  aiSystem:"Jesteś analitykiem produktywności w aplikacji Day Menu. Indeks 0-100 = sen (50%, optimum 8h) + efektywność nauki (50%, pełne punkty za 2h zrealizowanych danego dnia). Odpowiadasz po polsku, zwięźle (3-5 zdań): trend, co ciągnie wynik w górę/dół, jedna konkretna rada. Bez markdown, bez nagłówków.",
+  aiContext:(s,from)=>{
     const studyTotal=S.matura.sessions.filter(x=>x.date>=from).reduce((a,x)=>a+x.minutes,0);
     const sleeps=S.sleep.filter(x=>x.date>=from);
-    const moods=S.moods.filter(x=>x.date>=from);
-    const summary={
+    return{
       indeks:s.map(x=>({data:x.ds,wartosc:x.v})),
       naukaLacznieMin:studyTotal,
+      sredniSenMin:sleeps.length?Math.round(sleeps.reduce((a,x)=>a+sleepMin(x),0)/sleeps.length):null
+    };
+  }
+});
+const renderNastroj=makeIndexChart({
+  scoreFn:nastrojDayScore,valId:"#nastrojVal",chgId:"#nastrojChg",chartId:"#nastrojChart",tabsSel:"#nastrojTabs",
+  aiBtnId:"#nastrojAiBtn",aiNoteId:"#nastrojAiNote",gradId:"nastrojG",chartLabel:"Wykres indeksu nastroju",
+  emptyMsg:"Zapisuj nastrój i sen, aby zobaczyć wykres indeksu nastroju.",
+  aiSystem:"Jesteś analitykiem samopoczucia w aplikacji Day Menu. Indeks 0-100 = sen (50%, optimum 8h) + nastrój (50%). Odpowiadasz po polsku, zwięźle (3-5 zdań): trend, co ciągnie wynik w górę/dół, jedna konkretna rada. Bez markdown, bez nagłówków.",
+  aiContext:(s,from)=>{
+    const sleeps=S.sleep.filter(x=>x.date>=from);
+    const moods=S.moods.filter(x=>x.date>=from);
+    return{
+      indeks:s.map(x=>({data:x.ds,wartosc:x.v})),
       sredniSenMin:sleeps.length?Math.round(sleeps.reduce((a,x)=>a+sleepMin(x),0)/sleeps.length):null,
       sredniNastroj:moods.length?+(moods.reduce((a,x)=>a+x.mood+1,0)/moods.length).toFixed(1)+"/5":null
     };
-    const text=await aiCall(
-      "Jesteś analitykiem produktywności w aplikacji Day Menu. Indeks 0-100 = nauka (50%, pełne punkty za 2h dziennie) + sen (30%, optimum 8h) + nastrój (20%). Odpowiadasz po polsku, zwięźle (3-5 zdań): trend, co ciągnie wynik w górę/dół, jedna konkretna rada. Bez markdown, bez nagłówków.",
-      [{role:"user",content:"Dane z wybranego zakresu: "+JSON.stringify(summary)}],
-      700
-    );
-    $("#prodAiNote").textContent=text.trim();
-  }catch(e){
-    $("#prodAiNote").textContent=e.message==="NOLOGIN"
-      ?"Zaloguj się do konta w chmurze (zakładka Konto), aby korzystać z analizy AI."
-      :"Błąd AI: "+e.message;
-  }finally{$("#prodAiBtn").disabled=false}
-};
+  }
+});
 
 /* ================= TIME ANALYSIS ================= */
 let timeRange=7;
@@ -1222,6 +1275,7 @@ $$("#timeTabs button").forEach(b=>b.onclick=()=>{timeRange=+b.dataset.r;$$("#tim
 const CAT_COLORS={Praca:"var(--primary)",Nauka:"var(--accent)",Pomodoro:"#c0564f",Dom:"var(--good)",Zdrowie:"#3aa0b8",Hobby:"#9b6dd6",Inne:"var(--text-3)"};
 function renderTime(){
   renderProd();
+  renderNastroj();
   let entries=S.timelog.filter(t=>(t.actual||0)>0);
   if(timeRange){const d=new Date();d.setDate(d.getDate()-timeRange);const ds=d.toISOString().slice(0,10);entries=entries.filter(t=>t.date>=ds);}
   const total=entries.reduce((a,t)=>a+t.actual,0);
