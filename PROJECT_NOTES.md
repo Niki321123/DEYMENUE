@@ -5,10 +5,15 @@ _Ostatnia aktualizacja: 2026-07-09 (sesja 4)_
 ## Czym jest projekt
 
 "Day Menu" — osobisty panel (nastrój, sen, cele, nauka). Dostępny jako:
-- aplikacja desktopowa Electron (`main.js`, `preload.js`, `DayMenu.html`) — `main.js`
-  ładuje **lokalny** `DayMenu.html` (`win.loadFile`), NIE z internetu
+- aplikacja desktopowa Electron (`main.js`, `DayMenu.html`, brak już `preload.js` —
+  usunięty w sesji 5, był tylko dla Obsidian) — `main.js` ładuje **lokalny**
+  `DayMenu.html` (`win.loadFile`), NIE z internetu
 - aplikacja Android przez Capacitor (`android-app/`, buduje się `build-android.js`)
 - wersja webowa (`docs/app.html`, publikowana przez GitHub Pages)
+
+Zakładka **Obsidian usunięta** (sesja 5) — cała integracja z vaultem (eksport
+notatek .md, auto-backup, `dayMenuAPI.chooseFolder/writeFile` w `main.js`/`preload.js`)
+skasowana na życzenie użytkownika. `allDates()` zostało (używane też w Analizie czasu).
 
 ### Mechanizm auto-aktualizacji (już zaimplementowany, nie budować od nowa)
 
@@ -35,7 +40,25 @@ przy każdej nowej sesji, że MCP wskazuje na właściwy projekt).
 Edge Functions w Supabase (na `jkpwboekztpkfxivueql`):
 - `daymenu-ai` — proxy do Anthropic API (model zablokowany na Haiku 4.5), wymaga
   zalogowanego usera (verify_jwt) i sekretu `ANTHROPIC_API_KEY`
-- `signup-username` — zakładanie konta (usera znane tylko jako `nazwa@daymenu.local`)
+- `signup-username` — **już nieużywana** (sesja 5, patrz niżej), zdeployowana ale
+  martwa; można ją skasować z dashboardu Supabase, jeśli ktoś kiedyś posprząta
+
+### Logowanie w zakładce Konto (przepisane w sesji 5)
+
+Zamiast sztucznej nazwy użytkownika (`nazwa@daymenu.local` przez `signup-username`)
+apka używa teraz **zwykłego Supabase Auth email+hasło** bezpośrednio (`/auth/v1/signup`,
+`/auth/v1/token?grant_type=password`, `/auth/v1/recover`, `/auth/v1/user` do zmiany
+hasła). Projekt ma `mailer_autoconfirm:false` — **potwierdzenie e-mail jest wymagane**
+przed pierwszym logowaniem (Supabase wysyła mail z linkiem). Link resetu
+hasła/potwierdzenia wraca do apki z tokenami we fragmencie URL (`#access_token=...&type=recovery|signup`)
+— obsługuje to IIFE na początku sekcji "KONTO W CHMURZE" w `DayMenu.html`
+(`recoveryToken`/`pendingAccountView`), które automatycznie przełącza na zakładkę
+Konto i pokazuje formularz "Ustaw nowe hasło" albo dogrywa sesję po potwierdzeniu.
+
+**Nie skonfigurowano** (wymaga dashboardu Supabase, poza zasięgiem MCP): Site URL /
+Redirect URLs dla Auth — bez tego link w mailu może przekierować pod nieskonfigurowany
+adres zamiast `https://niki321123.github.io/DEYMENUE/app.html`. Do sprawdzenia/ustawienia
+ręcznie przez użytkownika w Supabase Dashboard → Authentication → URL Configuration.
 
 Uwaga: projekt **nie używa Stripe** — wcześniejszy wpis o funkcjach płatniczych
 (`create-checkout-session`, `stripe-webhook` itd.) i `redeem-promo-code` był błędny
@@ -85,9 +108,23 @@ sprzed tej sesji, już nieużywany przez apkę, można zignorować/skasować.
       Day Menu.exe` ma teraz build 15 i poprawny `DM_UPDATE_URL`. Istniejący skrót
       „Day Menu” na Pulpicie użytkownika wskazuje bezpośrednio na ten plik w `dist/`
       wewnątrz repo — nie trzeba nowego skrótu.
-- [ ] Użytkownik: założyć jedno konto w zakładce „Konto" (po aktualizacji apki do
-      build 15 na obu urządzeniach) i zalogować się nim na PC i telefonie, żeby
-      potwierdzić realną synchronizację danych (nie tylko test API skryptem)
+- [x] Dodano auto-pull w tle co 15s + przy powrocie do apki (`cloudAutoPull`,
+      `startCloudPolling`/`stopCloudPolling`) — dane z innego urządzenia stosują się
+      same, bez klikania „Pobierz z chmury” (build 16).
+- [x] Naprawiono `.gitignore` (`*.apk` blokowało `docs/DayMenu.apk` przed dotarciem
+      do GitHub — dodano wyjątek `!docs/DayMenu.apk`).
+- [x] Usunięto zakładkę Obsidian (cały eksport do vaulta, auto-notatki, auto-backup)
+      i przepisano logowanie w zakładce Konto na prawdziwy Supabase Auth
+      email+hasło z potwierdzeniem mailowym i resetem hasła (build 17). Przetestowano
+      na jednorazowym koncie (`@mailinator.com`): signup→session:null (wymaga
+      potwierdzenia), login przed potwierdzeniem poprawnie odrzucony, recover→200.
+      Konto testowe skasowane.
+- [ ] Użytkownik: założyć jedno konto (prawdziwym e-mailem) w zakładce „Konto" (po
+      aktualizacji apki do build 17 na obu urządzeniach), potwierdzić mailem, zalogować
+      się na PC i telefonie
+- [ ] Rozważyć ustawienie Site URL / Redirect URLs w Supabase Dashboard →
+      Authentication → URL Configuration na `https://niki321123.github.io/DEYMENUE/app.html`
+      (poza zasięgiem MCP, wymaga ręcznej konfiguracji)
 
 ### Proces publikacji (zweryfikowany i naprawiony w tej sesji)
 
@@ -139,3 +176,13 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
   Pulpicie. Potwierdzono, że wbudowany mechanizm auto-aktualizacji (IndexedDB +
   `version.json`) już realizuje wymaganie "każdy build aktualizuje się sam bez
   ponownego pobierania" — działał od zawsze, tylko wskazywał martwy adres.
+- **2026-07-09 (sesja 5)**: Dodano auto-pull w tle (build 16). Naprawiono
+  `.gitignore` blokujący `docs/DayMenu.apk` (link do APK dawał 404 mimo poprawnego
+  `DM_UPDATE_URL`). Usunięto zakładkę Obsidian i całą jej integrację (main.js/
+  preload.js), przepisano logowanie w Koncie na prawdziwy Supabase Auth
+  email+hasło (zamiast `nazwa@daymenu.local`) z potwierdzeniem mailowym i resetem
+  hasła — przetestowane end-to-end, opublikowano build 17. `signup-username` zostaje
+  wdrożona ale nieużywana. Nieukończone: konfiguracja Site URL/Redirect URLs w
+  Supabase Auth (wymaga dashboardu, poza zasięgiem MCP) oraz opcjonalny rebuild
+  `dist/` (main.js się zmienił, ale to nie wpływa na już zainstalowaną paczkę —
+  auto-update dotyczy tylko `DayMenu.html`).
