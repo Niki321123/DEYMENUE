@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session, Menu, Tray, ipcMain, dialog } = require("electron");
+const { app, BrowserWindow, session, Menu, Tray } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
@@ -35,8 +35,7 @@ function createWindow() {
     title: "Day Menu",
     icon: path.join(__dirname, "build", "icon-256.png"),
     webPreferences: {
-      spellcheck: false,
-      preload: path.join(__dirname, "preload.js")
+      spellcheck: false
     }
   });
 
@@ -60,28 +59,10 @@ function createTray() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "Pokaż Day Menu", click: () => { win.show(); win.focus(); } },
     { type: "separator" },
-    { label: "Zamknij", click: () => {
-        if (win) win.webContents.send("app-quitting");
-        setTimeout(() => { app.isQuiting = true; app.quit(); }, 700);
-      } }
+    { label: "Zamknij", click: () => { app.isQuiting = true; app.quit(); } }
   ]));
   tray.on("double-click", () => { win.show(); win.focus(); });
 }
-
-ipcMain.handle("choose-folder", async () => {
-  const r = await dialog.showOpenDialog(win, {
-    properties: ["openDirectory"],
-    title: "Wybierz folder vaulta Obsidian"
-  });
-  return r.canceled ? null : r.filePaths[0];
-});
-
-ipcMain.handle("write-file", async (e, dir, name, content) => {
-  if (!dir || !fs.existsSync(dir)) throw new Error("Folder nie istnieje: " + dir);
-  const safe = String(name).replace(/[\\/:*?"<>|]/g, "-");
-  fs.writeFileSync(path.join(dir, safe), content, "utf8");
-  return true;
-});
 
 app.whenReady().then(() => { createWindow(); createTray(); });
 app.on("window-all-closed", () => {}); // program żyje w zasobniku

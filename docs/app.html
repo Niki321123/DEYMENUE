@@ -235,7 +235,6 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   </div>
   <div class="nav-group"><h3>Ustawienia</h3>
     <button class="nav-btn" data-view="look">Wygląd</button>
-    <button class="nav-btn" data-view="obsidian">Obsidian</button>
     <button class="nav-btn" data-view="account">Konto</button>
   </div>
   <div class="side-footer">
@@ -518,38 +517,6 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   <div id="accBox"></div>
 </section>
 
-<!-- ============ OBSIDIAN ============ -->
-<section class="view" id="view-obsidian">
-  <h1>Obsidian — notatki dnia</h1>
-  <p class="sub">Z każdego dnia powstaje notatka Markdown: nastrój, sen, nawyki, nauka i cele — gotowa do Twojego vaulta. Pomaga to uporządkować projekty i pamięć o tym, co się działo.</p>
-  <div class="card" id="obsSupport" hidden>
-    <strong>Ta przeglądarka nie obsługuje zapisu bezpośrednio do folderu.</strong>
-    <p class="muted">Zapis prosto do vaulta działa w Chrome i Edge. W innych przeglądarkach notatki będą pobierane jako pliki .md, które możesz przenieść do vaulta ręcznie.</p>
-  </div>
-  <div class="card">
-    <h2>Połączenie z vaultem</h2>
-    <p id="obsStatus" style="margin-bottom:var(--sp-3)"></p>
-    <button class="btn" id="obsConnect">Wybierz folder vaulta</button>
-  </div>
-  <div class="card">
-    <h2>Generowanie notatek</h2>
-    <div class="row">
-      <input type="date" id="obsDate" style="width:170px">
-      <button class="btn" id="obsGen">Zapisz notatkę dnia</button>
-      <button class="btn ghost" id="obsGenAll">Zapisz wszystkie dni</button>
-      <button class="btn ghost" id="obsPreview">Podgląd</button>
-    </div>
-    <textarea id="obsPreviewBox" readonly style="margin-top:var(--sp-3);min-height:240px;font-family:Consolas,monospace;font-size:13px" hidden></textarea>
-  </div>
-  <div class="card">
-    <h2>Automatyzacja</h2>
-    <p class="muted" style="margin-bottom:var(--sp-2)" id="autoHint" hidden>Na telefonie automatyczny zapis do vaulta nie jest dostępny — używaj przycisków powyżej i pobieraj pliki .md.</p>
-    <label class="row" style="cursor:pointer;margin-bottom:var(--sp-2)"><input type="checkbox" id="autoNoteChk" style="width:18px;height:18px;min-height:0;flex:none"> Automatycznie zapisuj notatkę dnia (co 5 minut i przy zamykaniu programu)</label>
-    <label class="row" style="cursor:pointer"><input type="checkbox" id="autoBackupChk" style="width:18px;height:18px;min-height:0;flex:none"> Cotygodniowa kopia zapasowa wszystkich danych do vaulta (plik JSON)</label>
-    <p class="muted" id="backupStatus" style="margin-top:var(--sp-2)"></p>
-  </div>
-</section>
-
 </main>
 <div class="toast" id="toast"></div>
 
@@ -559,7 +526,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=16;
+const DM_BUILD=17;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -617,7 +584,7 @@ const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 "use strict";
 /* ================= DATA ================= */
 const KEY="daymenu_v1";
-const defaults={theme:"light",moods:[],goals:[],books:[],timelog:[],sleep:[],appearance:null,habits:[],vaultPath:null,autoNote:true,autoBackup:true,lastBackup:null,account:null,lastCloudSync:null,matura:{grid:{},topics:[],plan:[],sessions:[],pomo:{work:25,break:5},prefs:""}};
+const defaults={theme:"light",moods:[],goals:[],books:[],timelog:[],sleep:[],appearance:null,habits:[],account:null,lastCloudSync:null,matura:{grid:{},topics:[],plan:[],sessions:[],pomo:{work:25,break:5},prefs:""}};
 let S=load();
 function load(){try{const d=JSON.parse(localStorage.getItem(KEY));return Object.assign({},defaults,d||{})}catch(e){return {...defaults}}}
 function save(){localStorage.setItem(KEY,JSON.stringify(S));cloudQueuePush()}
@@ -679,7 +646,7 @@ $("#themeBtn").onclick=()=>{
 applyTheme();loadBg();
 
 /* ================= NAV ================= */
-const renderers={dash:renderDash,mood:renderMood,goals:renderGoals,books:renderBooks,time:renderTime,sleep:renderSleep,look:renderLook,obsidian:renderObsidian,habits:renderHabits,account:renderAccount,matura:renderMatura};
+const renderers={dash:renderDash,mood:renderMood,goals:renderGoals,books:renderBooks,time:renderTime,sleep:renderSleep,look:renderLook,habits:renderHabits,account:renderAccount,matura:renderMatura};
 $$(".nav-btn").forEach(b=>b.onclick=()=>show(b.dataset.view));
 function show(v){
   $$(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
@@ -1451,6 +1418,40 @@ async function sbAuth(path,body){
   if(!r.ok)throw new Error(j.msg||j.error_description||j.message||("Błąd ("+r.status+")"));
   return j;
 }
+const EMAIL_RE=/^\S+@\S+\.\S+$/;
+async function sbSignup(email,password){
+  const r=await fetch(SB_URL+"/auth/v1/signup",{method:"POST",headers:{apikey:SB_KEY,"Content-Type":"application/json"},body:JSON.stringify({email,password})});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(j.msg||j.error_description||j.message||("Błąd ("+r.status+")"));
+  return j; // {user, session} — session=null jeśli wymagane jest potwierdzenie e-maila
+}
+async function sbRecover(email){
+  const r=await fetch(SB_URL+"/auth/v1/recover",{method:"POST",headers:{apikey:SB_KEY,"Content-Type":"application/json"},body:JSON.stringify({email})});
+  if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.msg||j.error_description||("Błąd ("+r.status+")"))}
+}
+async function sbSetNewPassword(token,password){
+  const r=await fetch(SB_URL+"/auth/v1/user",{method:"PUT",headers:{apikey:SB_KEY,Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({password})});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(j.msg||j.error_description||("Błąd ("+r.status+")"));
+  return j;
+}
+/* link z e-maila (potwierdzenie konta / reset hasła) wraca z tokenami we fragmencie URL */
+let recoveryToken=null,pendingAccountView=false;
+(function(){
+  if(!location.hash)return;
+  const p=new URLSearchParams(location.hash.replace(/^#/,""));
+  const type=p.get("type"),at=p.get("access_token"),rt=p.get("refresh_token");
+  if(!at)return;
+  if(type==="recovery"){recoveryToken=at;pendingAccountView=true;}
+  else if(type==="signup"||type==="magiclink"){
+    sbSaveSession({access_token:at,refresh_token:rt,user:null});
+    pendingAccountView=true;
+    fetch(SB_URL+"/auth/v1/user",{headers:{apikey:SB_KEY,Authorization:"Bearer "+at}})
+      .then(r=>r.json()).then(u=>{if(sbSession){sbSession.user=u;sbSaveSession(sbSession);}renderAccount();})
+      .catch(()=>{});
+  }
+  history.replaceState(null,"",location.pathname+location.search);
+})();
 async function sbToken(){
   if(!sbSession)return null;
   if(sbSession.expires_at&&sbSession.expires_at*1000>Date.now()+60000)return sbSession.access_token;
@@ -1497,19 +1498,23 @@ async function cloudPull(){
   return rows&&rows.length?rows[0]:null;
 }
 function applyCloud(row,goAccount){
-  const keepVault=S.vaultPath;
   S=Object.assign({},defaults,row.data||{});
-  S.vaultPath=keepVault;
   S.lastCloudSync=row.updated_at;
   localStorage.setItem(KEY,JSON.stringify(S));
   applyTheme();renderDash();
   if(goAccount)show("account");
 }
 function cloudCard(){
+  if(recoveryToken)return `<div class="card"><h2>Ustaw nowe hasło</h2>
+    <p class="muted" style="margin-bottom:var(--sp-3)">Kliknięto link resetu hasła z e-maila. Wpisz nowe hasło do konta.</p>
+    <div class="field"><label class="fld">Nowe hasło (min. 6 znaków)</label><input type="password" id="sbNewPass" autocomplete="new-password"></div>
+    <div class="row" style="margin-top:var(--sp-3)"><button class="btn" id="sbSetPass">Ustaw hasło</button></div>
+    <p class="muted" id="sbMsg" style="margin-top:var(--sp-2)"></p>
+  </div>`;
   if(!sbSession)return `<div class="card"><h2>Konto w chmurze — wspólne dane na PC i telefonie</h2>
     <p class="muted" style="margin-bottom:var(--sp-3)">Zaloguj się tym samym kontem na komputerze i telefonie, a wszystkie dane (nastroje, dziennik, fiszki, nawyki…) będą się synchronizować automatycznie. Nagrania i zdjęcie tła pozostają lokalne na każdym urządzeniu.</p>
     <div class="row">
-      <div class="field"><label class="fld">Nazwa użytkownika</label><input type="text" id="sbUser" autocomplete="username" maxlength="20"></div>
+      <div class="field"><label class="fld">E-mail</label><input type="email" id="sbEmail" autocomplete="email"></div>
       <div class="field"><label class="fld">Hasło (min. 6 znaków)</label><input type="password" id="sbPass" autocomplete="current-password"></div>
     </div>
     <div class="row" style="margin-top:var(--sp-3)">
@@ -1517,9 +1522,10 @@ function cloudCard(){
       <button class="btn ghost" id="sbSignup">Załóż konto</button>
     </div>
     <p class="muted" id="sbMsg" style="margin-top:var(--sp-2)"></p>
+    <p class="muted" style="margin-top:var(--sp-2)"><a href="#" id="sbForgot">Zapomniałeś hasła?</a></p>
   </div>`;
   return `<div class="card"><h2>Konto w chmurze</h2>
-    <div class="row"><span class="badge b-good">Zalogowano</span><strong>${esc((sbSession.user&&sbSession.user.email||"").replace(/@.*$/,""))}</strong></div>
+    <div class="row"><span class="badge b-good">Zalogowano</span><strong>${esc(sbSession.user&&sbSession.user.email||"")}</strong></div>
     <p class="muted" id="sbStatus" style="margin:var(--sp-2) 0">${S.lastCloudSync?"Ostatnia synchronizacja: "+new Date(S.lastCloudSync).toLocaleString("pl-PL"):"Jeszcze nie synchronizowano."}</p>
     <div class="row">
       <button class="btn" id="sbSync">Synchronizuj teraz</button>
@@ -1530,10 +1536,31 @@ function cloudCard(){
   </div>`;
 }
 function wireCloud(){
+  if(recoveryToken){
+    $("#sbSetPass").onclick=async()=>{
+      const pass=$("#sbNewPass").value,msg=$("#sbMsg");
+      if(pass.length<6)return msg.textContent="Hasło musi mieć min. 6 znaków.";
+      msg.textContent="Ustawianie hasła…";
+      try{
+        await sbSetNewPassword(recoveryToken,pass);
+        recoveryToken=null;
+        renderAccount();toast("Hasło zmienione — zaloguj się nowym hasłem");
+      }catch(e){msg.textContent=e.message||"Błąd — spróbuj ponownie"}
+    };
+    return;
+  }
   if(!sbSession){
     $("#sbLogin").onclick=()=>sbDoAuth(false);
     $("#sbSignup").onclick=()=>sbDoAuth(true);
     $("#sbPass").onkeydown=e=>{if(e.key==="Enter")sbDoAuth(false)};
+    $("#sbForgot").onclick=async(e)=>{
+      e.preventDefault();
+      const email=$("#sbEmail").value.trim(),msg=$("#sbMsg");
+      if(!EMAIL_RE.test(email))return msg.textContent="Wpisz najpierw poprawny adres e-mail powyżej.";
+      msg.textContent="Wysyłanie…";
+      try{await sbRecover(email);msg.textContent="Wysłano e-mail z linkiem do resetu hasła."}
+      catch(e2){msg.textContent=e2.message||"Błąd wysyłania"}
+    };
   }else{
     $("#sbSync").onclick=async()=>{await cloudPush(true);renderAccount()};
     $("#sbPull").onclick=async()=>{
@@ -1551,23 +1578,18 @@ function wireCloud(){
   }
 }
 async function sbDoAuth(signup){
-  const name=$("#sbUser").value.trim().toLowerCase(),pass=$("#sbPass").value,msg=$("#sbMsg");
-  if(!/^[a-z0-9_-]{3,20}$/.test(name))return msg.textContent="Nazwa: 3–20 znaków (litery, cyfry, _ lub -), bez polskich znaków i spacji.";
+  const email=$("#sbEmail").value.trim(),pass=$("#sbPass").value,msg=$("#sbMsg");
+  if(!EMAIL_RE.test(email))return msg.textContent="Wpisz poprawny adres e-mail.";
   if(pass.length<6)return msg.textContent="Hasło musi mieć min. 6 znaków.";
-  const email=name+"@daymenu.local";
   msg.textContent=signup?"Zakładanie konta…":"Logowanie…";
   try{
     if(signup){
-      const r=await fetch(SB_URL+"/functions/v1/signup-username",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:name,password:pass})});
-      const jr=await r.json().catch(()=>({}));
-      if(!r.ok){
-        msg.textContent=jr.error==="taken"?"Ta nazwa jest już zajęta — zaloguj się lub wybierz inną."
-          :jr.error==="invalid_username"?"Nazwa: 3–20 znaków (litery, cyfry, _ lub -)."
-          :"Błąd zakładania konta — spróbuj ponownie.";
-        return;
+      const r=await sbSignup(email,pass);
+      if(r.session){
+        sbSaveSession(r.session);await firstSync();startCloudPolling();renderAccount();toast("Konto utworzone — zalogowano");
+      }else{
+        msg.textContent="Konto utworzone — sprawdź e-mail i kliknij link potwierdzający, zanim się zalogujesz.";
       }
-      const j=await sbAuth("token?grant_type=password",{email,password:pass});
-      sbSaveSession(j);await firstSync();startCloudPolling();renderAccount();toast("Konto utworzone — zalogowano");
     }else{
       const j=await sbAuth("token?grant_type=password",{email,password:pass});
       sbSaveSession(j);
@@ -1576,8 +1598,9 @@ async function sbDoAuth(signup){
       renderAccount();toast("Zalogowano do chmury");
     }
   }catch(e){
-    msg.textContent=/invalid login credentials/i.test(e.message)?"Błędna nazwa użytkownika lub hasło."
-      :/already registered/i.test(e.message)?"Ta nazwa jest już zajęta — zaloguj się lub wybierz inną."
+    msg.textContent=/invalid login credentials/i.test(e.message)?"Błędny e-mail lub hasło."
+      :/already registered|already been registered/i.test(e.message)?"Konto z tym e-mailem już istnieje — zaloguj się."
+      :/email not confirmed/i.test(e.message)?"Potwierdź adres e-mail (sprawdź skrzynkę), zanim się zalogujesz."
       :(e.message||"Błąd połączenia");
   }
 }
@@ -1739,8 +1762,6 @@ $("#bgRemove").onclick=async()=>{
 $("#bgOverlay").oninput=()=>{S.appearance.bgOverlay=+$("#bgOverlay").value;$("#ovVal").textContent=$("#bgOverlay").value+"%";save();applyTheme()};
 $("#bgBlur").oninput=()=>{S.appearance.bgBlur=+$("#bgBlur").value;$("#blVal").textContent=$("#bgBlur").value+" px";save();applyTheme()};
 
-/* ================= OBSIDIAN ================= */
-let obsDir=null;
 function allDates(){
   const set=new Set();
   S.moods.forEach(x=>set.add(x.date));S.sleep.forEach(x=>set.add(x.date));
@@ -1749,141 +1770,11 @@ function allDates(){
   S.habits.forEach(h=>Object.keys(h.days).forEach(d=>set.add(d)));
   return [...set].sort();
 }
-async function buildNote(ds){
-  const L=["---","date: "+ds,"tags:","  - day-menu","---","",`# Day Menu — ${ds}`,""];
-  const m=S.moods.find(x=>x.date===ds);
-  if(m)L.push("## Nastrój",`- ${MOODS[m.mood]}${m.note?" — "+m.note:""}`,"");
-  const sl=S.sleep.find(x=>x.date===ds);
-  if(sl)L.push("## Sen",`- ${sl.bed}–${sl.wake} (${fmtMin(sleepMin(sl))}), jakość ${sl.quality}/5${sl.note?" — "+sl.note:""}`,"");
-  if(S.habits.length){
-    const hl=S.habits.filter(h=>Object.keys(h.days).length||ds===today());
-    if(hl.length)L.push("## Nawyki",...hl.map(h=>`- [${h.days[ds]?"x":" "}] ${h.name}`),"");
-  }
-  const matS=S.matura.sessions.filter(s=>s.date===ds);
-  if(matS.length)L.push("## Nauka",...matS.map(s=>{const t=S.matura.topics.find(x=>x.id===s.topicId);return `- ${t?t.name:"(usunięty temat)"}: ${fmtMin(s.minutes)}`}),"");
-  if(ds===today()&&S.goals.length)
-    L.push("## Cele — stan na dziś",...S.goals.map(g=>{const d=g.steps.filter(s=>s.done).length;return `- ${g.title} — ${d}/${g.steps.length} kroków`}),"");
-  if(ds===today()){
-    const reading=S.books.filter(b=>b.status==="reading");
-    if(reading.length)L.push("## Czytam",...reading.map(b=>`- ${b.title}${b.author?" — "+b.author:""}`),"");
-  }
-  return L.join("\n");
-}
-async function ensureObsDir(){
-  if(!obsDir)obsDir=await idbGet("misc","obsDir").catch(()=>null);
-  return obsDir;
-}
-async function ensurePerm(){
-  if(!obsDir)return false;
-  try{
-    if(await obsDir.queryPermission({mode:"readwrite"})==="granted")return true;
-    return (await obsDir.requestPermission({mode:"readwrite"}))==="granted";
-  }catch(e){return false}
-}
-async function writeNote(name,content){
-  const fh=await obsDir.getFileHandle(name,{create:true});
-  const w=await fh.createWritable();await w.write(content);await w.close();
-}
-function downloadText(name,content){
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([content],{type:"text/markdown"}));
-  a.download=name;a.click();URL.revokeObjectURL(a.href);
-}
-const isDesktop=!!window.dayMenuAPI;
-async function vaultOk(){
-  if(isDesktop)return !!S.vaultPath;
-  return !!(await ensureObsDir());
-}
-async function vaultWrite(name,content){
-  if(isDesktop){
-    if(!S.vaultPath)throw new Error("brak folderu");
-    return window.dayMenuAPI.writeFile(S.vaultPath,name,content);
-  }
-  if(!(await ensureObsDir())||!(await ensurePerm()))throw new Error("brak uprawnień");
-  return writeNote(name,content);
-}
-async function renderObsidian(){
-  if(!isDesktop)await ensureObsDir();
-  $("#obsSupport").hidden=isDesktop||"showDirectoryPicker" in window;
-  const where=isDesktop?S.vaultPath:(obsDir&&obsDir.name);
-  $("#obsStatus").innerHTML=where
-    ?`Połączono z folderem: <strong>${esc(where)}</strong>. Notatki zapisują się jako „Day Menu RRRR-MM-DD.md”.`
-    :"Nie wybrano folderu — notatki będą pobierane jako pliki .md do przeniesienia ręcznie.";
-  if(!$("#obsDate").value)$("#obsDate").value=today();
-  $("#autoNoteChk").checked=!!S.autoNote;
-  $("#autoBackupChk").checked=!!S.autoBackup;
-  $("#autoHint").hidden=isDesktop||"showDirectoryPicker" in window;
-  $("#backupStatus").textContent=S.lastBackup
-    ?`Ostatnia kopia zapasowa: ${S.lastBackup}.`
-    :"Kopia zapasowa nie była jeszcze wykonana.";
-}
-$("#autoNoteChk").onchange=()=>{S.autoNote=$("#autoNoteChk").checked;save()};
-$("#autoBackupChk").onchange=()=>{S.autoBackup=$("#autoBackupChk").checked;save()};
-$("#obsConnect").onclick=async()=>{
-  if(isDesktop){
-    const p=await window.dayMenuAPI.chooseFolder();
-    if(p){S.vaultPath=p;save();renderObsidian();toast("Folder vaulta połączony")}
-    return;
-  }
-  if(!("showDirectoryPicker" in window))return toast("Ta przeglądarka nie obsługuje wyboru folderu");
-  try{
-    obsDir=await showDirectoryPicker({mode:"readwrite"});
-    await idbPut("misc",obsDir,"obsDir");
-    renderObsidian();toast("Folder vaulta połączony");
-  }catch(e){}
-};
-$("#obsGen").onclick=async()=>{
-  const ds=$("#obsDate").value||today();
-  const md=await buildNote(ds);
-  try{await vaultWrite(`Day Menu ${ds}.md`,md);toast("Notatka zapisana w vaulcie")}
-  catch(e){downloadText(`Day Menu ${ds}.md`,md);toast("Pobrano plik .md — wskaż folder vaulta, aby zapisywać bezpośrednio")}
-};
-$("#obsGenAll").onclick=async()=>{
-  const dates=allDates();
-  if(!dates.length)return toast("Brak danych do wyeksportowania");
-  if(await vaultOk()){
-    let n=0;
-    try{for(const ds of dates){await vaultWrite(`Day Menu ${ds}.md`,await buildNote(ds));n++;}}catch(e){}
-    toast(`Zapisano ${n} notatek w vaulcie`);
-  }else{
-    for(const ds of dates)downloadText(`Day Menu ${ds}.md`,await buildNote(ds));
-  }
-};
-$("#obsPreview").onclick=async()=>{
-  const box=$("#obsPreviewBox");
-  box.hidden=false;box.value=await buildNote($("#obsDate").value||today());
-};
-/* automatyczna notatka dnia + kopia zapasowa */
-let _noteCache=null;
-async function autoNoteTick(){
-  if(!S.autoNote)return;
-  if(!(await vaultOk()))return;
-  const ds=today();
-  try{
-    _noteCache=await buildNote(ds);
-    await vaultWrite(`Day Menu ${ds}.md`,_noteCache);
-  }catch(e){}
-}
-setInterval(autoNoteTick,5*60*1000);
-setTimeout(autoNoteTick,15000);
-setTimeout(async()=>{
-  if(!S.autoBackup)return;
-  if(!(await vaultOk()))return;
-  if(S.lastBackup&&(Date.now()-new Date(S.lastBackup))/(864e5)<7)return;
-  try{
-    await vaultWrite("Day Menu - kopia danych.json",JSON.stringify(S,null,1));
-    S.lastBackup=today();save();
-    if($("#view-obsidian").classList.contains("active"))renderObsidian();
-  }catch(e){}
-},8000);
-if(isDesktop&&window.dayMenuAPI.onQuit)window.dayMenuAPI.onQuit(()=>{
-  save();
-  if(S.autoNote&&S.vaultPath&&_noteCache)window.dayMenuAPI.writeFile(S.vaultPath,`Day Menu ${today()}.md`,_noteCache);
-});
 
 /* init */
 renderDash();
 showLogin();
+if(pendingAccountView)show("account");
 </script>
 </body>
 </html>
