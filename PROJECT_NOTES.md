@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-07-09 (sesja 4)_
+_Ostatnia aktualizacja: 2026-07-09 (sesja 6)_
 
 ## Czym jest projekt
 
@@ -130,6 +130,26 @@ sprzed tej sesji, już nieużywany przez apkę, można zignorować/skasować.
       na jednorazowym koncie (`@mailinator.com`): signup→session:null (wymaga
       potwierdzenia), login przed potwierdzeniem poprawnie odrzucony, recover→200.
       Konto testowe skasowane.
+- [x] **Przebudowano zakładkę „Nauka" (sesja 6, tylko `DayMenu.html` — źródło):**
+      - usunięto starą siatkę „wolnych godzin" i zakładkę „Tematy" (priorytet 1-3 +
+        opanowanie/mastery)
+      - **Harmonogram**: siatka tygodnia z 3 pędzlami — Dostępny / W szkole /
+        Niedostępny; malowanie pojedynczej komórki, całego dnia (klik nagłówka) lub
+        całego wiersza (klik godziny). Stan w `S.matura.grid[d_h]="avail"|"school"`,
+        brak klucza = niedostępny. Godziny „W szkole" blokują naukę (AI wie, że uczyć
+        się można dopiero po szkole)
+      - **Przedmioty** (zamiast Tematów): nazwa + priorytet w procentach; plan dzieli
+        czas proporcjonalnie (80/20 → 4× więcej). `S.matura.topics=[{id,name,percent}]`
+      - **Plan** jako lista pogrupowana po dniach z checkboxami „zrobione" +
+        pasek postępu; odhaczenia trzymane per tydzień (`block.doneWeek=weekId()`),
+        resetują się automatycznie z nowym tygodniem; odhaczenie tworzy sesję 60 min
+        (statystyki/streak/pulpit), odznaczenie ją usuwa
+      - **Pomodoro zostaje** — startowane przyciskiem ▶ przy pozycji planu; ukończenie
+        pracy odhacza daną godzinę i loguje wpis w Analizie czasu
+      - Czat AI może teraz zmieniać też harmonogram (zwraca `grid` + nowy `blocks`)
+      - migracja starych danych w `matMigrate()` (grid bool→"avail",
+        priorytet/mastery→percent). **Do zrobienia przez użytkownika:** `npm run publish`
+        (podbije build, zbuduje APK, skopiuje do `docs/`/`android-app`)
 - [ ] Użytkownik: założyć jedno konto (prawdziwym e-mailem) w zakładce „Konto" (po
       aktualizacji apki do build 17 na obu urządzeniach), potwierdzić mailem, zalogować
       się na PC i telefonie
@@ -187,6 +207,14 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
   Pulpicie. Potwierdzono, że wbudowany mechanizm auto-aktualizacji (IndexedDB +
   `version.json`) już realizuje wymaganie "każdy build aktualizuje się sam bez
   ponownego pobierania" — działał od zawsze, tylko wskazywał martwy adres.
+- **2026-07-09 (sesja 6)**: Przebudowano zakładkę „Nauka" na życzenie użytkownika —
+  usunięto siatkę wolnych godzin i zakładkę Tematy; dodano Harmonogram z 3 stanami
+  (Dostępny / W szkole / Niedostępny, malowanie komórki/dnia/wiersza), Przedmioty z
+  priorytetem procentowym (proporcjonalny podział czasu), plan jako listę z
+  odhaczaniem zrobionych godzin (reset co tydzień). Pomodoro zachowane (start ▶ przy
+  pozycji planu, ukończenie odhacza godzinę). Czat AI może zmieniać też harmonogram.
+  Zmiany tylko w `DayMenu.html` (źródło) — czeka `npm run publish`. Składnia JS
+  zweryfikowana (oba bloki `<script>` parsują się bez błędów).
 - **2026-07-09 (sesja 5)**: Dodano auto-pull w tle (build 16). Naprawiono
   `.gitignore` blokujący `docs/DayMenu.apk` (link do APK dawał 404 mimo poprawnego
   `DM_UPDATE_URL`). Usunięto zakładkę Obsidian i całą jej integrację (main.js/
