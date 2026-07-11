@@ -185,7 +185,8 @@ sprzed tej sesji, już nieużywany przez apkę, można zignorować/skasować.
            `librus-timetable` → Secrets (albo `supabase secrets set`):
            `LIBRUS_LOGIN`, `LIBRUS_PASSWORD` (dane do Librusa), `LIBRUS_USER_ID`
            (UUID własnego konta z auth.users — to do niego trafią powiadomienia),
-           `LIBRUS_CRON_KEY` = `6LR_-_95OfVC3IOGj6rsecKJLIZaXhex` (ten sam, co w Vault).
+           `LIBRUS_CRON_KEY` = (wartość ustawiona ręcznie, ta sama co w Vault `librus_cron_key`;
+           NIE zapisujemy jej w repo — patrz uwaga o sekretach niżej).
            Dopóki nie ustawione, funkcja zwraca 503/`missing_secrets` i nic nie robi.
         2. `npm run publish` — żeby zmiana w `DayMenu.html` (odbiór powiadomień) trafiła
            do `docs/app.html` i wersji Android.
@@ -243,10 +244,13 @@ sprzed tej sesji, już nieużywany przez apkę, można zignorować/skasować.
         funkcję z JWT. `librusSyncSchedule` czyta teraz własny snapshot (bez `id=eq.default`).
         Zweryfikowane w przeglądarce (render karty + formularz).
       - **DO ZROBIENIA PRZEZ UŻYTKOWNIKA:**
-        1. Ustawić sekret Edge Function `LIBRUS_ENC_KEY` = `qZTwstSPgaKOm4Xcrz4QGGDg2oh6zil3Gd6qiUQpYJE=`
-           (klucz AES-256, base64). Zostaje też `LIBRUS_CRON_KEY`. Sekrety
+        1. Ustawić sekret Edge Function `LIBRUS_ENC_KEY` (klucz AES-256, base64 32B —
+           wygeneruj: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`;
+           przekaż wartość poza repo). Zostaje też `LIBRUS_CRON_KEY`. Sekrety
            `LIBRUS_LOGIN/PASSWORD/USER_ID` są już nieużywane — można usunąć.
            Bez `LIBRUS_ENC_KEY` funkcja zwraca 503/`not_configured`.
+           ⚠ NIGDY nie wpisuj wartości kluczy do tego pliku ani żadnego śledzonego przez
+           git — `publish.js` robi `git add -A` i wypchnie je do publicznego repo.
         2. `npm run publish`.
       - Każdy znajomy: zakłada konto w chmurze (zakładka Konto), potem w tej samej zakładce
         „Połącz z Librusem" wpisuje swój login/hasło Synergii. Reszta (harmonogram,
