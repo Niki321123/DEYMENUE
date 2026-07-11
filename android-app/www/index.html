@@ -381,7 +381,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
         <span><i style="background:var(--surface-2);border:1px solid var(--border)"></i>Niedostępny</span>
       </div>
     </div>
-    <div class="card">
+    <div class="card" id="matChatCard" data-ai-only hidden>
       <h2>Czat z AI — zmiany w planie</h2>
       <p class="muted" style="margin-bottom:var(--sp-3)">Napisz np. „w środy mam trening 17–19, oznacz jako niedostępne i przełóż naukę” — AI zaktualizuje harmonogram i plan. Wymaga zalogowania do konta w chmurze.</p>
       <div class="chat-log" id="matChatLog"></div>
@@ -548,7 +548,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=25;
+const DM_BUILD=26;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1025,6 +1025,7 @@ function matGeneratePlan(){
 }
 /* ---- AI (Haiku 4.5 przez funkcję serwerową — klucz nie opuszcza serwera) ---- */
 async function aiCall(system,messages,maxTokens){
+  if(!aiAccess)throw new Error("NO_AI_ACCESS"); // zwykła wersja nie ma dostępu do AI
   const tok=await sbToken();
   if(!tok)throw new Error("NOLOGIN");
   const r=await fetch(SB_URL+"/functions/v1/daymenu-ai",{
@@ -1077,19 +1078,28 @@ $("#matGen").onclick=async()=>{
   // Najpierw odśwież szkielet tygodnia z Librusa (bez AI), potem AI układa naukę.
   try{await librusSyncSchedule(false)}catch(e){}
   if(!matFreeSlots().length){$("#matPlanHint").textContent="Brak godzin „Dostępny” w harmonogramie (po godzinach szkolnych). Sprawdź plan lekcji lub pomaluj wolne godziny.";$("#matGen").disabled=false;return}
-  $("#matPlanHint").textContent="AI układa plan…";
   try{
-    const blocks=await aiPlan(S.matura.prefs);
-    S.matura.plan=blocks;save();
-    $("#matPlanHint").textContent=`AI ułożyło ${blocks.length} godzin nauki — pojawiły się w zielonych okienkach. Kliknij okienko, aby odhaczyć zrobioną godzinę.`;
-    renderMatSched();toast("Plan wygenerowany przez AI ✓");
-  }catch(e){
-    const{blocks,msg}=matGeneratePlan();
-    S.matura.plan=blocks;save();
-    $("#matPlanHint").textContent=msg+(e.message==="NOLOGIN"
-      ?" (Zaloguj się do konta w chmurze, aby plan układało AI — użyto planera lokalnego.)"
-      :" (AI niedostępne — użyto planera lokalnego.)");
-    renderMatSched();toast(blocks.length?"Plan wygenerowany ✓":"Nie udało się wygenerować planu");
+    if(aiAccess){
+      // wersja z AI
+      $("#matPlanHint").textContent="AI układa plan…";
+      try{
+        const blocks=await aiPlan(S.matura.prefs);
+        S.matura.plan=blocks;save();
+        $("#matPlanHint").textContent=`AI ułożyło ${blocks.length} godzin nauki — pojawiły się w zielonych okienkach. Kliknij okienko, aby odhaczyć zrobioną godzinę.`;
+        renderMatSched();toast("Plan wygenerowany przez AI ✓");
+      }catch(e){
+        const{blocks,msg}=matGeneratePlan();
+        S.matura.plan=blocks;save();
+        $("#matPlanHint").textContent=msg+" (AI chwilowo niedostępne — użyto planera lokalnego.)";
+        renderMatSched();toast(blocks.length?"Plan wygenerowany ✓":"Nie udało się wygenerować planu");
+      }
+    }else{
+      // wersja bez AI — planer lokalny (proporcjonalny podział czasu wg przedmiotów)
+      const{blocks,msg}=matGeneratePlan();
+      S.matura.plan=blocks;save();
+      $("#matPlanHint").textContent=msg;
+      renderMatSched();toast(blocks.length?"Plan wygenerowany ✓":"Nie udało się wygenerować planu");
+    }
   }finally{$("#matGen").disabled=false}
 };
 
@@ -1129,6 +1139,8 @@ $("#matChatSend").onclick=async()=>{
   }catch(e){
     matChat[matChat.length-1]={role:"ai",text:e.message==="NOLOGIN"
       ?"Zaloguj się do konta w chmurze (zakładka Konto), aby korzystać z czatu AI."
+      :e.message==="NO_AI_ACCESS"
+      ?"Ta wersja aplikacji nie ma dostępu do AI."
       :"Błąd AI: "+e.message};
   }finally{$("#matChatSend").disabled=false}
   matChatRender();
@@ -1794,16 +1806,41 @@ async function cloudAutoPull(){
     }
   }catch(e){}
 }
+/* ---- dostęp do AI (allowlista maili w tabeli ai_access, egzekwowana też w funkcji
+   serwerowej daymenu-ai) — wersja bez dostępu nie widzi funkcji AI i nie może ich wołać.
+   Nowe funkcje AI: oznacz element atrybutem data-ai-only (auto-ukrywanie) i wołaj przez
+   aiCall() (auto-blokada klienta + serwera). ---- */
+let aiAccess=false;
+function applyAiGating(){
+  document.querySelectorAll("[data-ai-only]").forEach(el=>{el.hidden=!aiAccess});
+}
+async function checkAiAccess(){
+  aiAccess=false;
+  if(sbSession){
+    try{
+      const tok=await sbToken();
+      if(tok){
+        // RLS zwraca tylko własny wiersz (mail z JWT) — jest = ma dostęp
+        const r=await fetch(`${SB_URL}/rest/v1/ai_access?select=email`,{headers:{apikey:SB_KEY,Authorization:"Bearer "+tok}});
+        if(r.ok){const rows=await r.json();aiAccess=Array.isArray(rows)&&rows.length>0;}
+      }
+    }catch(e){}
+  }
+  applyAiGating();
+}
 function startCloudPolling(){
   if(cloudPollTimer)return;
   cloudPollTimer=setInterval(cloudAutoPull,15000);
   startLibrusPolling();librusPollEvents();
+  checkAiAccess();
 }
 function stopCloudPolling(){
   clearInterval(cloudPollTimer);cloudPollTimer=null;
   stopLibrusPolling();
+  aiAccess=false;applyAiGating();
 }
 setTimeout(cloudAutoPull,2500);
+applyAiGating();               // domyślnie (przed potwierdzeniem dostępu) AI ukryte
 if(sbSession)startCloudPolling();
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)cloudAutoPull()});
 

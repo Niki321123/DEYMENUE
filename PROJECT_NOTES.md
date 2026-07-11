@@ -255,6 +255,29 @@ sprzed tej sesji, już nieużywany przez apkę, można zignorować/skasować.
       - Każdy znajomy: zakłada konto w chmurze (zakładka Konto), potem w tej samej zakładce
         „Połącz z Librusem" wpisuje swój login/hasło Synergii. Reszta (harmonogram,
         powiadomienia) działa jak wcześniej, ale per jego konto.
+- [x] **Dostęp do AI per użytkownik (allowlista maili, sesja 9).** Zamiast dwóch osobnych
+      apek — jedna apka, dostęp do AI kontrolowany allowlistą maili, którą zarządza admin.
+      - Tabela `ai_access(email pk, granted_at, note)`. RLS: user widzi tylko swój wiersz
+        (`lower(email)=lower(auth.jwt()->>'email')`). Wpisy dodaje/kasuje admin (service_role).
+      - **Egzekwowanie serwerowe (nie do obejścia):** funkcja `daymenu-ai` (v4) czyta mail
+        z JWT, sprawdza `ai_access`; brak → 403 `no_ai_access`. KAŻDE wywołanie AI idzie
+        przez tę funkcję (`aiCall`), więc dowolna przyszła funkcja AI jest automatycznie
+        zablokowana dla zwykłej wersji.
+      - **Klient (`DayMenu.html`):** globalny `aiAccess`, `checkAiAccess()` (pyta `ai_access`
+        o własny wiersz przez RLS) wpięty w `startCloudPolling`/`stopCloudPolling`.
+        `applyAiGating()` chowa/pokazuje wszystkie elementy `[data-ai-only]`. `aiCall()`
+        z góry rzuca `NO_AI_ACCESS` bez dostępu. Karta „Czat z AI" ma `data-ai-only`
+        (ukryta bez dostępu). „Generuj plan" bez AI używa planera lokalnego
+        (`matGeneratePlan`, proporcjonalny podział czasu) — wersja bez AI działa normalnie,
+        tylko bez czatu i bez AI-układania.
+      - **WZORZEC NA PRZYSZŁE FUNKCJE AI:** element UI → atrybut `data-ai-only`
+        (auto-ukrywanie); logika → przez `aiCall()` (auto-blokada klient+serwer). Nic
+        więcej nie trzeba, żeby zwykła wersja nie miała dostępu.
+      - **Jak nadać dostęp (robi to Claude na polecenie admina):** admin podaje mail
+        zalogowanego użytkownika → `insert into ai_access(email) values (lower('mail'));`.
+        Odebranie: `delete from ai_access where email=lower('mail');`.
+      - Zweryfikowane w przeglądarce: bez dostępu czat ukryty + `aiCall` blokuje + plan
+        lokalny działa; po nadaniu dostępu czat się pokazuje. **Wymaga `npm run publish`.**
 - [ ] Użytkownik: założyć jedno konto (prawdziwym e-mailem) w zakładce „Konto" (po
       aktualizacji apki do build 17 na obu urządzeniach), potwierdzić mailem, zalogować
       się na PC i telefonie
@@ -291,7 +314,14 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
   Nowa tabela `librus_accounts` z hasłem szyfrowanym AES-GCM w Edge Function (klucz
   `LIBRUS_ENC_KEY` tylko w env). `librus_snapshot` przerobiony na per-user. Funkcja v4
   ma tryb „connect/disconnect" (z apki, JWT usera) i „cron" (pętla po wszystkich kontach).
-  Karta „Plan lekcji z Librus Synergia" w Koncie. Do zrobienia: sekret `LIBRUS_ENC_KEY`
+  Karta „Plan lekcji z Librus Synergia" w Koncie. Dodano też **dostęp do AI per
+  użytkownik** (allowlista maili `ai_access`, egzekwowana serwerowo w `daymenu-ai` v4 +
+  gating klienta przez `data-ai-only`/`aiCall`) — zwykła wersja bez AI, dostęp nadaje
+  admin przez wpis maila. Publikacja: build 25 wypchnięty (publish.js uodporniony na
+  brak Android SDK). **Incydent: realne wartości `LIBRUS_ENC_KEY`/`LIBRUS_CRON_KEY`
+  wpisane do PROJECT_NOTES.md trafiły do publicznego repo (build 25) — klucze uznane za
+  spalone, wyczyszczone z notatek, do wymiany przez usera (zob. memory
+  publish-pushes-public-repo).** Do zrobienia: sekret `LIBRUS_ENC_KEY`
   + `npm run publish`. Wcześniej w tej sesji dopięto: okienka między lekcjami jako
   „w szkole" (nauka tylko w domu), usunięto osobny przycisk „Z Librusa" (Generuj plan
   sam pobiera dane), analiza zmian planu na bieżąco bez AI, usunięto notkę o szyfrowaniu
