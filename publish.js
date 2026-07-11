@@ -17,8 +17,18 @@ html = html.replace(/const DM_BUILD=\d+;/, `const DM_BUILD=${build};`);
 fs.writeFileSync(htmlPath, html);
 console.log("Build: " + build);
 
-// 2) przebuduj APK (dla nowych instalacji)
-run(`node "${path.join(root, "build-android.js")}"`);
+// 2) przebuduj APK (dla nowych instalacji Androida).
+// Budowa APK wymaga Android SDK + Gradle. Jesli ich brak lub build padnie, NIE blokujemy
+// publikacji web/desktop — to ona dostarcza auto-aktualizacje wszystkim juz zainstalowanym
+// aplikacjom (przez version.json). W docs/ zostaje wtedy poprzedni APK.
+let apkOk = true;
+try {
+  run(`node "${path.join(root, "build-android.js")}"`);
+} catch (e) {
+  apkOk = false;
+  console.warn("\n⚠ Nie udalo sie zbudowac APK (Android SDK/Gradle). Publikuje web+desktop, " +
+    "APK w docs/ zostaje z poprzedniego builda. Aby zbudowac APK: `npm run android`.\n");
+}
 
 // 3) opublikuj na GitHub Pages
 // Uwaga: plik nazywa sie app.html (nie DayMenu.html) - stare wersje (build 1-4)
@@ -26,7 +36,9 @@ run(`node "${path.join(root, "build-android.js")}"`);
 const site = path.join(root, "docs");
 fs.copyFileSync(htmlPath, path.join(site, "app.html"));
 if (fs.existsSync(path.join(site, "DayMenu.html"))) fs.unlinkSync(path.join(site, "DayMenu.html"));
-fs.copyFileSync(path.join(root, "DayMenu.apk"), path.join(site, "DayMenu.apk"));
+if (apkOk && fs.existsSync(path.join(root, "DayMenu.apk"))) {
+  fs.copyFileSync(path.join(root, "DayMenu.apk"), path.join(site, "DayMenu.apk"));
+}
 fs.writeFileSync(path.join(site, "version.json"), `{"build":${build}}`);
 run("git add -A");
 run(`git commit -m "build ${build}"`);

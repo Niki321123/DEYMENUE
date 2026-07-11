@@ -548,7 +548,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=23;
+const DM_BUILD=25;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -851,21 +851,41 @@ function matMigrate(){
     if("mastery"in t){delete t.mastery;ch=true;}
   }
   if(!m.pomo){m.pomo={work:25,break:5};ch=true;}
+  // Dwie warstwy harmonogramu: base = stały szkielet (Librus + ręczny pędzel),
+  // ovr = nadpisania z czatu AI ważne tylko w bieżącym tygodniu. `grid` jest wyliczane.
+  if(!m.base){m.base={...(m.grid||{})};ch=true;}         // istniejąca siatka staje się bazą
+  if(!m.ovr){m.ovr={week:weekId(),cells:{}};ch=true;}
   if(ch)save();
 }
 matMigrate();
+
+/* Składa efektywną siatkę (S.matura.grid) z bazy + nadpisań bieżącego tygodnia.
+   Nadpisania resetują się automatycznie z nowym tygodniem. */
+function matRecompute(){
+  const m=S.matura;
+  if(!m.ovr||m.ovr.week!==weekId())m.ovr={week:weekId(),cells:{}}; // reset nadpisań co tydzień
+  const g={...(m.base||{})};
+  for(const[k,v]of Object.entries(m.ovr.cells)){
+    if(v==="avail"||v==="school")g[k]=v;else delete g[k]; // "unavail" = brak klucza
+  }
+  m.grid=g;
+}
+matRecompute();
 
 /* ---- harmonogram tygodnia: 3 stany (dostępny / w szkole / niedostępny), plan wpisany w dostępne okienka ---- */
 let matBrush="avail";
 let matCellTimer=null;
 $$("#matBrush button").forEach(b=>b.onclick=()=>{matBrush=b.dataset.b;$$("#matBrush button").forEach(x=>x.classList.toggle("on",x===b))});
-/* maluje dostępność wg pędzla; malowanie stanu innego niż „avail” usuwa blok planu z tej komórki */
+/* maluje dostępność wg pędzla; malowanie stanu innego niż „avail” usuwa blok planu z tej komórki.
+   Pędzel ręczny edytuje bazę (stały szkielet), nie nadpisania tygodniowe. */
 function matPaint(d,h){
   const k=matKey(d,h);
-  if(matBrush==="avail"){S.matura.grid[k]="avail";return;}
-  const blk=S.matura.plan.find(b=>b.day===d&&b.hour===h);
-  if(blk){matUnmarkDone(blk);S.matura.plan=S.matura.plan.filter(b=>!(b.day===d&&b.hour===h));}
-  if(matBrush==="unavail")delete S.matura.grid[k];else S.matura.grid[k]=matBrush;
+  if(matBrush!=="avail"){
+    const blk=S.matura.plan.find(b=>b.day===d&&b.hour===h);
+    if(blk){matUnmarkDone(blk);S.matura.plan=S.matura.plan.filter(b=>!(b.day===d&&b.hour===h));}
+  }
+  if(matBrush==="unavail")delete S.matura.base[k];else S.matura.base[k]=matBrush;
+  matRecompute();
 }
 function matCellToggleDone(d,h){
   const blk=S.matura.plan.find(b=>b.day===d&&b.hour===h);
@@ -920,7 +940,7 @@ function renderMatPlanProgress(){
   if(total){$("#matPlanProg").hidden=false;$("#matProgPct").textContent=`${done}/${total}`;$("#matProgBar").style.width=(done/total*100)+"%";}
   else $("#matPlanProg").hidden=true;
 }
-$("#matGridClear").onclick=()=>{if(confirm("Wyczyścić cały harmonogram i plan?")){S.matura.grid={};S.matura.plan=[];save();renderMatSched()}};
+$("#matGridClear").onclick=()=>{if(confirm("Wyczyścić cały harmonogram i plan?")){S.matura.base={};S.matura.ovr={week:weekId(),cells:{}};S.matura.plan=[];matRecompute();save();renderMatSched()}};
 
 /* ---- przedmioty z priorytetem procentowym ---- */
 function renderMatSubjects(){
@@ -1053,8 +1073,11 @@ async function aiPlan(prefs){
 $("#matGen").onclick=async()=>{
   S.matura.prefs=$("#matPrefs").value.trim();save();
   if(!S.matura.topics.some(t=>(t.percent||0)>0)){$("#matPlanHint").textContent="Dodaj przynajmniej jeden przedmiot w zakładce „Przedmioty”.";return}
-  if(!matFreeSlots().length){$("#matPlanHint").textContent="Zaznacz w harmonogramie godziny „Dostępny”.";return}
-  $("#matGen").disabled=true;$("#matPlanHint").textContent="AI układa plan…";
+  $("#matGen").disabled=true;$("#matPlanHint").textContent="Pobieram plan lekcji z Librusa…";
+  // Najpierw odśwież szkielet tygodnia z Librusa (bez AI), potem AI układa naukę.
+  try{await librusSyncSchedule(false)}catch(e){}
+  if(!matFreeSlots().length){$("#matPlanHint").textContent="Brak godzin „Dostępny” w harmonogramie (po godzinach szkolnych). Sprawdź plan lekcji lub pomaluj wolne godziny.";$("#matGen").disabled=false;return}
+  $("#matPlanHint").textContent="AI układa plan…";
   try{
     const blocks=await aiPlan(S.matura.prefs);
     S.matura.plan=blocks;save();
@@ -1084,20 +1107,22 @@ $("#matChatSend").onclick=async()=>{
   try{
     const ctx=matAiContext();
     const now=new Date();const todayDay=(now.getDay()+6)%7;
-    const sys=MAT_AI_RULES+` Dziś jest ${MAT_DAYS[todayDay]} (day=${todayDay}), godzina ${now.getHours()}:00. Harmonogram — godziny dostępne: ${JSON.stringify(ctx.slots)}; godziny szkolne: ${JSON.stringify(ctx.school)}. Aktualny plan tygodnia: ${JSON.stringify(S.matura.plan.map(b=>({day:b.day,hour:b.hour,topicId:b.topicId})))}. Przedmioty: ${JSON.stringify(ctx.subjects)}. Użytkownik prosi o zmiany w harmonogramie lub planie albo zadaje pytania. Format odpowiedzi: {"reply":"krótka odpowiedź po polsku","grid":{"3_17":"unavail"}|null,"blocks":[...]|null}. "grid" to WYŁĄCZNIE zmieniane komórki harmonogramu (klucz "dzień_godzina", wartość "avail"/"school"/"unavail") — po zmianie harmonogramu ułóż też nowy "blocks". "blocks" to CAŁY nowy plan tygodnia (wszystkie bloki). Jeśli coś ma zostać bez zmian, ustaw je na null.`;
+    const sys=MAT_AI_RULES+` Dziś jest ${MAT_DAYS[todayDay]} (day=${todayDay}), godzina ${now.getHours()}:00. Harmonogram — godziny dostępne: ${JSON.stringify(ctx.slots)}; godziny szkolne: ${JSON.stringify(ctx.school)}. Aktualny plan tygodnia: ${JSON.stringify(S.matura.plan.map(b=>({day:b.day,hour:b.hour,topicId:b.topicId})))}. Przedmioty: ${JSON.stringify(ctx.subjects)}. Użytkownik prosi o zmiany w harmonogramie lub planie albo zadaje pytania. Format odpowiedzi: {"reply":"krótka odpowiedź po polsku","grid":{"3_17":"unavail"}|null,"blocks":[...]|null}. "grid" to WYŁĄCZNIE zmieniane komórki harmonogramu (klucz "dzień_godzina", wartość "avail"/"school"/"unavail") — po zmianie harmonogramu ułóż też nowy "blocks". Zmiany w "grid" obowiązują TYLKO w bieżącym tygodniu i resetują się w następnym (stały szkielet z planu lekcji wraca) — informuj o tym użytkownika przy zmianach dostępności. "blocks" to CAŁY nowy plan tygodnia (wszystkie bloki). Jeśli coś ma zostać bez zmian, ustaw je na null.`;
     const hist=matChat.filter(m=>m.text!=="…").slice(-8).map(m=>({role:m.role==="user"?"user":"assistant",content:m.text}));
     while(hist.length&&hist[0].role!=="user")hist.shift();
     const j=aiJson(await aiCall(sys,hist,2500));
     matChat[matChat.length-1]={role:"ai",text:j.reply||"OK"};
     let changed=false;
     if(j.grid&&typeof j.grid==="object"){
+      if(S.matura.ovr.week!==weekId())S.matura.ovr={week:weekId(),cells:{}};
       for(const[k,v]of Object.entries(j.grid)){
         const p=String(k).split("_");const d=+p[0],h=+p[1];
         if(d>=0&&d<7&&MAT_HOURS.includes(h)){
-          if(v==="avail"||v==="school")S.matura.grid[k]=v;else delete S.matura.grid[k];
+          // zmiany z czatu AI to nadpisania TYLKO na bieżący tydzień (reset w kolejnym)
+          S.matura.ovr.cells[k]=(v==="avail"||v==="school")?v:"unavail";
         }
       }
-      changed=true;
+      matRecompute();changed=true;
     }
     if(Array.isArray(j.blocks)){S.matura.plan=matSanitizeBlocks(j.blocks);changed=true;}
     if(changed){save();renderMatSched();matChat[matChat.length-1].text+="\n(zaktualizowano ✓)";}
@@ -1194,7 +1219,7 @@ function renderMatStats(){
 }
 
 /* ---- zakładki ---- */
-function renderMatSched(){renderMatGrid();renderMatPlanProgress();}
+function renderMatSched(){matRecompute();renderMatGrid();renderMatPlanProgress();}
 $$("#matTabs button").forEach(b=>b.onclick=()=>{
   $$("#matTabs button").forEach(x=>x.classList.toggle("on",x===b));
   $("#matSched").hidden=b.dataset.mt!=="sched";
@@ -1666,6 +1691,11 @@ function cloudCard(){
       <button class="btn danger" id="sbLogout">Wyloguj</button>
     </div>
     <p class="muted" style="margin-top:var(--sp-2)">Zmiany wysyłają się same kilka sekund po każdym zapisie, a dane z innych urządzeń pobierają się same w tle — bez klikania.</p>
+  </div>
+  <div class="card" style="margin-top:var(--sp-4)"><h2>Plan lekcji z Librus Synergia</h2>
+    <p class="muted" style="margin-bottom:var(--sp-3)">Połącz konto Librus Synergia, aby aplikacja sama pobierała Twój plan lekcji, wypełniała Harmonogram (godziny szkolne) i powiadamiała o zmianach (odwołane lekcje, zmiana sali/nauczyciela) — także gdy apka jest zamknięta.</p>
+    <div id="librusBox"><p class="muted">Sprawdzam status połączenia…</p></div>
+    <p class="muted" id="librusMsg" style="margin-top:var(--sp-2)"></p>
   </div>`;
 }
 function wireCloud(){
@@ -1695,6 +1725,7 @@ function wireCloud(){
       catch(e2){msg.textContent=e2.message||"Błąd wysyłania"}
     };
   }else{
+    librusRenderBox();
     $("#sbSync").onclick=async()=>{await cloudPush(true);renderAccount()};
     $("#sbPull").onclick=async()=>{
       if(!confirm("Pobrać dane z chmury i zastąpić dane na tym urządzeniu?"))return;
@@ -1766,13 +1797,182 @@ async function cloudAutoPull(){
 function startCloudPolling(){
   if(cloudPollTimer)return;
   cloudPollTimer=setInterval(cloudAutoPull,15000);
+  startLibrusPolling();librusPollEvents();
 }
 function stopCloudPolling(){
   clearInterval(cloudPollTimer);cloudPollTimer=null;
+  stopLibrusPolling();
 }
 setTimeout(cloudAutoPull,2500);
 if(sbSession)startCloudPolling();
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)cloudAutoPull()});
+
+/* ============ LIBRUS: powiadomienia o zmianach w planie lekcji ============
+   Monitorowanie planu robi Edge Function `librus-timetable` (cron co godzine).
+   Wykryte zmiany laduja w tabeli librus_events. Tu tylko odbieramy nieprzeczytane
+   swoje wpisy, pokazujemy przez istniejacy notify()/toast() i odhaczamy seen=true. */
+async function librusPollEvents(){
+  if(!sbSession)return;
+  let tok; try{tok=await sbToken()}catch(e){return}
+  if(!tok)return;
+  let rows;
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/librus_events?seen=eq.false&select=id,message&order=created_at.asc`,{
+      headers:{apikey:SB_KEY,Authorization:"Bearer "+tok}
+    });
+    if(!r.ok)return;                 // blad sieci/serwera nie moze wywalic apki
+    rows=await r.json();
+  }catch(e){return}
+  if(!Array.isArray(rows)||!rows.length)return;
+  for(const ev of rows){
+    notify("Plan lekcji — zmiana",ev.message);
+    toast("Librus: "+ev.message);
+  }
+  // odhacz jako zobaczone (RLS pilnuje, ze to wlasne wiersze)
+  const ids=rows.map(e=>e.id).join(",");
+  try{
+    await fetch(`${SB_URL}/rest/v1/librus_events?id=in.(${ids})`,{
+      method:"PATCH",
+      headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json",Prefer:"return=minimal"},
+      body:JSON.stringify({seen:true})
+    });
+  }catch(e){}
+}
+/* ---- Librus → Harmonogram: plan lekcji ustawia STAŁY szkielet tygodnia (base) ----
+   Reguły: przed pierwszą lekcją = niedostępny, godziny lekcji + 1h na powrót = w szkole,
+   reszta dnia po powrocie = dostępny. Nadpisań tygodniowych (ovr, z czatu AI) to nie rusza. */
+function librusToMin(t){const[a,b]=String(t).split(":").map(Number);return a*60+(b||0)}
+function librusUnitsToBase(units){
+  const byDay={};
+  for(const u of units){
+    if(!u||!u.date||!u.from||!u.to)continue;
+    const dow=(new Date(u.date+"T00:00:00").getDay()+6)%7; // 0=Pon..6=Nd
+    (byDay[dow]||(byDay[dow]=[])).push(u);
+  }
+  let daysFilled=0;
+  for(const d in byDay){
+    const list=byDay[d];
+    const covered=new Set();
+    for(const u of list){
+      const f=librusToMin(u.from),t=librusToMin(u.to);
+      for(const h of MAT_HOURS)if(h*60<t&&(h+1)*60>f)covered.add(h);
+    }
+    if(!covered.size)continue;
+    const first=Math.min(...covered),last=Math.max(...covered);
+    const ret=Math.min(last+1,MAT_HOURS[MAT_HOURS.length-1]);
+    for(const h of MAT_HOURS){
+      const k=matKey(+d,h);
+      if(h<first)delete S.matura.base[k];        // przed szkołą → niedostępny
+      else if(h<=ret)S.matura.base[k]="school";  // lekcje + okienka + 1h powrót → w szkole
+      else S.matura.base[k]="avail";             // dopiero po powrocie → dostępny (nauka w domu)
+    }
+    daysFilled++;
+  }
+  return daysFilled;
+}
+async function librusSyncSchedule(force){
+  if(!sbSession)return null;
+  let tok; try{tok=await sbToken()}catch(e){return null}
+  if(!tok)return null;
+  let row;
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/librus_snapshot?select=week,units,fetched_at`,{
+      headers:{apikey:SB_KEY,Authorization:"Bearer "+tok}
+    });
+    if(!r.ok)return null;             // brak dostępu/sieci nie może wywalić apki
+    row=(await r.json())[0];
+  }catch(e){return null}
+  if(!row||!Array.isArray(row.units))return null;
+  if(!force&&S.matura.librusAppliedAt===row.fetched_at)return {days:0,skipped:true};
+  const days=librusUnitsToBase(row.units);
+  S.matura.librusAppliedAt=row.fetched_at;
+  matRecompute();
+  // Bez AI: gdy plan lekcji się zmienił, usuń zaplanowane godziny nauki, które trafiły
+  // na godziny szkolne/niedostępne (np. dostawiona lekcja). Odwołane lekcje zwalniają
+  // godziny → same stają się „dostępne”, wolne pod nową naukę przy „Generuj plan”.
+  const before=S.matura.plan.length;
+  S.matura.plan=S.matura.plan.filter(b=>S.matura.grid[matKey(b.day,b.hour)]==="avail");
+  if(S.matura.plan.length!==before)renderMatPlanProgress();
+  save();
+  if(!$("#matSched").hidden)renderMatSched();
+  return {days,units:row.units.length};
+}
+
+let librusPollTimer=null;
+function librusTick(){librusPollEvents();librusSyncSchedule(false);}
+function startLibrusPolling(){
+  if(librusPollTimer)return;
+  librusPollTimer=setInterval(librusTick,5*60*1000); // co 5 min
+}
+function stopLibrusPolling(){
+  clearInterval(librusPollTimer);librusPollTimer=null;
+}
+setTimeout(librusTick,4000);
+if(sbSession)startLibrusPolling();
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)librusTick()});
+
+/* ---- Librus: łączenie konta z poziomu apki (zakładka Konto) ---- */
+const LIBRUS_FN=SB_URL+"/functions/v1/librus-timetable";
+async function librusAccountStatus(){
+  const tok=await sbToken();if(!tok)return null;
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/librus_accounts?select=login,status,last_sync_at,last_error`,{
+      headers:{apikey:SB_KEY,Authorization:"Bearer "+tok}
+    });
+    if(!r.ok)return null;
+    return (await r.json())[0]||null;
+  }catch(e){return null}
+}
+async function librusRenderBox(){
+  const box=$("#librusBox");if(!box)return;
+  const acc=await librusAccountStatus();
+  if(acc){
+    const sync=acc.last_sync_at?new Date(acc.last_sync_at).toLocaleString("pl-PL"):"jeszcze nie sprawdzano";
+    const err=acc.status&&acc.status!=="ok"?`<p class="muted" style="color:var(--bad)">Ostatni błąd: ${esc(acc.last_error||acc.status)} — sprawdź, czy hasło do Librusa jest aktualne (Rozłącz i połącz ponownie).</p>`:"";
+    box.innerHTML=`<div class="row"><span class="badge b-good">Połączono</span><strong>${esc(acc.login)}</strong></div>
+      <p class="muted" style="margin:var(--sp-2) 0">Ostatnie sprawdzenie planu: ${sync}</p>${err}
+      <button class="btn danger" id="librusDisc">Rozłącz Librus</button>`;
+    $("#librusDisc").onclick=librusDisconnect;
+  }else{
+    box.innerHTML=`<div class="field"><label class="fld">Login Librus (Synergia)</label><input type="text" id="librusLogin" autocomplete="off"></div>
+      <div class="field"><label class="fld">Hasło Librus</label><input type="password" id="librusPass" autocomplete="off"></div>
+      <button class="btn accent" id="librusConn">Połącz z Librusem</button>`;
+    $("#librusConn").onclick=librusConnect;
+    $("#librusPass").onkeydown=e=>{if(e.key==="Enter")librusConnect()};
+  }
+}
+async function librusConnect(){
+  const login=$("#librusLogin").value.trim(),password=$("#librusPass").value,msg=$("#librusMsg");
+  if(!login||!password){msg.textContent="Wpisz login i hasło Librusa.";return}
+  const tok=await sbToken();if(!tok){msg.textContent="Najpierw zaloguj się do konta w chmurze.";return}
+  $("#librusConn").disabled=true;msg.textContent="Łączę z Librusem…";
+  try{
+    const r=await fetch(LIBRUS_FN,{method:"POST",
+      headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json"},
+      body:JSON.stringify({action:"connect",login,password})});
+    const j=await r.json().catch(()=>({}));
+    if(j.ok){
+      msg.textContent=j.units?`Połączono ✓ Pobrano plan (${j.units} lekcji). Harmonogram zaraz się wypełni.`:"Połączono ✓ Plan pobierze się przy najbliższym sprawdzeniu.";
+      await librusSyncSchedule(true);
+      await librusRenderBox();
+    }else if(j.error==="librus_auth"){msg.textContent="Błędny login lub hasło do Librusa.";}
+    else if(j.error==="not_configured"){msg.textContent="Funkcja Librus nie jest jeszcze skonfigurowana na serwerze (brak klucza szyfrowania).";}
+    else{msg.textContent="Nie udało się połączyć — spróbuj ponownie.";}
+  }catch(e){msg.textContent="Błąd sieci — spróbuj ponownie.";}
+  finally{const b=$("#librusConn");if(b)b.disabled=false;}
+}
+async function librusDisconnect(){
+  if(!confirm("Rozłączyć Librus? Aplikacja przestanie pobierać plan lekcji i usunie zapisane hasło Librusa."))return;
+  const tok=await sbToken();if(!tok)return;
+  const msg=$("#librusMsg");msg.textContent="Rozłączam…";
+  try{
+    await fetch(LIBRUS_FN,{method:"POST",
+      headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json"},
+      body:JSON.stringify({action:"disconnect"})});
+    msg.textContent="Rozłączono. Hasło Librusa usunięte.";
+  }catch(e){msg.textContent="Błąd — spróbuj ponownie.";}
+  await librusRenderBox();
+}
 
 /* ================= EXPORT / IMPORT ================= */
 function doExport(){

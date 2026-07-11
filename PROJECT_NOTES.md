@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-07-10 (sesja 7 — porządki w plikach)_
+_Ostatnia aktualizacja: 2026-07-11 (sesja 9 — Librus multi-user, logowanie w apce)_
 
 ## Czym jest projekt
 
@@ -156,6 +156,101 @@ sprzed tej sesji, już nieużywany przez apkę, można zignorować/skasować.
       - migracja starych danych w `matMigrate()` (grid bool→"avail",
         priorytet/mastery→percent). **Do zrobienia przez użytkownika:** `npm run publish`
         (podbije build, zbuduje APK, skopiuje do `docs/`/`android-app`)
+- [x] **Monitor planu lekcji z Librus Synergia (sesja 8).** Wymaganie mówiło o
+      bibliotece `librusapi` (Python) — nie da się jej użyć: projekt to Electron/HTML,
+      a Android i web nie mają Pythona. Flow biblioteki (logowanie OAuth na
+      api.librus.pl → cookie DZIENNIKSID → POST `przegladaj_plan_lekcji` → parsowanie
+      `td#timetableEntryBox`) odtworzony 1:1 w Edge Function **`librus-timetable`**
+      (Deno, `verify_jwt=false`, na `jkpwboekztpkfxivueql`). Działa dla wszystkich
+      trzech wersji apki, bo każda odpytuje Supabase.
+      - Nowe tabele: `librus_snapshot` (jeden wiersz 'default', ostatni plan + `last_error`;
+        RLS bez polityki = tylko service_role — celowa blokada, klient tego nie czyta) i
+        `librus_events` (kolejka komunikatów per user, RLS select/update own).
+      - Diff wykrywa: nowa lekcja / odwołana (po polu `info`) / zmiana godziny (przeniesienie
+        rozpoznane jako 1 komunikat, nie usuń+dodaj) / zmiana sali / nauczyciela / końca
+        lekcji. Przetestowane jednostkowo — każdy typ = 1 czytelny komunikat PL.
+      - Scheduler: **pg_cron** `librus-timetable-hourly` (`0 * * * *`) woła funkcję przez
+        pg_net z nagłówkiem `x-librus-key` (sekret w Vault `librus_cron_key`). Rate-limit
+        podwójny: cron co godzinę + twardy bezpiecznik 59 min w samej funkcji.
+      - Odporność: żaden błąd Librusa (brak sieci/wygasła sesja/zmiana struktury strony)
+        nie wywala funkcji — łapany, klasyfikowany (auth/session/structure/network) i
+        zapisywany do `librus_snapshot.last_error` + log. Bezpiecznik: pusty plan tam,
+        gdzie wcześniej były lekcje = podejrzana zmiana strony, snapshot nietknięty,
+        zero fałszywych „wszystko odwołane".
+      - Klient (`DayMenu.html`): `librusPollEvents()` co 5 min + przy powrocie do apki
+        czyta nieprzeczytane `librus_events`, pokazuje przez istniejące `notify()`+`toast()`,
+        odhacza `seen=true`. Wpięte w `startCloudPolling`/`stopCloudPolling`.
+      - **DO ZROBIENIA PRZEZ UŻYTKOWNIKA (2 kroki):**
+        1. Ustawić 4 sekrety Edge Function w Supabase Dashboard → Edge Functions →
+           `librus-timetable` → Secrets (albo `supabase secrets set`):
+           `LIBRUS_LOGIN`, `LIBRUS_PASSWORD` (dane do Librusa), `LIBRUS_USER_ID`
+           (UUID własnego konta z auth.users — to do niego trafią powiadomienia),
+           `LIBRUS_CRON_KEY` = `6LR_-_95OfVC3IOGj6rsecKJLIZaXhex` (ten sam, co w Vault).
+           Dopóki nie ustawione, funkcja zwraca 503/`missing_secrets` i nic nie robi.
+        2. `npm run publish` — żeby zmiana w `DayMenu.html` (odbiór powiadomień) trafiła
+           do `docs/app.html` i wersji Android.
+      **UWAGA (sesja 9):** ten model „jedno konto w sekretach" został ZASTĄPIONY logowaniem
+      per użytkownik w apce — patrz niżej. Sekrety `LIBRUS_LOGIN/PASSWORD/USER_ID` są już
+      nieużywane (można usunąć), zostaje `LIBRUS_CRON_KEY` + nowy `LIBRUS_ENC_KEY`.
+- [x] **Plan Librusa wypełnia Harmonogram w zakładce Nauka (sesja 8, `DayMenu.html`).**
+      Siatka ma teraz DWIE warstwy (żeby nie ruszać dziesiątek miejsc czytających
+      `S.matura.grid` — jest ono odtąd **wyliczane**):
+      - `S.matura.base` — stały szkielet tygodnia (z Librusa + ręczny pędzel). Reguły
+        mapowania planu na dzień: godziny przed pierwszą lekcją → niedostępny, godziny
+        lekcji, **okienka między lekcjami** oraz **1h na powrót** → w szkole; dostępny
+        dopiero po powrocie (użytkownik uczy się tylko w domu). W kodzie: `h<first`→
+        niedostępny, `h<=ret`→w szkole, dalej→dostępny (`ret=ostatnia_lekcja+1`).
+      - `S.matura.ovr={week,cells}` — nadpisania z **czatu AI** (np. „w poniedziałek
+        17–22 mnie nie ma") ważne TYLKO w bieżącym tygodniu; `matRecompute()` kasuje je
+        automatycznie przy zmianie `weekId()` i baza wraca.
+      - `matRecompute()` składa `grid = base + ovr(bieżący tydzień)`; wołane w
+        `renderMatSched`, po pędzlu, po czacie AI i przy starcie.
+      - Klient czyta plan z `librus_snapshot` (dodana polityka RLS: SELECT dla
+        `authenticated`; zapis nadal tylko service_role). **Bez osobnego przycisku** —
+        `librusSyncSchedule()`: (a) auto co 5 min / przy powrocie do apki aktualizuje
+        siatkę na bieżąco (porównanie `fetched_at` z `S.matura.librusAppliedAt`, bez AI),
+        (b) odpala się też na starcie „Generuj plan", żeby AI planowała na świeżym planie
+        lekcji. Przy każdej zmianie planu lekcji skrypt czyści bloki nauki, które wpadły
+        na godziny szkolne/niedostępne (np. dostawiona lekcja); odwołane lekcje same
+        zwalniają godziny na „dostępny". Zweryfikowane w przeglądarce: odwołanie 2
+        ostatnich lekcji → godziny robią się dostępne bez AI; dostawiona lekcja → blok
+        nauki usuwany. Mapowanie + reset tygodniowy też przetestowane jednostkowo.
+      - **Wymaga `npm run publish`** (jak wyżej) — zmiany są tylko w źródłowym `DayMenu.html`.
+- [x] **Librus MULTI-USER: logowanie do Librusa w apce (sesja 9).** Cel użytkownika:
+      z apki ma korzystać wiele osób (znajomi), każdy ze swoim kontem Librus — koniec
+      z jednym kontem w sekretach. Model przebudowany na konto per użytkownik:
+      - Nowa tabela `librus_accounts(user_id pk→auth.users, login, pass_cipher, pass_iv,
+        status, last_sync_at, last_error…)`. Hasło Librusa szyfrowane **AES-GCM w Edge
+        Function** (klucz tylko w env `LIBRUS_ENC_KEY`, w bazie leży sam szyfrogram —
+        Postgres nie ma klucza). RLS: user czyta/kasuje TYLKO swój wiersz; zapis wyłącznie
+        service_role (przez funkcję, która szyfruje). Librus nie ma OAuth/tokenów dla
+        aplikacji 3rd-party — scraper loguje się prawdziwym hasłem, więc hasło MUSI być
+        przechowywane odwracalnie, żeby cron działał w tle. Użytkownik świadomie zaakceptował
+        (apka dla znajomych). Notka „hasło szyfrowane…" w UI usunięta na jego prośbę.
+      - `librus_snapshot` przebudowany z jednego wiersza 'default' na **per-user**
+        (`user_id` pk); RLS SELECT own. `librus_events` bez zmian (już per-user).
+      - Edge Function `librus-timetable` (v4) ma teraz DWA tryby:
+        (a) **APKA**: `POST {action:"connect"|"disconnect", login, password}` + JWT usera
+        w Authorization; `user_id` bierze się z JWT (`/auth/v1/user`), NIGDY z body. Connect
+        weryfikuje dane logując się do Librusa, szyfruje hasło, zapisuje wiersz i robi
+        pierwszy fetch planu od razu. Disconnect kasuje konto + snapshot.
+        (b) **CRON**: nagłówek `x-librus-key`; pętla po WSZYSTKICH `librus_accounts`,
+        każdy w osobnym try/catch (jeden padnięty user nie blokuje reszty), rate-limit
+        per user (59 min wg jego snapshotu), diff → jego `librus_events`.
+      - Klient (`DayMenu.html`): karta „Plan lekcji z Librus Synergia" w zakładce Konto
+        (widok zalogowany): `librusRenderBox()` pokazuje formularz login/hasło + „Połącz",
+        albo status „Połączono jako X" + „Rozłącz". `librusConnect/Disconnect` wołają
+        funkcję z JWT. `librusSyncSchedule` czyta teraz własny snapshot (bez `id=eq.default`).
+        Zweryfikowane w przeglądarce (render karty + formularz).
+      - **DO ZROBIENIA PRZEZ UŻYTKOWNIKA:**
+        1. Ustawić sekret Edge Function `LIBRUS_ENC_KEY` = `qZTwstSPgaKOm4Xcrz4QGGDg2oh6zil3Gd6qiUQpYJE=`
+           (klucz AES-256, base64). Zostaje też `LIBRUS_CRON_KEY`. Sekrety
+           `LIBRUS_LOGIN/PASSWORD/USER_ID` są już nieużywane — można usunąć.
+           Bez `LIBRUS_ENC_KEY` funkcja zwraca 503/`not_configured`.
+        2. `npm run publish`.
+      - Każdy znajomy: zakłada konto w chmurze (zakładka Konto), potem w tej samej zakładce
+        „Połącz z Librusem" wpisuje swój login/hasło Synergii. Reszta (harmonogram,
+        powiadomienia) działa jak wcześniej, ale per jego konto.
 - [ ] Użytkownik: założyć jedno konto (prawdziwym e-mailem) w zakładce „Konto" (po
       aktualizacji apki do build 17 na obu urządzeniach), potwierdzić mailem, zalogować
       się na PC i telefonie
@@ -186,6 +281,30 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-07-11 (sesja 9)**: Librus przerobiony na multi-user — logowanie do Librusa
+  z poziomu apki (zakładka Konto), konto per użytkownik zamiast jednego w sekretach.
+  Nowa tabela `librus_accounts` z hasłem szyfrowanym AES-GCM w Edge Function (klucz
+  `LIBRUS_ENC_KEY` tylko w env). `librus_snapshot` przerobiony na per-user. Funkcja v4
+  ma tryb „connect/disconnect" (z apki, JWT usera) i „cron" (pętla po wszystkich kontach).
+  Karta „Plan lekcji z Librus Synergia" w Koncie. Do zrobienia: sekret `LIBRUS_ENC_KEY`
+  + `npm run publish`. Wcześniej w tej sesji dopięto: okienka między lekcjami jako
+  „w szkole" (nauka tylko w domu), usunięto osobny przycisk „Z Librusa" (Generuj plan
+  sam pobiera dane), analiza zmian planu na bieżąco bez AI, usunięto notkę o szyfrowaniu
+  hasła z UI na prośbę użytkownika.
+
+- **2026-07-10 (sesja 8)**: Dodano monitor planu lekcji z Librus Synergia. Wymaganie
+  zakładało bibliotekę `librusapi` (Python) — niewykonalne w projekcie Electron/HTML
+  (Android/web bez Pythona), więc jej flow logowania i parsowania planu odtworzony 1:1
+  w Edge Function `librus-timetable` (Deno). Nowe tabele `librus_snapshot`/`librus_events`,
+  diff 6 typów zmian z czytelnymi komunikatami PL, scheduler pg_cron co godzinę (klucz
+  w Vault), rate-limit 59 min, pełna obsługa błędów bez wywalania funkcji. Klient w
+  `DayMenu.html` odbiera zdarzenia i pokazuje przez istniejące `notify()`. Dodatkowo plan
+  z Librusa wypełnia teraz Harmonogram w zakładce Nauka: dwuwarstwowa siatka (stała baza
+  z Librusa/pędzla + tygodniowe nadpisania z czatu AI, kasowane co tydzień), reguły
+  przed-szkołą=niedostępny / lekcje+1h=w szkole / po=dostępny, auto + przycisk
+  „📅 Z Librusa". Zostają 2 ręczne kroki użytkownika: ustawienie 4 sekretów funkcji i
+  `npm run publish` (szczegóły w liście zadań wyżej).
 
 - **2026-07-10 (sesja 7)**: Porządki w plikach. Usunięto 8 pustych plików-śmieci
   z katalogu głównego (`{,+`, `100%`, `300`, `4`, `a+t.actual`, `day-menu@1.0.0`,
