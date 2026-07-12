@@ -309,6 +309,18 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 
 ## Historia sesji (skrót)
 
+- **2026-07-12 (sesja 10)**: Naprawiono budowanie APK Androida. `npm run publish`/`android`
+  od dawna wywalało się na Gradle „SDK location not found... Directory does not exist",
+  mimo że SDK istnieje (`%LOCALAPPDATA%\Android\Sdk`, platforms/android-36, build-tools
+  35/36). Przyczyna: `android-app/android/local.properties` miało escapowaną ścieżkę
+  `sdk.dir=C\:\\Users\\...` — Gradle interpretował ją błędnie. Fix: forward-slashe
+  `sdk.dir=C:/Users/user/AppData/Local/Android/Sdk`. Dodatkowo `build-android.js` **sam
+  zapisuje** poprawny `local.properties` (z ANDROID_HOME, ukośniki) przed każdym buildem,
+  więc plik nie musi być śledzony i nie zależymy od jego stanu. Zweryfikowane: po celowym
+  zepsuciu pliku `npm run android` sam się naprawia i buduje APK. APK build 27 zbudowany
+  i wypchnięty do `docs/DayMenu.apk` (Android dostaje aktualną wersję z fixem startu).
+  Przy okazji usunięto 2 kolejne pliki-śmieci z roota (`Pages`, `{`).
+
 - **2026-07-11 (sesja 9, hotfix)**: Naprawiono krytyczny błąd startu — apka po buildzie
   26 "przestała działać" (martwe przyciski, brak karty chmury). Przyczyna: `save()` woła
   `cloudQueuePush()` czytające `sbSession`, a `matMigrate()` (przez seedowanie base/ovr)
