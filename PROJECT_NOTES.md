@@ -309,6 +309,15 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 
 ## Historia sesji (skrót)
 
+- **2026-07-11 (sesja 9, hotfix)**: Naprawiono krytyczny błąd startu — apka po buildzie
+  26 "przestała działać" (martwe przyciski, brak karty chmury). Przyczyna: `save()` woła
+  `cloudQueuePush()` czytające `sbSession`, a `matMigrate()` (przez seedowanie base/ovr)
+  odpala `save()` już przy starcie, zanim `let sbSession` deklarowało się w sekcji chmury →
+  TDZ ReferenceError przerywał cały skrypt. Fix: `let sbSession=null` przeniesione wcześnie
+  (zaraz po `let S=load()`). Zweryfikowane (Node harness z atrapą DOM + realna przeglądarka:
+  karta chmury renderuje się, `#sbLogin` ma handler). Zob. memory [[save-at-load-tdz]].
+  **Wymaga `npm run publish` (build 27).**
+
 - **2026-07-11 (sesja 9)**: Librus przerobiony na multi-user — logowanie do Librusa
   z poziomu apki (zakładka Konto), konto per użytkownik zamiast jednego w sekretach.
   Nowa tabela `librus_accounts` z hasłem szyfrowanym AES-GCM w Edge Function (klucz

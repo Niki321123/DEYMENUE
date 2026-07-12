@@ -548,7 +548,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=26;
+const DM_BUILD=27;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -614,6 +614,7 @@ const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 const KEY="daymenu_v1";
 const defaults={theme:"light",moods:[],goals:[],books:[],timelog:[],sleep:[],appearance:null,habits:[],account:null,lastCloudSync:null,matura:{grid:{},topics:[],plan:[],sessions:[],pomo:{work:25,break:5},prefs:""}};
 let S=load();
+let sbSession=null; // zadeklarowane WCZEŚNIE — save()→cloudQueuePush() bywa wołane już przy starcie (matMigrate), zanim wykona się sekcja chmury
 function load(){try{const d=JSON.parse(localStorage.getItem(KEY));return Object.assign({},defaults,d||{})}catch(e){return {...defaults}}}
 function save(){localStorage.setItem(KEY,JSON.stringify(S));cloudQueuePush()}
 const $=s=>document.querySelector(s);
@@ -1579,7 +1580,6 @@ function renderAccount(){
 const SB_URL="https://jkpwboekztpkfxivueql.supabase.co";
 const SB_KEY="sb_publishable_hq2-GCoJtHstXRVSCSh95g_3omuQDCd";
 const SB_SESS_KEY="daymenu_sb_session";
-let sbSession=null;
 try{sbSession=JSON.parse(localStorage.getItem(SB_SESS_KEY))}catch(e){}
 function sbSaveSession(s){sbSession=s;if(s)localStorage.setItem(SB_SESS_KEY,JSON.stringify(s));else localStorage.removeItem(SB_SESS_KEY)}
 async function sbAuth(path,body){
