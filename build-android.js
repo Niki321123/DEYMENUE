@@ -11,7 +11,15 @@ fs.mkdirSync(www, { recursive: true });
 fs.copyFileSync(path.join(root, "DayMenu.html"), path.join(www, "index.html"));
 
 // 2) synchronizacja Capacitora i budowa APK
-const env = { ...process.env, ANDROID_HOME: path.join(process.env.LOCALAPPDATA, "Android", "Sdk") };
+const sdkDir = path.join(process.env.LOCALAPPDATA, "Android", "Sdk");
+const env = { ...process.env, ANDROID_HOME: sdkDir };
+// Zapisz local.properties z ukosnikami "/" — Gradle zle interpretuje escapowana
+// sciezke z "\\" ("Directory does not exist" mimo istniejacego SDK). Forward-slashe
+// dzialaja jednoznacznie i naprawiaja build APK.
+fs.writeFileSync(
+  path.join(root, "android-app", "android", "local.properties"),
+  "sdk.dir=" + sdkDir.replace(/\\/g, "/") + "\n"
+);
 execSync("npx cap sync android", { cwd: path.join(root, "android-app"), stdio: "inherit", env });
 execSync(".\\gradlew.bat assembleDebug", { cwd: path.join(root, "android-app", "android"), stdio: "inherit", env });
 
