@@ -309,6 +309,20 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 
 ## Historia sesji (skrót)
 
+- **2026-07-12 (sesja 10)**: Rozbudowano zakładkę „Lista książek" (`DayMenu.html`).
+  Model `S.books` rozszerzony o `cover` i `desc`. Dodawanie z podpowiedziami: wpisywanie
+  tytułu (debounce 350 ms) odpytuje **Google Books + Open Library** równolegle
+  (`bookSearch` = merge best-of: Google najpierw dla opisów, OL uzupełnia okładki),
+  dropdown z okładką+tytułem+autorem; wybór wpisuje tytuł/autora i zapamiętuje okładkę/opis;
+  ręcznie wpisany tytuł też dociąga metadane przy dodaniu. Karta książki pokazuje okładkę
+  (56×82) + krótki opis. **Analiza AI** (karta `#bookAiCard` z `data-ai-only` → tylko konta
+  z dostępem do AI): `bookAnalyze` wysyła listę przez `aiCall` (Haiku), dostaje JSON
+  {gust, propozycje[5]} — opis gustu czytelniczego + 5 propozycji z przyciskiem „＋ Dodaj"
+  (dociąga okładkę/opis i wrzuca do „Do przeczytania"). Oba API są CORS-friendly, bez klucza.
+  Zweryfikowane w przeglądarce: wyszukiwanie zwraca wyniki z okładkami, dodanie renderuje
+  okładkę, karta AI ukryta bez dostępu. Uwaga: opisy/autorzy bywają niepełne (zależnie od
+  API) — user może poprawić autora przed dodaniem. **Wymaga `npm run publish`.**
+
 - **2026-07-12 (sesja 10)**: Naprawiono budowanie APK Androida. `npm run publish`/`android`
   od dawna wywalało się na Gradle „SDK location not found... Directory does not exist",
   mimo że SDK istnieje (`%LOCALAPPDATA%\Android\Sdk`, platforms/android-36, build-tools

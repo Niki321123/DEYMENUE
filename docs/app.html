@@ -136,6 +136,17 @@ label.fld{display:block;font-size:var(--fs-1);font-weight:600;color:var(--text-2
 .mat-cell.plan.done{opacity:.5;text-decoration:line-through}
 .mat-grid .hd.clk,.mat-grid .hr.clk{cursor:pointer;user-select:none}
 .mat-grid .hd.clk:hover,.mat-grid .hr.clk:hover{color:var(--primary)}
+/* książki: podpowiedzi + okładki */
+.book-sug{position:absolute;top:100%;left:0;right:0;z-index:30;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-top:4px;max-height:340px;overflow:auto;box-shadow:0 10px 30px rgba(0,0,0,.22)}
+.book-sug .it{display:flex;gap:10px;padding:8px 10px;cursor:pointer;align-items:center;border-bottom:1px solid var(--border)}
+.book-sug .it:last-child{border-bottom:none}
+.book-sug .it:hover{background:var(--surface-2)}
+.book-sug img,.book-sug .noimg{width:34px;height:50px;object-fit:cover;border-radius:3px;flex:none;background:var(--surface-2)}
+.book-sug .t{font-weight:600;line-height:1.2}
+.book-sug .a{font-size:12px;color:var(--text-3)}
+.book-cover,.book-noimg{width:56px;height:82px;object-fit:cover;border-radius:5px;flex:none;background:var(--surface-2)}
+.book-row{display:flex;gap:12px}
+.book-desc{color:var(--text-2);font-size:13px;margin-top:6px;line-height:1.35}
 .brush-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
 
 /* wykres produktywności (styl krypto) + czat AI */
@@ -306,7 +317,10 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   <div class="card">
     <h2>Dodaj książkę</h2>
     <div class="row">
-      <input type="text" id="bookTitle" class="field" placeholder="Tytuł">
+      <div style="position:relative;flex:1;min-width:220px">
+        <input type="text" id="bookTitle" class="field" style="width:100%" autocomplete="off" placeholder="Zacznij pisać tytuł — podpowiemy autora i okładkę">
+        <div id="bookSug" class="book-sug" hidden></div>
+      </div>
       <input type="text" id="bookAuthor" class="field" placeholder="Autor">
       <select id="bookStatus" style="width:180px">
         <option value="todo">Do przeczytania</option>
@@ -315,6 +329,12 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
       </select>
       <button class="btn" id="bookAdd">Dodaj</button>
     </div>
+  </div>
+  <div class="card" id="bookAiCard" data-ai-only hidden>
+    <h2>Analiza AI i propozycje</h2>
+    <p class="muted" style="margin-bottom:var(--sp-3)">AI przeanalizuje Twoją listę (co czytasz, przeczytałeś, chcesz przeczytać), opisze Twój gust i zaproponuje nowe tytuły dopasowane do Ciebie.</p>
+    <button class="btn accent" id="bookAnalyze">🔮 Analizuj i zaproponuj</button>
+    <div id="bookAnalysis" style="margin-top:var(--sp-3)"></div>
   </div>
   <div class="tabs" id="bookTabs">
     <button data-f="all" class="on">Wszystkie</button>
@@ -548,7 +568,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=27;
+const DM_BUILD=28;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -788,31 +808,140 @@ function renderBooks(){
   const list=S.books.filter(b=>bookFilter==="all"||b.status===bookFilter);
   $("#bookList").innerHTML=list.length?list.map(b=>`
     <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <div><strong style="font-size:var(--fs-3)">${esc(b.title)}</strong> <span class="muted">— ${esc(b.author)||"autor nieznany"}</span></div>
-        <div class="row">
-          <select data-st="${b.id}" style="width:170px;min-height:34px;padding:4px 8px">
-            ${Object.entries(BOOK_ST).map(([k,v])=>`<option value="${k}" ${b.status===k?"selected":""}>${v[0]}</option>`).join("")}
-          </select>
-          <button class="icon-btn del" data-del="${b.id}" title="Usuń">✕</button>
+      <div class="book-row">
+        ${b.cover?`<img class="book-cover" src="${esc(b.cover)}" alt="">`:`<div class="book-noimg"></div>`}
+        <div style="flex:1;min-width:0">
+          <div class="row" style="justify-content:space-between;gap:8px">
+            <div><strong style="font-size:var(--fs-3)">${esc(b.title)}</strong> <span class="muted">— ${esc(b.author)||"autor nieznany"}</span></div>
+            <div class="row">
+              <select data-st="${b.id}" style="width:170px;min-height:34px;padding:4px 8px">
+                ${Object.entries(BOOK_ST).map(([k,v])=>`<option value="${k}" ${b.status===k?"selected":""}>${v[0]}</option>`).join("")}
+              </select>
+              <button class="icon-btn del" data-del="${b.id}" title="Usuń">✕</button>
+            </div>
+          </div>
+          ${b.desc?`<div class="book-desc">${esc(b.desc)}</div>`:""}
+          ${b.status==="done"?`
+            <div class="row" style="margin-top:var(--sp-2)">
+              <span class="muted">Ocena:</span>
+              <span class="stars">${[1,2,3,4,5].map(n=>`<button data-rate="${b.id}" data-n="${n}" class="${b.rating>=n?'on':''}" aria-label="${n} gwiazdek">★</button>`).join("")}</span>
+            </div>
+            <textarea data-rev="${b.id}" placeholder="Twoja recenzja / wrażenia…" style="margin-top:var(--sp-2);min-height:60px">${esc(b.review||"")}</textarea>`:""}
         </div>
       </div>
-      ${b.status==="done"?`
-        <div class="row" style="margin-top:var(--sp-2)">
-          <span class="muted">Ocena:</span>
-          <span class="stars">${[1,2,3,4,5].map(n=>`<button data-rate="${b.id}" data-n="${n}" class="${b.rating>=n?'on':''}" aria-label="${n} gwiazdek">★</button>`).join("")}</span>
-        </div>
-        <textarea data-rev="${b.id}" placeholder="Twoja recenzja / wrażenia…" style="margin-top:var(--sp-2);min-height:60px">${esc(b.review||"")}</textarea>`:""}
     </div>`).join(""):`<div class="empty">Brak książek w tym widoku.</div>`;
+  $$("#bookList img.book-cover").forEach(im=>im.onerror=()=>{im.style.visibility="hidden"});
   $$("#bookList [data-st]").forEach(s=>s.onchange=()=>{S.books.find(b=>b.id===s.dataset.st).status=s.value;save();renderBooks()});
   $$("#bookList [data-del]").forEach(b=>b.onclick=()=>{if(confirm("Usunąć książkę?")){S.books=S.books.filter(x=>x.id!==b.dataset.del);save();renderBooks()}});
   $$("#bookList [data-rate]").forEach(b=>b.onclick=()=>{S.books.find(x=>x.id===b.dataset.rate).rating=+b.dataset.n;save();renderBooks()});
   $$("#bookList [data-rev]").forEach(t=>t.onchange=()=>{S.books.find(x=>x.id===t.dataset.rev).review=t.value;save();toast("Recenzja zapisana ✓")});
 }
-$("#bookAdd").onclick=()=>{
+/* ---- wyszukiwarka książek: Google Books + Open Library (bierzemy lepsze z obu) ---- */
+const _norm=s=>(s||"").toLowerCase().replace(/\s+/g," ").trim();
+async function gbSearch(q){
+  try{
+    const r=await fetch("https://www.googleapis.com/books/v1/volumes?maxResults=6&q="+encodeURIComponent(q));
+    if(!r.ok)return [];
+    const j=await r.json();
+    return (j.items||[]).map(it=>{const v=it.volumeInfo||{};
+      let c=(v.imageLinks&&(v.imageLinks.thumbnail||v.imageLinks.smallThumbnail))||"";
+      return {title:v.title||"",author:(v.authors||[]).join(", "),cover:c.replace(/^http:/,"https:"),desc:v.description||"",year:(v.publishedDate||"").slice(0,4)};
+    }).filter(b=>b.title);
+  }catch(e){return []}
+}
+async function olSearch(q){
+  try{
+    const r=await fetch("https://openlibrary.org/search.json?limit=6&fields=title,author_name,cover_i,first_sentence&q="+encodeURIComponent(q));
+    if(!r.ok)return [];
+    const j=await r.json();
+    return (j.docs||[]).map(d=>({title:d.title||"",author:(d.author_name||[]).join(", "),
+      cover:d.cover_i?`https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg`:"",
+      desc:Array.isArray(d.first_sentence)?d.first_sentence[0]:(d.first_sentence||""),year:""})).filter(b=>b.title);
+  }catch(e){return []}
+}
+async function bookSearch(q){
+  const [g,o]=await Promise.all([gbSearch(q),olSearch(q)]);
+  const map=new Map();
+  const put=b=>{
+    const k=_norm(b.title)+"|"+_norm(b.author).split(",")[0];
+    if(!map.has(k)){map.set(k,{...b});return}
+    const e=map.get(k);
+    if(!e.cover&&b.cover)e.cover=b.cover;
+    if(b.desc&&b.desc.length>(e.desc||"").length)e.desc=b.desc;
+    if(!e.author&&b.author)e.author=b.author;
+  };
+  g.forEach(put);o.forEach(put);           // Google najpierw (bogatsze opisy), OL uzupełnia okładki
+  return [...map.values()].slice(0,7);
+}
+let bookPick=null,_bookSugTimer=null,_bookSugSeq=0;
+function bookHideSug(){const el=$("#bookSug");if(el){el.hidden=true;el.innerHTML=""}}
+$("#bookTitle").addEventListener("input",()=>{
+  bookPick=null;                            // ręczna edycja unieważnia poprzedni wybór
+  const q=$("#bookTitle").value.trim();
+  clearTimeout(_bookSugTimer);
+  if(q.length<3){bookHideSug();return}
+  const seq=++_bookSugSeq;
+  _bookSugTimer=setTimeout(async()=>{
+    const res=await bookSearch(q);
+    if(seq!==_bookSugSeq)return;             // przyszła nowsza odpowiedź
+    const el=$("#bookSug");if(!el)return;
+    if(!res.length){bookHideSug();return}
+    el.innerHTML=res.map((b,i)=>`<div class="it" data-i="${i}">
+      ${b.cover?`<img src="${esc(b.cover)}" alt="">`:`<div class="noimg"></div>`}
+      <div><div class="t">${esc(b.title)}</div><div class="a">${esc(b.author)||"autor nieznany"}${b.year?" · "+b.year:""}</div></div></div>`).join("");
+    el.hidden=false;
+    $$("#bookSug .it img").forEach(im=>im.onerror=()=>{im.style.visibility="hidden"});
+    $$("#bookSug .it").forEach(it=>it.onclick=()=>{
+      const b=res[+it.dataset.i];
+      $("#bookTitle").value=b.title;$("#bookAuthor").value=b.author;
+      bookPick={cover:b.cover||"",desc:(b.desc||"").trim()};
+      bookHideSug();
+    });
+  },350);
+});
+document.addEventListener("click",e=>{if(!e.target.closest("#bookSug")&&e.target.id!=="bookTitle")bookHideSug()});
+const bookTrim=d=>{d=(d||"").trim();return d.length>400?d.slice(0,400).replace(/\s+\S*$/,"")+"…":d};
+$("#bookAdd").onclick=async()=>{
   const t=$("#bookTitle").value.trim();if(!t)return toast("Wpisz tytuł");
-  S.books.unshift({id:uid(),title:t,author:$("#bookAuthor").value.trim(),status:$("#bookStatus").value,rating:0,review:""});
-  $("#bookTitle").value="";$("#bookAuthor").value="";save();renderBooks();toast("Książka dodana ✓");
+  let cover="",desc="";
+  if(bookPick){cover=bookPick.cover;desc=bookPick.desc;}
+  else{                                     // ręcznie wpisany tytuł — dociągnij okładkę/opis
+    const btn=$("#bookAdd");btn.disabled=true;
+    try{const res=await bookSearch(t+" "+$("#bookAuthor").value.trim());if(res[0]){cover=res[0].cover||"";desc=res[0].desc||"";if(!$("#bookAuthor").value.trim())$("#bookAuthor").value=res[0].author||"";}}catch(e){}
+    btn.disabled=false;
+  }
+  S.books.unshift({id:uid(),title:t,author:$("#bookAuthor").value.trim(),status:$("#bookStatus").value,rating:0,review:"",cover,desc:bookTrim(desc)});
+  $("#bookTitle").value="";$("#bookAuthor").value="";bookPick=null;bookHideSug();
+  save();renderBooks();toast("Książka dodana ✓");
+};
+/* ---- analiza AI: opis gustu + propozycje (przez aiCall → tylko konta z dostępem) ---- */
+function bookAiContext(){
+  return S.books.slice(0,60).map(b=>({tytul:b.title,autor:b.author,status:(BOOK_ST[b.status]||[b.status])[0],ocena:b.rating||null}));
+}
+$("#bookAnalyze").onclick=async()=>{
+  if(!S.books.length){$("#bookAnalysis").innerHTML=`<p class="muted">Dodaj najpierw kilka książek, żeby AI miało co analizować.</p>`;return}
+  $("#bookAnalyze").disabled=true;$("#bookAnalysis").innerHTML=`<p class="muted">AI analizuje Twoją listę…</p>`;
+  try{
+    const sys=`Jesteś doradcą czytelniczym. Na podstawie listy książek użytkownika (z ich statusem: Przeczytana/Czytam/Do przeczytania i oceną 1-5) opisz zwięźle jego gust i zainteresowania, a potem zaproponuj 5 NOWYCH tytułów, których NIE ma na liście, dopasowanych do gustu. Odpowiadasz WYŁĄCZNIE poprawnym JSON, bez markdown i komentarzy. Format: {"gust":"2-4 zdania po polsku","propozycje":[{"tytul":"...","autor":"...","dlaczego":"1 zdanie po polsku"}]}`;
+    const text=await aiCall(sys,[{role:"user",content:"Moje książki: "+JSON.stringify(bookAiContext())}],1500);
+    const j=aiJson(text);
+    const props=(j.propozycje||[]).map((p,i)=>`<div class="card" style="padding:var(--sp-3)">
+      <div class="row" style="justify-content:space-between;gap:8px">
+        <div style="min-width:0"><strong>${esc(p.tytul)}</strong> <span class="muted">— ${esc(p.autor||"")}</span>
+          <div class="muted" style="font-size:13px;margin-top:2px">${esc(p.dlaczego||"")}</div></div>
+        <button class="btn small" data-addsug="${i}">＋ Dodaj</button>
+      </div></div>`).join("");
+    $("#bookAnalysis").innerHTML=`<div class="card" style="background:var(--surface-2)"><strong>Twój gust czytelniczy</strong><p style="margin-top:6px">${esc(j.gust||"")}</p></div>
+      ${props?`<h3 style="margin:var(--sp-3) 0 var(--sp-2)">Proponowane tytuły</h3>${props}`:""}`;
+    $$("#bookAnalysis [data-addsug]").forEach(btn=>btn.onclick=async()=>{
+      const p=j.propozycje[+btn.dataset.addsug];btn.disabled=true;btn.textContent="Dodaję…";
+      let m={};try{const res=await bookSearch(p.tytul+" "+(p.autor||""));m=res[0]||{}}catch(e){}
+      S.books.unshift({id:uid(),title:p.tytul,author:p.autor||m.author||"",status:"todo",rating:0,review:"",cover:m.cover||"",desc:bookTrim(m.desc)});
+      save();renderBooks();btn.textContent="Dodano ✓";toast("Dodano do „Do przeczytania” ✓");
+    });
+  }catch(e){
+    $("#bookAnalysis").innerHTML=`<p class="muted">${e.message==="NO_AI_ACCESS"?"Ta wersja aplikacji nie ma dostępu do AI.":e.message==="NOLOGIN"?"Zaloguj się do konta w chmurze (zakładka Konto), aby użyć AI.":"Błąd AI: "+esc(e.message)}</p>`;
+  }finally{$("#bookAnalyze").disabled=false}
 };
 
 function beep(){
