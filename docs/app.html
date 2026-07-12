@@ -286,7 +286,8 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 <section class="view" id="view-mood">
   <h1>Mood tracker</h1><p class="sub">Jak się dziś czujesz? Codzienny zapis pomaga zauważyć wzorce.</p>
   <div class="card">
-    <h2>Dzisiaj</h2>
+    <h2>Zapisz nastrój</h2>
+    <div class="field" style="max-width:220px"><label class="fld">Dzień</label><input type="date" id="moodDate"></div>
     <div class="mood-pick" id="moodPick"></div>
     <div class="row">
       <input type="text" id="moodNote" class="field" placeholder="Krótka notatka (opcjonalnie) — co wpłynęło na nastrój?">
@@ -568,7 +569,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=28;
+const DM_BUILD=29;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -701,6 +702,11 @@ function show(v){
   $$(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
   $$(".view").forEach(x=>x.classList.remove("active"));
   $("#view-"+v).classList.add("active");
+  // dostęp do AI bywa nadany PO tym, jak apka już była otwarta (sesja logowania trwa
+  // od rana) — checkAiAccess() normalnie leci tylko przy logowaniu, więc tutaj
+  // doświeżamy go przy każdym wejściu w zakładkę korzystającą z AI, żeby nowo
+  // nadany dostęp pojawił się bez konieczności wylogowania.
+  if((v==="books"||v==="matura")&&typeof checkAiAccess==="function")checkAiAccess().then(()=>renderers[v]&&renderers[v]());
   renderers[v]&&renderers[v]();
   $("#main").scrollTop=0;
 }
@@ -732,12 +738,17 @@ function renderDash(){
 
 /* ================= MOOD ================= */
 let moodSel=null;
-function renderMood(){
-  const t=S.moods.find(x=>x.date===today());
+function moodRenderPicker(){
+  const ds=$("#moodDate").value||today();
+  const t=S.moods.find(x=>x.date===ds);
   moodSel=t?t.mood:null;
   $("#moodNote").value=t?t.note:"";
   $("#moodPick").innerHTML=MOODS.map((e,i)=>`<button data-m="${i}" class="${moodSel===i?'sel':''}" aria-label="Nastrój ${i+1} z 5"><span class="mood-dot" style="background:${MOOD_COLORS[i]}"></span>${e}</button>`).join("");
   $$("#moodPick button").forEach(b=>b.onclick=()=>{moodSel=+b.dataset.m;$$("#moodPick button").forEach(x=>x.classList.toggle("sel",+x.dataset.m===moodSel))});
+}
+function renderMood(){
+  if(!$("#moodDate").value)$("#moodDate").value=today();
+  moodRenderPicker();
   $("#moodChart").innerHTML=moodChartHTML();
   const hist=[...S.moods].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30);
   $("#moodHistory").innerHTML=hist.length?hist.map(m=>`
@@ -758,11 +769,13 @@ function moodChartHTML(){
   }
   return out;
 }
+$("#moodDate").onchange=moodRenderPicker;
 $("#moodSave").onclick=()=>{
   if(moodSel===null)return toast("Wybierz nastrój");
-  S.moods=S.moods.filter(m=>m.date!==today());
-  S.moods.push({date:today(),mood:moodSel,note:$("#moodNote").value.trim()});
-  save();renderMood();toast("Nastrój zapisany ✓");
+  const ds=$("#moodDate").value||today();
+  S.moods=S.moods.filter(m=>m.date!==ds);
+  S.moods.push({date:ds,mood:moodSel,note:$("#moodNote").value.trim()});
+  save();renderMood();toast(ds===today()?"Nastrój zapisany ✓":"Nastrój zapisany dla "+fmtDate(ds)+" ✓");
 };
 
 /* ================= GOALS ================= */

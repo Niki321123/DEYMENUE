@@ -309,6 +309,30 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 
 ## Historia sesji (skrót)
 
+- **2026-07-12 (sesja 10, część 3)**: Zgłoszenie usera "nie mogę dodać snu / odznaczać
+  godzin nauki / brak AI w książkach / książki się nie zapisują" — zweryfikowano każdy
+  punkt osobno (żywe testy w przeglądarce + zapytania SQL do auth.users/ai_access):
+  - **Dodawanie snu i odznaczanie godzin nauki działają poprawnie** (potwierdzone testem
+    end-to-end) — nie były to bugi.
+  - **Prawdziwa luka:** Mood tracker nie miał pola daty (sen miał od dawna) — nie dało się
+    dodać nastroju za wczoraj. Naprawione: `#moodDate` (analogicznie do `#slDate`),
+    `moodRenderPicker()` wczytuje istniejący wpis dla wybranego dnia, `moodSave` zapisuje
+    pod wybraną datą zamiast zawsze `today()`.
+  - **Prawdziwy bug:** `checkAiAccess()` sprawdzał dostęp do AI TYLKO raz, przy logowaniu.
+    Jeśli dostęp nadano PO tym, jak apka była już otwarta (typowy przypadek — admin
+    dodaje mail w trakcie), `aiAccess` zostawał `false` na stałe aż do wylogowania.
+    To tłumaczyło "nie ma analizy AI w książkach" mimo że mail (mikolaj.sledziewski@gmail.com)
+    MIAŁ już dostęp w bazie. Naprawione: `show(v)` teraz doświeża `checkAiAccess()` przy
+    każdym wejściu w zakładki `books`/`matura`, więc nowo nadany dostęp pojawia się od razu.
+    Zweryfikowane na żywo (mock fetch do `ai_access`): karta AI pokazuje się po wejściu
+    w zakładkę, bez restartu/relogowania.
+  - **Wyjaśnione (nie bug):** Książki JUŻ synchronizują się z chmurą — `cloudPush` wysyła
+    cały obiekt `S` (w tym `S.books`) jako jeden JSON do `daymenu_data`. Warunek: user musi
+    być zalogowany w „Konto w chmurze". Odkryto przy okazji: mail `miciwici.yt@gmail.com`
+    (któremu nadano dostęp AI jako pierwszemu) NIGDY nie założył konta w apce — nie ma go
+    w `auth.users`. Ten dostęp jest "martwy", dopóki ktoś nie zaloguje się tym mailem.
+  - **Wymaga `npm run publish`.**
+
 - **2026-07-12 (sesja 10)**: Rozbudowano zakładkę „Lista książek" (`DayMenu.html`).
   Model `S.books` rozszerzony o `cover` i `desc`. Dodawanie z podpowiedziami: wpisywanie
   tytułu (debounce 350 ms) odpytuje **Google Books + Open Library** równolegle
