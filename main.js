@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session, Menu, Tray } = require("electron");
+const { app, BrowserWindow, session, Menu, Tray, Notification } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
@@ -50,6 +50,25 @@ function createWindow() {
 
   session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => {
     cb(["media", "audioCapture", "notifications"].includes(permission));
+  });
+
+  // Eksport danych (przycisk "Eksportuj dane") triggeruje pobieranie przez <a download>.
+  // Bez tego handlera Electron ma domyślne, niejawne zachowanie pobierania — plik może
+  // wylądować w nieoczekiwanym miejscu bez żadnego potwierdzenia. Wymuszamy zapis do
+  // systemowego folderu Pobrane i pokazujemy powiadomienie, żeby zawsze było wiadomo,
+  // czy i gdzie plik faktycznie się zapisał.
+  session.defaultSession.on("will-download", (event, item) => {
+    const dest = path.join(app.getPath("downloads"), item.getFilename());
+    item.setSavePath(dest);
+    item.once("done", (e, state) => {
+      if (!Notification.isSupported()) return;
+      new Notification({
+        title: "Day Menu",
+        body: state === "completed"
+          ? "Zapisano: " + item.getFilename() + " (folder Pobrane)"
+          : "Nie udało się zapisać pliku (" + state + ")"
+      }).show();
+    });
   });
 }
 

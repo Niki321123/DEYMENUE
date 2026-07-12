@@ -569,7 +569,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=29;
+const DM_BUILD=30;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -637,7 +637,21 @@ const defaults={theme:"light",moods:[],goals:[],books:[],timelog:[],sleep:[],app
 let S=load();
 let sbSession=null; // zadeklarowane WCZEŚNIE — save()→cloudQueuePush() bywa wołane już przy starcie (matMigrate), zanim wykona się sekcja chmury
 function load(){try{const d=JSON.parse(localStorage.getItem(KEY));return Object.assign({},defaults,d||{})}catch(e){return {...defaults}}}
-function save(){localStorage.setItem(KEY,JSON.stringify(S));cloudQueuePush()}
+function save(){
+  // Jeśli localStorage.setItem rzuci (np. przekroczony limit pamięci przeglądarki),
+  // błąd wcześniej znikał w ciszy — przycisk "wyglądał" jakby nic nie robił. Teraz
+  // save() zwraca false przy błędzie, żeby wywołujący kod (np. "save();toast('Zapisano')")
+  // mógł to sprawdzić i NIE pokazywać fałszywego komunikatu sukcesu zaraz po błędzie.
+  try{
+    localStorage.setItem(KEY,JSON.stringify(S));
+  }catch(e){
+    console.error("save() failed:",e);
+    toast("Błąd zapisu danych: "+(e&&e.name==="QuotaExceededError"?"brak miejsca w pamięci aplikacji":(e&&e.message)||"nieznany"));
+    return false;
+  }
+  cloudQueuePush();
+  return true;
+}
 const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -775,7 +789,7 @@ $("#moodSave").onclick=()=>{
   const ds=$("#moodDate").value||today();
   S.moods=S.moods.filter(m=>m.date!==ds);
   S.moods.push({date:ds,mood:moodSel,note:$("#moodNote").value.trim()});
-  save();renderMood();toast(ds===today()?"Nastrój zapisany ✓":"Nastrój zapisany dla "+fmtDate(ds)+" ✓");
+  if(save()){renderMood();toast(ds===today()?"Nastrój zapisany ✓":"Nastrój zapisany dla "+fmtDate(ds)+" ✓");}else renderMood();
 };
 
 /* ================= GOALS ================= */
@@ -2155,10 +2169,20 @@ async function librusDisconnect(){
 
 /* ================= EXPORT / IMPORT ================= */
 function doExport(){
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:"application/json"}));
-  a.download=`daymenu-kopia-${today()}.json`;a.click();URL.revokeObjectURL(a.href);
-  toast("Kopia zapasowa pobrana");
+  try{
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:"application/json"}));
+    a.download=`daymenu-kopia-${today()}.json`;
+    document.body.appendChild(a);a.click();a.remove();
+    // Rewoke z opóźnieniem — pobieranie w Electronie/niektórych przeglądarkach jest
+    // asynchroniczne (osobny proces); natychmiastowe revokeObjectURL potrafi po cichu
+    // zepsuć plik, zanim menedżer pobierania zdąży go odczytać (bez błędu w konsoli).
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    toast("Kopia zapasowa pobrana — sprawdź folder Pobrane");
+  }catch(e){
+    console.error("doExport failed:",e);
+    toast("Błąd eksportu: "+(e&&e.message||"nieznany"));
+  }
 }
 $("#exportBtn").onclick=doExport;
 $("#exportBtn2").onclick=doExport;
@@ -2218,7 +2242,8 @@ $("#slSave").onclick=()=>{
   if(!bed||!wake)return toast("Podaj godzinę zaśnięcia i pobudki");
   S.sleep=S.sleep.filter(s=>s.date!==date);
   S.sleep.push({date,bed,wake,quality:+$("#slQ").value,note:$("#slNote").value.trim()});
-  $("#slNote").value="";save();renderSleep();toast("Sen zapisany");
+  $("#slNote").value="";
+  if(save()){renderSleep();toast("Sen zapisany");}else renderSleep();
 };
 
 /* ================= WYGLĄD — PANEL ================= */

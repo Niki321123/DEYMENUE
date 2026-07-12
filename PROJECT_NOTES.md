@@ -309,6 +309,30 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 
 ## Historia sesji (skrót)
 
+- **2026-07-12 (sesja 10, część 4)**: Dalsze śledztwo "sen się nie dodaje" — user
+  potwierdził zaktualizowaną wersję (build 29, desktop) i BRAK jakiegokolwiek komunikatu
+  po kliknięciu Zapisz (nawet błędu walidacji), co wskazywało na cichy wyjątek. Czyste
+  testy (lokalne i na żywej stronie) zawsze przechodziły — więc problem musiał być
+  specyficzny dla środowiska desktop/Electron. Znaleziono i naprawiono DWA realne bugi:
+  1. `save()` (`DayMenu.html`) nie miało obsługi błędu `localStorage.setItem` (np.
+     przekroczony limit pamięci) — wyjątek przerywał handler PRZED wywołaniem toast(),
+     dając wrażenie "nic się nie dzieje". Naprawione: `save()` łapie błąd, pokazuje
+     czytelny toast, zwraca `true`/`false`. Poprawiono też wywołania w handlerach snu
+     i nastroju, żeby nie pokazywały fałszywego "Zapisano ✓" zaraz po prawdziwym błędzie
+     (wcześniej: `save();toast('Zapisano')` pokazywało sukces NAWET gdy save() failował).
+  2. `doExport()` wołało `URL.revokeObjectURL()` NATYCHMIAST po `a.click()` — pobieranie
+     w Electronie jest asynchroniczne (osobny proces), więc blob mógł zostać unieważniony
+     zanim menedżer pobierania zdążył go odczytać, bez żadnego błędu JS. Naprawione:
+     revoke z opóźnieniem 4s + try/catch z czytelnym komunikatem błędu.
+  3. `main.js` nie miało obsługi `will-download` — Electron miał niejawne, nieprzewidywalne
+     zachowanie zapisu. Dodano jawny handler: zapis zawsze do folderu Pobrane +
+     natywne powiadomienie systemowe z potwierdzeniem (lub błędem).
+  Przy okazji ustalono i udokumentowano źródło powtarzających się plików-śmieci w repo
+  (`'email')`)`, `Pages`, `{`, `m.date!`...) — to `!` w podwójnych cudzysłowach Bash
+  (history expansion), nie losowe wklejenia. Zob. memory [[bash-bang-history-expansion]].
+  **Wymaga `npm run publish` I `npm run package`** (main.js zmienił się — sama
+  `publish.js` NIE przebudowuje spakowanej paczki desktopowej w `dist/`).
+
 - **2026-07-12 (sesja 10, część 3)**: Zgłoszenie usera "nie mogę dodać snu / odznaczać
   godzin nauki / brak AI w książkach / książki się nie zapisują" — zweryfikowano każdy
   punkt osobno (żywe testy w przeglądarce + zapytania SQL do auth.users/ai_access):
