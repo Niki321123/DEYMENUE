@@ -569,7 +569,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=30;
+const DM_BUILD=31;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -660,6 +660,18 @@ const today=()=>new Date().toISOString().slice(0,10);
 const fmtDate=d=>new Date(d+"T00:00").toLocaleDateString("pl-PL",{day:"numeric",month:"long",year:"numeric"});
 const fmtMin=m=>{m=Math.round(m);const h=Math.floor(m/60);return h?`${h} h ${m%60} min`:`${m} min`};
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2200)}
+/* Globalny wyłapywacz błędów — dotychczas nieobsłużony wyjątek w handlerze onclick
+   (np. przy suwaku tła, "Usuń tło") przerywał funkcję W CISZY: żaden toast, żaden ślad,
+   przycisk "wyglądał" jakby nic nie robił. Teraz KAŻDY taki błąd pokazuje się jako
+   czerwony toast na dole ekranu, żeby dało się zdiagnozować przyczynę zamiast zgadywać. */
+function toastErr(msg){
+  const t=$("#toast");if(!t)return;
+  t.textContent="Błąd: "+msg;t.style.background="var(--bad,#c0392b)";
+  t.classList.add("show");clearTimeout(t._h);
+  t._h=setTimeout(()=>{t.classList.remove("show");t.style.background="";},5000);
+}
+window.addEventListener("error",e=>{console.error("Nieobsłużony błąd:",e.error||e.message);toastErr((e.error&&e.error.message)||e.message||"nieznany");});
+window.addEventListener("unhandledrejection",e=>{console.error("Nieobsłużone odrzucenie Promise:",e.reason);toastErr((e.reason&&e.reason.message)||String(e.reason)||"nieznany");});
 function notify(title,body){
   try{
     if(!("Notification" in window))return;

@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-07-11 (sesja 9 — Librus multi-user, logowanie w apce)_
+_Ostatnia aktualizacja: 2026-07-12 (sesja 10 — globalny wyłapywacz błędów)_
 
 ## Czym jest projekt
 
@@ -308,6 +308,29 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-07-12 (sesja 10, część 5)**: Po republikacji (build 29) + repackage user zgłosił,
+  że sen NADAL się nie dodaje, i DODATKOWO zepsuły się suwaki tła (rozmycie/przyciemnienie)
+  i przycisk "Usuń tło" — kilka niepowiązanych funkcji naraz. Sprawdzono realne procesy
+  (`Get-Process`) — user faktycznie uruchomił świeży .exe (nie stary proces w tle), więc
+  to NIE była kwestia nieodświeżonej wersji. Zamiast dalej łatać pojedynczo, dodano
+  **globalny wyłapywacz błędów** w `DayMenu.html`: `window.addEventListener("error"/
+  "unhandledrejection", ...)` → `toastErr()` pokazuje CZERWONY toast z treścią KAŻDEGO
+  nieobsłużonego wyjątku/odrzucenia Promise w całej aplikacji (zarejestrowany zaraz po
+  zdefiniowaniu `$`/`toast`, na samym początku głównego scriptu). Zweryfikowano na żywo:
+  celowo rzucony błąd (`nieistniejącaFunkcjaXYZ()`) poprawnie pokazuje się jako
+  "Błąd: nieistniejącaFunkcjaXYZ is not defined". To docelowo zamienia KAŻDĄ przyszłą
+  "ciszę" w konkretny, czytelny komunikat, zamiast zgadywania.
+  Dodatkowo w `main.js`: naprawiono skrót Ctrl+Shift+I do narzędzi deweloperskich (user
+  zgłosił że nie działał — accelerator menu nie działa gdy `Menu.setApplicationMenu(null)`;
+  naprawione przez `webContents.on("before-input-event", ...)`, działa niezależnie od menu)
+  + dodano pozycję "Narzędzia deweloperskie (diagnostyka)" w menu zasobnika jako alternatywę.
+  Sprawdzono kod `#bgRemove`: przycisk jest CELOWO `disabled` gdy `S.appearance.hasBg=false`
+  — jeśli user nie ma ustawionego tła, "nic się nie dzieje" jest poprawnym zachowaniem, nie
+  bugiem (do zweryfikowania czy user faktycznie MIAŁ ustawione tło).
+  **Wymaga `npm run publish` I `npm run package`** (main.js znów się zmienił). Po tym
+  user powinien zobaczyć realny komunikat błędu przy próbie zapisu snu/zmiany tła —
+  to da ostateczną odpowiedź co dokładnie zawodzi.
 
 - **2026-07-12 (sesja 10, część 4)**: Dalsze śledztwo "sen się nie dodaje" — user
   potwierdził zaktualizowaną wersję (build 29, desktop) i BRAK jakiegokolwiek komunikatu

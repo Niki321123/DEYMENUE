@@ -42,6 +42,15 @@ function createWindow() {
   Menu.setApplicationMenu(null);
   win.loadFile("DayMenu.html");
 
+  // Ctrl+Shift+I otwiera narzędzia deweloperskie — działa niezależnie od menu
+  // aplikacji (które jest wyłączone), bo natywny skrót menu bez menu nie zadziała.
+  // Potrzebne do diagnozowania błędów w spakowanej wersji (brak konsoli inaczej).
+  win.webContents.on("before-input-event", (event, input) => {
+    if (input.control && input.shift && input.key.toLowerCase() === "i") {
+      win.webContents.toggleDevTools();
+    }
+  });
+
   // zamknięcie X chowa do zasobnika; pełne wyjście przez menu zasobnika
   win.on("close", (e) => {
     saveState();
@@ -77,6 +86,7 @@ function createTray() {
   tray.setToolTip("Day Menu");
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "Pokaż Day Menu", click: () => { win.show(); win.focus(); } },
+    { label: "Narzędzia deweloperskie (diagnostyka)", click: () => { win.show(); win.webContents.openDevTools(); } },
     { type: "separator" },
     { label: "Zamknij", click: () => { app.isQuiting = true; app.quit(); } }
   ]));
