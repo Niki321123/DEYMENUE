@@ -330,6 +330,12 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
     Na web/desktop plugin nie istnieje → funkcja jest no-opem.
   Zweryfikowane: klasy + layout + receiver obecne w zbudowanym APK (inspekcja zipa),
   build 32 opublikowany, Pages serwuje APK 5.09MB.
+  **HOTFIX (build 33):** user zgłosił "nie widzę tego widżetu" na liście widżetów.
+  Przyczyna: `android:exported="false"` na receiverze `DayMenuWidgetProvider` w
+  AndroidManifest.xml — Android wymaga `exported="true"` na widget-receiverach, inaczej
+  launcher (proces spoza aplikacji) nie może go zobaczyć/wywołać i widżet nie pojawia
+  się na liście do wyboru. Naprawione na `true`, zweryfikowane binarnie w zbudowanym
+  APK (aapt2 dump xmltree potwierdza `exported=true`). Build 33 opublikowany.
   **WAŻNE OGRANICZENIE:** widżet wymaga RĘCZNEJ instalacji nowego APK na telefonie
   (pobrać DayMenu.apk z Pages i zainstalować) — wbudowany self-updater podmienia tylko
   HTML wewnątrz apki i NIE MOŻE dodać natywnego kodu. Dane widżetu odświeżają się przy
