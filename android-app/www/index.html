@@ -569,7 +569,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=31;
+const DM_BUILD=32;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -650,8 +650,33 @@ function save(){
     return false;
   }
   cloudQueuePush();
+  widgetQueuePush();
   return true;
 }
+/* ---- widżet Androida: godziny nauki na dziś + produktywność 7 dni ----
+   Działa tylko w apce Capacitor (plugin DayMenuWidget z WidgetPlugin.java);
+   na desktopie/web brak pluginu = funkcja nic nie robi. Dane liczymy tu w JS
+   (te same wzory co w Analizie czasu) i wysyłamy gotowe do natywnego widżetu. */
+let widgetPushTimer=null;
+function widgetQueuePush(){clearTimeout(widgetPushTimer);widgetPushTimer=setTimeout(widgetPush,1200)}
+function widgetPush(){
+  try{
+    const P=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.DayMenuWidget;
+    if(!P)return;
+    const dow=(new Date().getDay()+6)%7,wk=weekId();
+    const blocks=S.matura.plan.filter(b=>b.day===dow);
+    const done=blocks.filter(b=>b.doneWeek===wk).length;
+    const DL=["Pn","Wt","Śr","Cz","Pt","So","Nd"];
+    const days=[];
+    for(let i=6;i>=0;i--){
+      const d=new Date();d.setDate(d.getDate()-i);
+      const v=pctProd(d.toISOString().slice(0,10));
+      days.push({l:DL[(d.getDay()+6)%7],v:v==null?-1:Math.round(v)});
+    }
+    P.update({data:JSON.stringify({total:blocks.length,done,days})});
+  }catch(e){console.error("widgetPush:",e)}
+}
+setTimeout(widgetPush,3500); // stan na start (gdy user nic nie zmienia, widżet i tak dostaje świeże dane)
 const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);

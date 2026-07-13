@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <!-- ciemna karta jak w motywie aplikacji, lekko przezroczysta -->
+    <solid android:color="#F21B1F27" />
+    <corners android:radius="24dp" />
+</shape>

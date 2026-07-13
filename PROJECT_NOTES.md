@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-07-12 (sesja 10 — globalny wyłapywacz błędów)_
+_Ostatnia aktualizacja: 2026-07-13 (sesja 10 — naprawa builda Android, --no-daemon)_
 
 ## Czym jest projekt
 
@@ -308,6 +308,27 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-07-13 (sesja 10, część 6)**: `npm run publish` (build 31) opublikował web/desktop
+  OK, ale Android padł ZNOWU z tym samym komunikatem "SDK location not found... Directory
+  does not exist", mimo że fix z `local.properties` (sesja 9, forward-slashe) był na
+  miejscu i plik miał poprawną treść. Prawdziwa przyczyna okazała się INNA: log zawierał
+  "1 incompatible and 1 stopped Daemons could not be reused" — stary/niekompatybilny
+  Gradle Daemon z poprzedniej sesji. Potwierdzone: `gradlew --stop` + rebuild od razu
+  przeszedł bez ŻADNEJ zmiany w kodzie. Naprawione trwale: `build-android.js` dodaje
+  `--no-daemon` na stałe do `assembleDebug` — build odrobinę wolniejszy, ale odporny na
+  stan poprzednich sesji Gradle. Zweryfikowane end-to-end (`node build-android.js` od
+  zera → "APK gotowy"). APK (build 31) skopiowany do `docs/DayMenu.apk` (wcześniej było
+  niespójne: `version.json`/`DayMenu.html` już na 31, ale APK w docs/ wciąż z buildu 29,
+  bo poprzednie 2 próby Android paść). Skomitowane i wypchnięte przez Claude bezpośrednio
+  (user nie musiał nic robić dla Androida w tej części). Przy okazji usunięto 2 kolejne
+  puste pliki-śmieci z roota (`({matches`, `{`).
+  Dokończone w tej samej sesji: user przesłał zrzuty ekranu pokazujące, że Licznik snu
+  i sekcja tła (suwaki, historia z wpisami 9-10 lipca) WIZUALNIE działają/renderują się
+  poprawnie — poprosił "zbuduj te rzeczy od nowa". Claude zamknął uruchomione procesy
+  Day Menu (za zgodą kontekstową), uruchomił `npm run package`, zweryfikował że nowa
+  paczka zawiera globalny wyłapywacz błędów + fix devtools, i uruchomił świeżą apkę.
+  Desktop .exe jest teraz w pełni aktualny (build 31 + wszystkie fixy z części 5-6).
 
 - **2026-07-12 (sesja 10, część 5)**: Po republikacji (build 29) + repackage user zgłosił,
   że sen NADAL się nie dodaje, i DODATKOWO zepsuły się suwaki tła (rozmycie/przyciemnienie)

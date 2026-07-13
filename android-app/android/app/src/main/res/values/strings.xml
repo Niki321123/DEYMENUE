@@ -4,4 +4,5 @@
     <string name="title_activity_main">Day Menu</string>
     <string name="package_name">pl.user.daymenu</string>
     <string name="custom_url_scheme">pl.user.daymenu</string>
+    <string name="widget_description">Godziny nauki na dziś i wykres produktywności z 7 dni</string>
 </resources>
