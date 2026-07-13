@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-07-13 (sesja 10 — naprawa builda Android, --no-daemon)_
+_Ostatnia aktualizacja: 2026-07-13 (sesja 10 — widżet Androida: nauka + produktywność)_
 
 ## Czym jest projekt
 
@@ -308,6 +308,33 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-07-13 (sesja 10, część 7)**: **Widżet ekranu głównego Androida** (build 32).
+  Na życzenie usera (ekran 9 rzędów x 4 kolumny, widżet "3x4" = 4 kolumny szer. x 3 rzędy
+  wys.): pokazuje liczbę godzin nauki do zrobienia dziś + słupkowy wykres produktywności
+  z 7 dni (ta sama metryka co linia "Produktywność" w Analizie czasu: sen 50% + nauka 50%,
+  liczona w JS przez `pctProd`). Architektura:
+  - `WidgetPlugin.java` — plugin Capacitora (`@CapacitorPlugin(name="DayMenuWidget")`),
+    JS woła `Capacitor.Plugins.DayMenuWidget.update({data})`; Java zapisuje JSON do
+    SharedPreferences `daymenu_widget` i odświeża widżet. Rejestrowany w `MainActivity`
+    PRZED `super.onCreate` (inaczej Capacitor nie wystawi go do JS).
+  - `DayMenuWidgetProvider.java` — AppWidgetProvider; wykres rysowany na Bitmapie
+    (RemoteViews nie obsługuje własnych widoków), dzisiejszy słupek akcentowany
+    pomarańczowym, dni bez danych jako szare pieńki, skala rośnie gdy >100%.
+    Klik w widżet otwiera apkę. Bez danych: "Otwórz Day Menu, aby wczytać dane".
+  - res: `layout/widget_daymenu.xml`, `drawable/widget_bg.xml` (ciemna karta 24dp),
+    `xml/widget_daymenu_info.xml` (targetCell 4x3 + minWidth/Height 250/180dp dla
+    starszych wersji), receiver w AndroidManifest, opis w strings.xml.
+  - JS (`DayMenu.html`): `widgetPush()` liczy {total,done,days[7]} i wysyła przez plugin;
+    wpięte w `save()` z debounce 1200ms (`widgetQueuePush`) + raz na starcie (3.5s).
+    Na web/desktop plugin nie istnieje → funkcja jest no-opem.
+  Zweryfikowane: klasy + layout + receiver obecne w zbudowanym APK (inspekcja zipa),
+  build 32 opublikowany, Pages serwuje APK 5.09MB.
+  **WAŻNE OGRANICZENIE:** widżet wymaga RĘCZNEJ instalacji nowego APK na telefonie
+  (pobrać DayMenu.apk z Pages i zainstalować) — wbudowany self-updater podmienia tylko
+  HTML wewnątrz apki i NIE MOŻE dodać natywnego kodu. Dane widżetu odświeżają się przy
+  każdym użyciu aplikacji (nie ma własnego harmonogramu pobierania — pokazuje stan
+  z ostatniego otwarcia apki).
 
 - **2026-07-13 (sesja 10, część 6)**: `npm run publish` (build 31) opublikował web/desktop
   OK, ale Android padł ZNOWU z tym samym komunikatem "SDK location not found... Directory
