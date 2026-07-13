@@ -21,7 +21,11 @@ fs.writeFileSync(
   "sdk.dir=" + sdkDir.replace(/\\/g, "/") + "\n"
 );
 execSync("npx cap sync android", { cwd: path.join(root, "android-app"), stdio: "inherit", env });
-execSync(".\\gradlew.bat assembleDebug", { cwd: path.join(root, "android-app", "android"), stdio: "inherit", env });
+// --no-daemon: stary/niekompatybilny Gradle Daemon z poprzedniego builda potrafi
+// wywalic caly build komunikatem mylacym o "SDK location not found", mimo ze
+// local.properties jest poprawny — build dziala od razu po zatrzymaniu daemona.
+// Bez daemona kazdy build jest odrobine wolniejszy, ale zawsze niezawodny.
+execSync(".\\gradlew.bat assembleDebug --no-daemon", { cwd: path.join(root, "android-app", "android"), stdio: "inherit", env });
 
 // 3) skopiuj gotowy APK do katalogu glownego
 fs.copyFileSync(
