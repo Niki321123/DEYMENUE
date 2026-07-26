@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-07-27 (sesja 11 — zakładka „Sprawdziany" + terminarz z Librusa)_
+_Ostatnia aktualizacja: 2026-07-27 (sesja 11 — zakładka „Sprawdziany" + dogrywka APK build 34)_
 
 ## Czym jest projekt
 
@@ -348,6 +348,20 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-07-27 (sesja 11, dogrywka APK)**: Użytkownik uruchomił `npm run publish` (build 34) —
+  web/desktop opublikowane OK, ale build APK padl na tym samym mylącym błędzie Gradle
+  "SDK location not found... Directory does not exist" mimo poprawnego `local.properties`
+  (patrz przypadek z sesji 10, część 6 — tam też okazało się to przejściowe). Zweryfikowano:
+  SDK istnieje, `local.properties` ma poprawną zawartość z forward-slashami tuż przed
+  wywołaniem Gradle, `npx cap sync android` niczego nie nadpisuje. Powtórzenie DOKŁADNIE
+  tego samego `gradlew assembleDebug --no-daemon` bez żadnej zmiany w kodzie przeszło
+  natychmiast (`BUILD SUCCESSFUL`) — potwierdzony przejściowy błąd, nie trwała
+  konfiguracja. Dokończono publikację ręcznie: skopiowano świeży APK do `DayMenu.apk`
+  i `docs/DayMenu.apk`, scommitowano i wypchnięto (`docs/DayMenu.apk` jedyny śledzony
+  plik APK). Zweryfikowane na żywo: GitHub Pages serwuje plik o rozmiarze zgodnym ze
+  świeżym buildem 34 (4 642 170 B), nie ze starym buildem 33 (5 093 806 B). Web, desktop
+  i Android są teraz spójne na buildzie 34.
 
 - **2026-07-27 (sesja 11)**: Dodano zakładkę **„Sprawdziany"** w grupie Edukacja (obok
   „Nauka") — zapowiedzi sprawdzianów/kartkówek z terminarza Librusa + możliwość wpisania
