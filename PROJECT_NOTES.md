@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-07-13 (sesja 10 — widżet Androida: nauka + produktywność)_
+_Ostatnia aktualizacja: 2026-07-27 (sesja 11 — zakładka „Sprawdziany" + terminarz z Librusa)_
 
 ## Czym jest projekt
 
@@ -278,6 +278,46 @@ sprzed tej sesji, już nieużywany przez apkę, można zignorować/skasować.
         Odebranie: `delete from ai_access where email=lower('mail');`.
       - Zweryfikowane w przeglądarce: bez dostępu czat ukryty + `aiCall` blokuje + plan
         lokalny działa; po nadaniu dostępu czat się pokazuje. **Wymaga `npm run publish`.**
+- [x] **Zakładka „Sprawdziany" w Edukacji (sesja 11).** Nowa pozycja w menu obok „Nauka"
+      (`data-view="exams"`, `#view-exams`, `renderExams`). Pokazuje zapowiedzi sprawdzianów,
+      kartkówek itp. z **terminarza Librusa** (data, przedmiot, rodzaj, nauczyciel, opis)
+      i pozwala do każdej dopisać **umówioną poprawę**.
+      - **Backend:** rozszerzona Edge Function `librus-timetable` — w tej samej sesji
+        logowania co plan lekcji pobiera `https://synergia.librus.pl/terminarz` (bieżący +
+        następny miesiąc). Zamiast parsować siatkę kalendarza (klasy CSS i numery dni Librus
+        zmienia często) wyłuskuje regexem linki `terminarz/szczegoly*/{id}` i czyta **strony
+        szczegółów** jako generyczne tabelki etykieta→wartość (`th+td` albo dwa `td`) —
+        stamtąd bierze pełną datę, rodzaj, przedmiot, nauczyciela i opis. Klasyfikacja
+        sprawdzian/nie-sprawdzian po słowach kluczowych (`exam:true/false`), więc nawet
+        nietrafiony rodzaj nie gubi danych (UI ma przełącznik „pokaż pozostałe wydarzenia").
+      - Bezpieczniki: awaria terminarza **nie może** zepsuć planu lekcji (osobny try/catch,
+        osobne pole `exams_error`); pusty terminarz tam, gdzie wcześniej były zapowiedzi =
+        zostaje stara lista; limit 45 stron szczegółów na przebieg (4 równolegle), a przy
+        urwanej liście diff nie zgłasza „odwołanych"; jedno niedostępne wydarzenie nie
+        przerywa reszty.
+      - Zmiany trafiają w istniejący mechanizm powiadomień (`librus_events`): „Nowa
+        zapowiedź", „Zmiana terminu", „Odwołana zapowiedź" — tylko dla sprawdzianów
+        i tylko dla terminów, które jeszcze nie minęły.
+      - **Baza:** migracja `librus_snapshot_exams` — kolumny `exams jsonb`,
+        `exams_fetched_at`, `exams_error` w `librus_snapshot` (istniejąca polityka RLS
+        `select own` obejmuje je automatycznie, bo działa na wierszach). **Już zastosowana.**
+      - **Klient:** `S.exams={librus,fetchedAt,err,manual,retakes}`. `librus` nadpisuje
+        synchronizacja, `manual` (wpisy ręczne) i `retakes` (poprawy, klucz `L:id`/`M:id`)
+        należą do użytkownika i przeżywają każdą synchronizację — poprawa zostaje nawet gdy
+        sprawdzian zniknie z Librusa. Dane jadą tym samym snapshotem co plan lekcji
+        (`librusApplyExams` w `librusSyncSchedule`, jeden request, zapis tylko przy realnej
+        zmianie). Zakładki Nadchodzące/Minione/Wszystkie, badge „dziś/jutro/za N dni",
+        ręczne dodawanie i karta „Umówione poprawy" z odhaczaniem.
+      - Funkcja **wdrożona** (wersja 9, `verify_jwt=false` zachowane). Smoke test: wywołanie
+        bez klucza crona zwraca 401 `unauthorized` (a nie 503 `not_configured`), co przy okazji
+        potwierdza, że sekrety `LIBRUS_ENC_KEY` i `LIBRUS_CRON_KEY` są ustawione.
+      - **DO ZROBIENIA:** `npm run publish` — zmiany klienta są tylko w źródłowym
+        `DayMenu.html`.
+      - ⚠ **Parsera nie dało się sprawdzić na prawdziwym Librusie** — `librus_accounts` ma
+        0 wierszy, nikt nie ma jeszcze podłączonego konta. Sprawdzony jest na 4 wariantach
+        układu strony szczegółów, ale pierwsze realne podłączenie dopiero pokaże, czy
+        struktura się zgadza. Gdyby nie: błąd wyląduje w `exams_error` i pokaże się
+        w zakładce na czerwono, plan lekcji będzie działał niezależnie.
 - [ ] Użytkownik: założyć jedno konto (prawdziwym e-mailem) w zakładce „Konto" (po
       aktualizacji apki do build 17 na obu urządzeniach), potwierdzić mailem, zalogować
       się na PC i telefonie
@@ -308,6 +348,23 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-07-27 (sesja 11)**: Dodano zakładkę **„Sprawdziany"** w grupie Edukacja (obok
+  „Nauka") — zapowiedzi sprawdzianów/kartkówek z terminarza Librusa + możliwość wpisania
+  umówionej poprawy. Szczegóły w liście zadań wyżej. Kluczowa decyzja projektowa: parser
+  terminarza **nie** czyta siatki kalendarza (numery dni i klasy CSS Librus zmienia często),
+  tylko wyłuskuje regexem linki do stron szczegółów i parsuje je jako generyczne tabelki
+  etykieta→wartość — dzięki temu zniesie zmianę wyglądu kalendarza, a pełną datę i tak bierze
+  ze strony szczegółów. Zweryfikowane: 4 warianty układu strony szczegółów (th+td, dwa td,
+  data ISO i `dd.mm.rrrr`, brak pola „Rodzaj" z rozpoznaniem po ścieżce URL), dedup linków,
+  8 przypadków diffa (nowa/przeniesiona/odwołana zapowiedź, ignorowanie minionych,
+  ignorowanie nie-sprawdzianów, urwana lista) — wszystko przeszło. UI przetestowane na żywo
+  w przeglądarce: filtry, sortowanie, dodawanie ręczne, pełny cykl poprawy (umów → zapisz →
+  zalicz) oraz to, że synchronizacja z Librusa **nie kasuje** popraw ani wpisów ręcznych.
+  Poprawiony układ karty sprawdzianu na telefonie (przyciski schodzą pod treść, klasy
+  `.ex-head`/`.ex-actions`). Migracja `librus_snapshot_exams` zastosowana na Supabase,
+  funkcja `librus-timetable` wdrożona (wersja 9) po potwierdzeniu przez użytkownika.
+  Zostaje `npm run publish`.
 
 - **2026-07-13 (sesja 10, część 7)**: **Widżet ekranu głównego Androida** (build 32).
   Na życzenie usera (ekran 9 rzędów x 4 kolumny, widżet "3x4" = 4 kolumny szer. x 3 rzędy

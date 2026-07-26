@@ -1,11 +1,12 @@
-// Monitor planu lekcji z Librus Synergia.
+// Monitor planu lekcji i zapowiedzi sprawdzianow z Librus Synergia.
 //
 // Odtwarza flow biblioteki `librusapi` (github.com/ravensiris/librusapi) w Deno:
 // logowanie OAuth na api.librus.pl -> cookie DZIENNIKSID -> POST przegladaj_plan_lekcji.
 // Pythona uzyc sie nie da (Edge Runtime to Deno), wiec logika jest przepisana 1:1.
+// W tej samej sesji logowania pobieramy tez terminarz (sprawdziany, kartkowki itp.).
 //
 // Wywolywane co godzine przez pg_cron. Nigdy nie rzuca wyjatkiem na zewnatrz —
-// blad ladnie laduje w librus_snapshot.last_error i w logach.
+// blad ladnie laduje w librus_snapshot.last_error / .exams_error i w logach.
 
 import { DOMParser, type Element } from "https://deno.land/x/deno_dom@v0.1.45/deno-dom-wasm.ts";
 
@@ -206,6 +207,141 @@ async function fetchTimetable(jar: Jar, week: string): Promise<Unit[]> {
   return parseTimetable(await res.text());
 }
 
+/* ------------------- terminarz: sprawdziany i kartkowki -------------------- */
+
+const TERMINARZ_URL = "https://synergia.librus.pl/terminarz";
+// Kazde wydarzenie w terminarzu linkuje do wlasnej strony szczegolow, a wariantow
+// sciezki jest kilka (szczegoly, szczegoly_wydarzenia, szczegoly_sprawdzianu...).
+// Lapiemy je regexem po calym HTML zamiast parsowac siatke kalendarza: numer dnia
+// w komorce i klasy CSS Librus zmienia znacznie czesciej niz te adresy, a i tak
+// pelna date bierzemy ze strony szczegolow.
+const EVENT_LINK_RE = /terminarz\/(szczegoly[a-z_]*)\/(\d+)/gi;
+const MAX_EVENT_DETAILS = 45;   // bezpiecznik na dlugosc przebiegu
+const EVENT_CONCURRENCY = 4;
+const EXAM_RE =
+  /sprawdzian|kartk[oó]wk|praca klasowa|klas[oó]wk|\btest|dyktando|wypracowan|egzamin|pr[oó]bn|odpowied[zź]|recytacj|referat/i;
+
+export interface Exam {
+  id: string;
+  path: string;
+  date: string;        // YYYY-MM-DD, "" gdy nie udalo sie odczytac
+  time: string | null;
+  type: string;        // "Sprawdzian" / "Kartkówka" / ...
+  subject: string;
+  teacher: string;
+  desc: string;
+  exam: boolean;       // sprawdzian/kartkowka, a nie zwykle wydarzenie klasowe
+}
+
+/** Strony szczegolow w Librusie to tabelki etykieta->wartosc. Czytamy je generycznie
+ *  (th+td albo dwa td), wiec zmiana nazw klas CSS nic nam nie robi. */
+function parseDetail(html: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  if (!doc) return out;
+  const clean = (s: string) => s.replace(/\s+/g, " ").trim();
+  for (const row of doc.querySelectorAll("tr")) {
+    const tr = row as unknown as Element;
+    const th = tr.querySelector("th");
+    const tds = [...tr.querySelectorAll("td")] as unknown as Element[];
+    let label = "", value = "";
+    if (th && tds.length >= 1) { label = clean(th.textContent); value = clean(tds[0].textContent); }
+    else if (tds.length === 2) { label = clean(tds[0].textContent); value = clean(tds[1].textContent); }
+    label = label.replace(/:\s*$/, "").toLowerCase();
+    if (label && value && !(label in out)) out[label] = value;
+  }
+  return out;
+}
+
+/** Pierwsza wartosc, ktorej etykieta zawiera ktorys z podanych fragmentow. */
+function pick(map: Record<string, string>, ...needles: string[]): string {
+  for (const n of needles) for (const [k, v] of Object.entries(map)) if (k.includes(n)) return v;
+  return "";
+}
+
+function normDate(s: string): string {
+  let m = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = s.match(/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})/); // 14.09.2026
+  if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  return "";
+}
+function normTime(s: string): string | null {
+  const m = s.match(/\b(\d{1,2}):(\d{2})\b/);
+  return m ? `${m[1].padStart(2, "0")}:${m[2]}` : null;
+}
+
+async function fetchEventDetail(jar: Jar, path: string, id: string): Promise<Exam | null> {
+  const res = await hop(jar, `${TERMINARZ_URL}/${path}/${id}`);
+  if (!res.ok) return null;
+  const map = parseDetail(await res.text());
+  if (!Object.keys(map).length) return null;
+
+  const type = pick(map, "rodzaj", "typ ", "kategoria") || (/sprawdzian/i.test(path) ? "Sprawdzian" : "");
+  const subject = pick(map, "przedmiot");
+  const teacher = pick(map, "nauczyciel", "prowadz", "dodał", "dodal");
+  const desc = pick(map, "opis", "treść", "tresc", "temat", "informacj");
+  const date = normDate(pick(map, "data", "termin", "dzień", "dzien"));
+  const time = normTime(pick(map, "godzin", "czas")) ?? null;
+  const hay = `${type} ${desc} ${path}`;
+
+  return { id, path, date, time, type, subject, teacher, desc, exam: EXAM_RE.test(hay) };
+}
+
+async function fetchCalendarHtml(jar: Jar, year: number, month: number, current: boolean): Promise<string> {
+  // Biezacy miesiac to zwykly GET. Dla kolejnego Librus oczekuje POST-a z miesiacem —
+  // nazwy pol bywaly rozne miedzy wersjami, wiec wysylamy wszystkie znane naraz
+  // (PHP ignoruje nadmiarowe). Jesli nawigacja nie zadziala, dostaniemy ten sam
+  // miesiac co wyzej i po prostu zdeduplikujemy wydarzenia po id.
+  const res = current
+    ? await hop(jar, TERMINARZ_URL)
+    : await hop(jar, TERMINARZ_URL, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        rok: String(year),
+        miesiac: String(month),
+        dzien: "1",
+        data: `${year}-${String(month).padStart(2, "0")}-01`,
+      }),
+    });
+  return res.ok ? await res.text() : "";
+}
+
+/** Zapowiedzi z biezacego i nastepnego miesiaca. `truncated` = trafilismy w limit
+ *  stron szczegolow, wiec lista jest niepelna i nie wolno z niej wnioskowac o
+ *  odwolanych sprawdzianach. */
+async function fetchExams(jar: Jar): Promise<{ exams: Exam[]; truncated: boolean }> {
+  const [y, m] = warsawToday().split("-").map(Number);
+  const months: [number, number][] = [[y, m], m === 12 ? [y + 1, 1] : [y, m + 1]];
+
+  const found = new Map<string, string>(); // id -> path
+  for (let i = 0; i < months.length; i++) {
+    let html = "";
+    try { html = await fetchCalendarHtml(jar, months[i][0], months[i][1], i === 0); } catch { continue; }
+    for (const mt of html.matchAll(EVENT_LINK_RE)) if (!found.has(mt[2])) found.set(mt[2], mt[1]);
+  }
+
+  const entries = [...found];
+  const truncated = entries.length > MAX_EVENT_DETAILS;
+  const todo = entries.slice(0, MAX_EVENT_DETAILS);
+
+  const exams: Exam[] = [];
+  let next = 0;
+  const worker = async () => {
+    while (next < todo.length) {
+      const [id, path] = todo[next++];
+      // Jedno niedostepne wydarzenie nie moze przerwac pobierania reszty.
+      try { const e = await fetchEventDetail(jar, path, id); if (e) exams.push(e); } catch { /* ignore */ }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(EVENT_CONCURRENCY, todo.length) }, worker),
+  );
+  exams.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  return { exams, truncated };
+}
+
 /* ----------------------------------- diff ----------------------------------- */
 
 const DNI = ["pon", "wt", "śr", "czw", "pt", "sob", "ndz"];
@@ -264,6 +400,39 @@ export function diff(prev: Unit[], next: Unit[]): string[] {
     if (a.classroom !== b.classroom) msgs.push(`Zmiana sali: ${at}: ${where(b)} → ${where(a)}`);
     if (a.teacher !== b.teacher) msgs.push(`Zmiana nauczyciela: ${at}: ${b.teacher} → ${a.teacher}`);
     if (a.to !== b.to) msgs.push(`Zmiana końca lekcji: ${at}: ${b.to} → ${a.to}`);
+  }
+  return msgs;
+}
+
+/** Komunikaty o zmianach w zapowiedzianych sprawdzianach. Milczymy o wydarzeniach,
+ *  ktore nie sa sprawdzianem, i o terminach, ktore juz minely. */
+export function diffExams(prev: Exam[], next: Exam[], todayYmd: string, truncated = false): string[] {
+  const prevMap = new Map(prev.map((e) => [e.id, e]));
+  const nextMap = new Map(next.map((e) => [e.id, e]));
+  const msgs: string[] = [];
+  const ahead = (e: Exam) => !e.date || e.date >= todayYmd;
+  const label = (e: Exam) => `${e.type || "Sprawdzian"}${e.subject ? ` — ${e.subject}` : ""}`;
+  const whenExam = (d: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return "termin nieznany";
+    const dt = new Date(`${d}T00:00:00Z`);
+    const [, mo, day] = d.split("-");
+    return `${DNI[(dt.getUTCDay() + 6) % 7]} ${day}.${mo}`;
+  };
+
+  for (const e of next) {
+    if (!e.exam || !ahead(e)) continue;
+    const old = prevMap.get(e.id);
+    if (!old) msgs.push(`Nowa zapowiedź: ${label(e)}, ${whenExam(e.date)}`);
+    else if (old.date !== e.date) {
+      msgs.push(`Zmiana terminu: ${label(e)}: ${whenExam(old.date)} → ${whenExam(e.date)}`);
+    }
+  }
+  // Przy urwanej liscie brak wydarzenia nie znaczy, ze zostalo odwolane.
+  if (!truncated) {
+    for (const e of prev) {
+      if (!e.exam || !ahead(e) || nextMap.has(e.id)) continue;
+      msgs.push(`Odwołana zapowiedź: ${label(e)}, ${whenExam(e.date)}`);
+    }
   }
   return msgs;
 }
@@ -350,6 +519,32 @@ async function accountError(userId: string, kind: string, message: string) {
 
 /* ---------------------------------- handler --------------------------------- */
 
+/** Pobiera zapowiedzi tak, zeby zaden blad terminarza nie przewrocil synchronizacji
+ *  planu lekcji: przy awarii zostaje poprzednia lista, a powod laduje w exams_error. */
+async function safeExams(jar: Jar, prevExams: Exam[], prevFetchedAt: string | null) {
+  const keepPrev = (error: string | null) => ({
+    exams: prevExams, fetchedAt: prevFetchedAt, error, messages: [] as string[],
+  });
+  try {
+    const { exams, truncated } = await fetchExams(jar);
+    // Pusty terminarz tam, gdzie wczesniej byly zapowiedzi, to raczej zmiana strony
+    // niz skasowanie wszystkiego — ten sam bezpiecznik co przy planie lekcji.
+    if (!exams.length && prevExams.length) {
+      return keepPrev("structure: pusty terminarz mimo wczesniejszych zapowiedzi");
+    }
+    return {
+      exams,
+      fetchedAt: new Date().toISOString(),
+      error: null as string | null,
+      messages: prevFetchedAt ? diffExams(prevExams, exams, warsawToday(), truncated) : [],
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[librus] terminarz: ${msg}`);
+    return keepPrev(msg.slice(0, 500));
+  }
+}
+
 async function processAccount(acc: { user_id: string; login: string; pass_cipher: string; pass_iv: string }, force: boolean) {
   const snap = await loadSnapshot(acc.user_id);
   // rate-limit per uzytkownik — max raz na godzine
@@ -369,8 +564,18 @@ async function processAccount(acc: { user_id: string; login: string; pass_cipher
     return { error: true };
   }
   const messages = firstRun ? [] : diff(prev, units);
+
+  // Zapowiedzi sprawdzianow — w tej samej sesji logowania. Awaria terminarza nie moze
+  // zepsuc planu lekcji, wiec wszystko laduje w osobnym try/catch i osobnym polu bledu.
+  const prevExams: Exam[] = Array.isArray(snap?.exams) ? snap.exams : [];
+  const exams = await safeExams(jar, prevExams, snap?.exams_fetched_at ?? null);
+  messages.push(...exams.messages);
+
   await pushEvents(acc.user_id, messages);
-  await saveSnapshot(acc.user_id, { week, units, fetched_at: new Date().toISOString(), last_error: null, last_error_at: null });
+  await saveSnapshot(acc.user_id, {
+    week, units, fetched_at: new Date().toISOString(), last_error: null, last_error_at: null,
+    exams: exams.exams, exams_fetched_at: exams.fetchedAt, exams_error: exams.error,
+  });
   await fetch(`${SB_URL}/rest/v1/librus_accounts?user_id=eq.${acc.user_id}`, {
     method: "PATCH", headers: { ...svc, Prefer: "return=minimal" },
     body: JSON.stringify({ status: "ok", last_sync_at: new Date().toISOString(), last_error: null, last_error_at: null }),
@@ -421,8 +626,12 @@ Deno.serve(async (req) => {
     try {
       const week = weekRange(warsawToday());
       const units = await fetchTimetable(jar, week);
-      await saveSnapshot(userId, { week, units, fetched_at: new Date().toISOString(), last_error: null, last_error_at: null });
-      return ok({ ok: true, connected: true, units: units.length });
+      const exams = await safeExams(jar, [], null); // pierwszy raz = bez powiadomien
+      await saveSnapshot(userId, {
+        week, units, fetched_at: new Date().toISOString(), last_error: null, last_error_at: null,
+        exams: exams.exams, exams_fetched_at: exams.fetchedAt, exams_error: exams.error,
+      });
+      return ok({ ok: true, connected: true, units: units.length, exams: exams.exams.length });
     } catch {
       return ok({ ok: true, connected: true, units: 0, warn: "first_fetch_failed" });
     }

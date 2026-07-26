@@ -75,6 +75,7 @@ textarea{resize:vertical;min-height:90px}
 label.fld{display:block;font-size:var(--fs-1);font-weight:600;color:var(--text-2);margin-bottom:var(--sp-1)}
 .field{flex:1;min-width:140px}
 .list-item{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3);border:1px solid var(--border);border-radius:var(--radius-s);margin-bottom:var(--sp-2);background:var(--surface)}
+.ex-actions{width:auto;flex:0 0 auto}
 .badge{font-size:11px;font-weight:700;border-radius:99px;padding:2px 10px;white-space:nowrap}
 .badge.b-primary{background:var(--primary-soft);color:var(--primary)}
 .badge.b-good{background:var(--good-soft);color:var(--good)}
@@ -213,6 +214,10 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   .row>input[type=date],.row>input[type=time],.row>select{width:100%!important}
   .row>div[style*="width"]{flex:1 1 46%;width:auto!important;min-width:0}
   .list-item{flex-wrap:wrap}
+  /* na telefonie przyciski sprawdzianu schodzą pod treść, żeby nie wchodziły w tytuł */
+  .ex-head{flex-direction:column;align-items:stretch}
+  .ex-head .ex-actions{width:100%}
+  .ex-head .ex-actions .btn{flex:1}
   .mood-pick button{flex:1 1 44%;justify-content:center}
   .mat-grid-wrap{overflow-x:auto}
   .mat-grid{min-width:640px}
@@ -253,6 +258,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   </div>
   <div class="nav-group"><h3>Edukacja</h3>
     <button class="nav-btn" data-view="matura">Nauka</button>
+    <button class="nav-btn" data-view="exams">Sprawdziany</button>
   </div>
   <div class="nav-group"><h3>Produktywność</h3>
     <button class="nav-btn" data-view="time">Analiza czasu</button>
@@ -438,6 +444,55 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   </div>
 </section>
 
+<!-- ============ SPRAWDZIANY ============ -->
+<section class="view" id="view-exams">
+  <h1>Sprawdziany</h1><p class="sub">Zapowiedzi sprawdzianów, kartkówek i innych prac z terminarza Librusa — data, przedmiot i opis. Do każdej możesz dopisać umówioną poprawę.</p>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;margin-bottom:var(--sp-2)">
+      <h2 style="margin:0">Terminarz z Librusa</h2>
+      <button class="btn ghost small" id="exSync">Odśwież</button>
+    </div>
+    <p class="muted" id="exStatus">—</p>
+    <p class="muted" id="exErr" hidden style="color:var(--bad)"></p>
+    <label class="row" style="gap:8px;margin-top:var(--sp-2);width:auto">
+      <input type="checkbox" id="exShowOther" style="width:auto;min-height:0">
+      <span class="muted">Pokaż też pozostałe wydarzenia z terminarza (wycieczki, apele…)</span>
+    </label>
+  </div>
+
+  <div class="card" id="exRetakeCard" hidden>
+    <h2>Umówione poprawy</h2>
+    <div id="exRetakeList"></div>
+  </div>
+
+  <div class="tabs" id="exTabs">
+    <button data-f="next" class="on">Nadchodzące</button>
+    <button data-f="past">Minione</button>
+    <button data-f="all">Wszystkie</button>
+  </div>
+  <div id="exList"></div>
+
+  <div class="card">
+    <h2>Dodaj ręcznie</h2>
+    <p class="muted" style="margin-bottom:var(--sp-3)">Sprawdzian, którego nie ma w Librusie — np. zapowiedziany tylko ustnie.</p>
+    <div class="row">
+      <input type="date" id="exNewDate" class="field">
+      <input type="text" id="exNewSubject" class="field" placeholder="Przedmiot">
+      <select id="exNewType" style="width:180px">
+        <option>Sprawdzian</option>
+        <option>Kartkówka</option>
+        <option>Praca klasowa</option>
+        <option>Test</option>
+        <option>Odpowiedź ustna</option>
+        <option>Inne</option>
+      </select>
+      <button class="btn" id="exAdd">Dodaj</button>
+    </div>
+    <input type="text" id="exNewDesc" class="field" style="width:100%;margin-top:var(--sp-2)" placeholder="Zakres materiału / opis (opcjonalnie)">
+  </div>
+</section>
+
 <!-- ============ TIME ANALYSIS ============ -->
 <section class="view" id="view-time">
   <h1>Analiza czasu</h1><p class="sub">Wszystkie wskaźniki na jednym wykresie giełdowym — zaznacz, które linie chcesz widzieć, osobno lub nałożone na siebie.</p>
@@ -569,7 +624,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=33;
+const DM_BUILD=34;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -633,7 +688,7 @@ const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 "use strict";
 /* ================= DATA ================= */
 const KEY="daymenu_v1";
-const defaults={theme:"light",moods:[],goals:[],books:[],timelog:[],sleep:[],appearance:null,habits:[],account:null,lastCloudSync:null,matura:{grid:{},topics:[],plan:[],sessions:[],pomo:{work:25,break:5},prefs:""}};
+const defaults={theme:"light",moods:[],goals:[],books:[],timelog:[],sleep:[],appearance:null,habits:[],account:null,lastCloudSync:null,matura:{grid:{},topics:[],plan:[],sessions:[],pomo:{work:25,break:5},prefs:""},exams:{librus:[],fetchedAt:null,err:null,manual:[],retakes:{}}};
 let S=load();
 let sbSession=null; // zadeklarowane WCZEŚNIE — save()→cloudQueuePush() bywa wołane już przy starcie (matMigrate), zanim wykona się sekcja chmury
 function load(){try{const d=JSON.parse(localStorage.getItem(KEY));return Object.assign({},defaults,d||{})}catch(e){return {...defaults}}}
@@ -747,7 +802,7 @@ $("#themeBtn").onclick=()=>{
 applyTheme();loadBg();
 
 /* ================= NAV ================= */
-const renderers={dash:renderDash,mood:renderMood,goals:renderGoals,books:renderBooks,time:renderTime,sleep:renderSleep,look:renderLook,habits:renderHabits,account:renderAccount,matura:renderMatura};
+const renderers={dash:renderDash,mood:renderMood,goals:renderGoals,books:renderBooks,time:renderTime,sleep:renderSleep,look:renderLook,habits:renderHabits,account:renderAccount,matura:renderMatura,exams:renderExams};
 $$(".nav-btn").forEach(b=>b.onclick=()=>show(b.dataset.view));
 function show(v){
   $$(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
@@ -1437,6 +1492,180 @@ function renderMatura(){
   renderMatGrid();renderMatPlanProgress();renderMatSubjects();renderMatStats();matChatRender();
 }
 
+/* ================= SPRAWDZIANY (zapowiedzi z terminarza Librusa + poprawy) ================= */
+/* S.exams.librus jest tylko do odczytu — nadpisuje je każda synchronizacja z serwerem.
+   Wpisy ręczne (S.exams.manual) i umówione poprawy (S.exams.retakes, klucz = "L:id"/"M:id")
+   należą do użytkownika i przeżywają synchronizację, nawet gdy sprawdzian zniknie z Librusa. */
+function exMigrate(){
+  const e=S.exams||(S.exams={});
+  if(!Array.isArray(e.librus))e.librus=[];
+  if(!Array.isArray(e.manual))e.manual=[];
+  if(!e.retakes||typeof e.retakes!=="object")e.retakes={};
+  if(e.fetchedAt===undefined)e.fetchedAt=null;
+  if(e.err===undefined)e.err=null;
+}
+exMigrate();
+
+let exFilter="next",exEditing=null; // exEditing = klucz wpisu z otwartym formularzem poprawy
+const isYmd=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||"");
+const exKey=x=>(x.src==="m"?"M:":"L:")+x.id;
+
+function exItems(){
+  const out=S.exams.librus.map(e=>({src:"l",id:String(e.id),date:e.date||"",time:e.time||"",
+    type:e.type||"",subject:e.subject||"",teacher:e.teacher||"",desc:e.desc||"",exam:e.exam!==false}));
+  for(const e of S.exams.manual)out.push({src:"m",id:e.id,date:e.date||"",time:e.time||"",
+    type:e.type||"Sprawdzian",subject:e.subject||"",teacher:"",desc:e.desc||"",exam:true});
+  return out;
+}
+function exDaysTo(d){
+  if(!isYmd(d))return null;
+  return Math.round((new Date(d+"T00:00")-new Date(today()+"T00:00"))/86400000);
+}
+function exBadge(n){
+  if(n===null)return {c:"b-muted",t:"termin nieznany"};
+  if(n<0)return {c:"b-muted",t:n===-1?"wczoraj":`${-n} dni temu`};
+  if(n===0)return {c:"b-bad",t:"dziś"};
+  if(n===1)return {c:"b-bad",t:"jutro"};
+  return {c:n<=3?"b-warn":"b-primary",t:`za ${n} dni`};
+}
+const exDateTxt=(d,t)=>(isYmd(d)?fmtDate(d):"termin nieznany")+(t?", godz. "+t:"");
+
+function exRetakeLine(r){
+  return `<div class="row" style="gap:8px;margin-top:8px">
+    <span class="badge ${r.done?"b-good":"b-warn"}">${r.done?"Poprawa zaliczona":"Umówiona poprawa"}</span>
+    <span>${esc(exDateTxt(r.date,r.time))}</span>
+    ${r.note?`<span class="muted">— ${esc(r.note)}</span>`:""}
+  </div>`;
+}
+function exForm(k,r){
+  return `<div style="margin-top:var(--sp-3);border-top:1px solid var(--border);padding-top:var(--sp-3)">
+    <label class="fld">Umówiona poprawa</label>
+    <div class="row">
+      <input type="date" class="field" id="exReDate" value="${esc(r&&r.date||"")}">
+      <input type="time" class="field" id="exReTime" value="${esc(r&&r.time||"")}">
+      <input type="text" class="field" id="exReNote" placeholder="Notatka — np. sala, u kogo, zakres" value="${esc(r&&r.note||"")}">
+    </div>
+    <div class="row" style="margin-top:var(--sp-2)">
+      <button class="btn" data-exsave="${k}">Zapisz poprawę</button>
+      ${r?`<button class="btn ghost" data-exdone="${k}">${r.done?"Cofnij zaliczenie":"Oznacz jako zaliczoną"}</button>
+        <button class="btn danger" data-exrem="${k}">Usuń poprawę</button>`:""}
+      <button class="btn ghost" data-excancel="1">Anuluj</button>
+    </div>
+  </div>`;
+}
+function exRow(x){
+  const k=exKey(x),r=S.exams.retakes[k],b=exBadge(exDaysTo(x.date));
+  return `<div class="card">
+    <div class="row ex-head" style="justify-content:space-between;gap:8px;align-items:flex-start">
+      <div style="flex:1;min-width:0">
+        <div class="row" style="gap:8px">
+          <span class="badge ${b.c}">${b.t}</span>
+          <strong style="font-size:var(--fs-3)">${esc(x.subject||x.type||"Sprawdzian")}</strong>
+          ${x.subject&&x.type?`<span class="muted">${esc(x.type)}</span>`:""}
+          ${x.src==="m"?`<span class="badge b-muted">wpis ręczny</span>`:""}
+        </div>
+        <div class="muted" style="margin-top:2px">${esc(exDateTxt(x.date,x.time))}${x.teacher?" — "+esc(x.teacher):""}</div>
+        ${x.desc?`<div style="margin-top:6px">${esc(x.desc)}</div>`:""}
+        ${r?exRetakeLine(r):""}
+      </div>
+      <div class="row ex-actions" style="gap:6px">
+        <button class="btn ghost small" data-exre="${k}">${r?"Zmień poprawę":"Umów poprawę"}</button>
+        ${x.src==="m"?`<button class="icon-btn del" data-exdel="${esc(x.id)}" title="Usuń wpis">✕</button>`:""}
+      </div>
+    </div>
+    ${exEditing===k?exForm(k,r):""}
+  </div>`;
+}
+function renderExRetakes(){
+  const byKey={};exItems().forEach(x=>byKey[exKey(x)]=x);
+  const rows=Object.entries(S.exams.retakes).filter(([,r])=>r&&!r.done)
+    .sort((a,b)=>(a[1].date||"9999").localeCompare(b[1].date||"9999"));
+  $("#exRetakeCard").hidden=!rows.length;
+  if(!rows.length)return;
+  $("#exRetakeList").innerHTML=rows.map(([k,r])=>{
+    const x=byKey[k],b=exBadge(exDaysTo(r.date));
+    return `<div class="list-item">
+      <span class="badge ${b.c}">${b.t}</span>
+      <div style="flex:1;min-width:0">
+        <strong>${esc(x?(x.subject||x.type||"Sprawdzian"):"Poprawa")}</strong>
+        <div class="muted">${esc(exDateTxt(r.date,r.time))}${r.note?" — "+esc(r.note):""}</div>
+      </div>
+      <button class="btn ghost small" data-exdone="${k}">Zaliczona ✓</button>
+    </div>`;
+  }).join("");
+}
+function renderExams(){
+  exMigrate();
+  const st=$("#exStatus"),er=$("#exErr");
+  if(!sbSession)st.textContent="Zaloguj się do konta w chmurze (zakładka „Konto”), żeby pobierać zapowiedzi z Librusa. Wpisy ręczne i poprawy działają bez logowania.";
+  else if(!S.exams.fetchedAt)st.textContent="Brak danych z terminarza. Połącz konto Librus w zakładce „Konto” — zapowiedzi pojawią się tu same (serwer sprawdza Librusa co godzinę).";
+  else st.textContent=`Ostatnie sprawdzenie terminarza: ${new Date(S.exams.fetchedAt).toLocaleString("pl-PL")}. Pobranych wydarzeń: ${S.exams.librus.length}.`;
+  er.hidden=!S.exams.err;
+  if(S.exams.err)er.textContent="Ostatni błąd pobierania terminarza: "+S.exams.err;
+
+  const t=today(),ahead=x=>!x.date||x.date>=t;
+  const asc=(a,b)=>(a.date||"9999").localeCompare(b.date||"9999");
+  const desc=(a,b)=>(b.date||"").localeCompare(a.date||"");
+  let items=exItems().filter(x=>$("#exShowOther").checked||x.exam);
+  if(exFilter==="next")items=items.filter(ahead).sort(asc);
+  else if(exFilter==="past")items=items.filter(x=>!ahead(x)).sort(desc);
+  else items=items.filter(ahead).sort(asc).concat(items.filter(x=>!ahead(x)).sort(desc));
+
+  $("#exList").innerHTML=items.length?items.map(exRow).join(""):
+    `<div class="empty">${exFilter==="past"?"Brak minionych sprawdzianów.":"Brak zapowiedzianych sprawdzianów."}</div>`;
+  renderExRetakes();
+  exBind();
+}
+function exBind(){
+  $$("#view-exams [data-exre]").forEach(b=>b.onclick=()=>{exEditing=exEditing===b.dataset.exre?null:b.dataset.exre;renderExams()});
+  $$("#view-exams [data-excancel]").forEach(b=>b.onclick=()=>{exEditing=null;renderExams()});
+  $$("#view-exams [data-exsave]").forEach(b=>b.onclick=()=>{
+    const d=$("#exReDate").value;
+    if(!d){toast("Podaj datę poprawy");return}
+    const prev=S.exams.retakes[b.dataset.exsave]||{};
+    S.exams.retakes[b.dataset.exsave]={date:d,time:$("#exReTime").value||"",note:$("#exReNote").value.trim(),done:!!prev.done};
+    exEditing=null;
+    if(save())toast("Poprawa zapisana ✓");
+    renderExams();
+  });
+  $$("#view-exams [data-exdone]").forEach(b=>b.onclick=()=>{
+    const r=S.exams.retakes[b.dataset.exdone];if(!r)return;
+    r.done=!r.done;save();renderExams();
+  });
+  $$("#view-exams [data-exrem]").forEach(b=>b.onclick=()=>{
+    delete S.exams.retakes[b.dataset.exrem];exEditing=null;save();renderExams();
+  });
+  $$("#view-exams [data-exdel]").forEach(b=>b.onclick=()=>{
+    if(!confirm("Usunąć ten wpis?"))return;
+    S.exams.manual=S.exams.manual.filter(x=>x.id!==b.dataset.exdel);
+    delete S.exams.retakes["M:"+b.dataset.exdel]; // poprawa bez sprawdzianu nie ma sensu
+    save();renderExams();
+  });
+}
+$$("#exTabs button").forEach(b=>b.onclick=()=>{
+  exFilter=b.dataset.f;exEditing=null;
+  $$("#exTabs button").forEach(x=>x.classList.toggle("on",x===b));
+  renderExams();
+});
+$("#exShowOther").onchange=renderExams;
+$("#exAdd").onclick=()=>{
+  const date=$("#exNewDate").value,subject=$("#exNewSubject").value.trim();
+  if(!date){toast("Podaj datę");return}
+  if(!subject){toast("Podaj przedmiot");return}
+  S.exams.manual.push({id:uid(),date,subject,type:$("#exNewType").value,desc:$("#exNewDesc").value.trim(),time:""});
+  $("#exNewSubject").value="";$("#exNewDesc").value="";
+  if(save())toast("Dodano ✓");
+  renderExams();
+};
+// Serwer i tak odpytuje Librusa co godzinę — „Odśwież” dociąga najnowszy snapshot z bazy.
+$("#exSync").onclick=async()=>{
+  const b=$("#exSync");b.disabled=true;b.textContent="Odświeżam…";
+  try{await librusSyncSchedule(true)}catch(e){}
+  b.disabled=false;b.textContent="Odśwież";
+  renderExams();
+  toast(S.exams.fetchedAt?"Odświeżono ✓":"Brak danych z Librusa");
+};
+
 /* ================= WYKRES (multi-linia: produktywność, sen, nauka, nastrój, humor) ================= */
 function studyHours(ds){return S.matura.sessions.filter(s=>s.date===ds).reduce((a,s)=>a+s.minutes,0)/60}
 const MOOD_PCT=[0,30,50,75,100]; // bardzo źle → świetnie
@@ -2100,18 +2329,34 @@ function librusUnitsToBase(units){
   }
   return daysFilled;
 }
+/* Zapowiedzi sprawdzianów z tego samego snapshotu co plan lekcji (jeden request).
+   Zapisujemy tylko przy realnej zmianie — funkcja chodzi co 5 min, a save() pcha
+   dane do chmury. Wpisów ręcznych i poprawek to nie dotyka. */
+function librusApplyExams(row){
+  if(!row||!Array.isArray(row.exams))return false;
+  exMigrate();
+  const before=JSON.stringify([S.exams.librus,S.exams.fetchedAt,S.exams.err]);
+  S.exams.librus=row.exams;
+  S.exams.fetchedAt=row.exams_fetched_at||null;
+  S.exams.err=row.exams_error||null;
+  if(JSON.stringify([S.exams.librus,S.exams.fetchedAt,S.exams.err])===before)return false;
+  save();
+  if($("#view-exams").classList.contains("active"))renderExams();
+  return true;
+}
 async function librusSyncSchedule(force){
   if(!sbSession)return null;
   let tok; try{tok=await sbToken()}catch(e){return null}
   if(!tok)return null;
   let row;
   try{
-    const r=await fetch(`${SB_URL}/rest/v1/librus_snapshot?select=week,units,fetched_at`,{
+    const r=await fetch(`${SB_URL}/rest/v1/librus_snapshot?select=week,units,fetched_at,exams,exams_fetched_at,exams_error`,{
       headers:{apikey:SB_KEY,Authorization:"Bearer "+tok}
     });
     if(!r.ok)return null;             // brak dostępu/sieci nie może wywalić apki
     row=(await r.json())[0];
   }catch(e){return null}
+  librusApplyExams(row);              // zapowiedzi sprawdzianów jadą tym samym snapshotem
   if(!row||!Array.isArray(row.units))return null;
   if(!force&&S.matura.librusAppliedAt===row.fetched_at)return {days:0,skipped:true};
   const days=librusUnitsToBase(row.units);
