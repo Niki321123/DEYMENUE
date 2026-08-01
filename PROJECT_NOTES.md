@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-07-27 (sesja 11 — zakładka „Sprawdziany" + dogrywka APK build 34)_
+_Ostatnia aktualizacja: 2026-08-02 (sesja 13 — zakładka „Wymagania maturalne" wdrożona w `DayMenu.html`)_
 
 ## Czym jest projekt
 
@@ -324,6 +324,69 @@ sprzed tej sesji, już nieużywany przez apkę, można zignorować/skasować.
 - [ ] Rozważyć ustawienie Site URL / Redirect URLs w Supabase Dashboard →
       Authentication → URL Configuration na `https://niki321123.github.io/DEYMENUE/app.html`
       (poza zasięgiem MCP, wymaga ręcznej konfiguracji)
+- [x] Zebrano wymagania maturalne 2027 (matematyka R, geografia R, fizyka R) —
+      katalog `wymagania-maturalne-2027/` (pliki .md jako źródło prawdy, `build_json.py`
+      generuje `wymagania-2027.json` i odchudzony `wymagania-2027.slim.json`, 635 pozycji)
+- [x] Zweryfikowano dane względem 5 oficjalnych plików CKE przesłanych przez
+      użytkowniczkę (informatory matematyki/fizyki/geografii + wyciąg z Dziennika Ustaw
+      dla matematyki). Potwierdzone w 100%: struktura egzaminu wszystkich trzech
+      przedmiotów, obszary tematyczne fizyki i geografii, dział I matematyki znak
+      w znak. Znaleziona i uzupełniona luka: sekcje „Materiały i przybory pomocnicze"
+      (linijka/cyrkiel/kalkulator/wzory dozwolone na egzaminie) nie były wcześniej
+      nigdzie udokumentowane — dopisane do README. Nadal niezweryfikowane wprost:
+      treść pozostałych 12 działów matematyki oraz cała geografia (opierają się na
+      wyciągach Nowej Ery / zpe.gov.pl, nie na oryginale z Dziennika Ustaw). Szczegóły
+      w `wymagania-maturalne-2027/README.md`, sekcja „Weryfikacja względem oficjalnych
+      plików CKE".
+- [x] **Wdrożono zakładkę „Wymagania maturalne" w `DayMenu.html` (sesja 13):**
+      - **Dane** wbudowane w plik jako `<script type="application/json" id="maturaReq">`
+        (114 kB, cała zawartość `wymagania-2027.slim.json`, 635 pozycji) — parsowane
+        leniwie przy pierwszym wejściu w zakładkę. Nic nie leci z sieci: apka ma działać
+        offline i jest dystrybuowana jako jeden plik. `DayMenu.html` urósł ze 147 do 272 kB.
+      - **Nawigacja:** `data-view="wymagania"` w grupie „Edukacja", widok `#view-wymagania`,
+        `renderWymagania` w mapie `renderers`.
+      - **Stan:** `S.wymagania={opanowane,notatki,ukryjFakultatywne,ostatnioOtwarty}`,
+        `opanowane` to mapa `id wymagania -> ISO data odhaczenia` (data pod przyszłe
+        powtórki). Zapis przez zwykłe `save()`, więc idzie do `cloudQueuePush` —
+        żadnej własnej logiki chmury.
+      - ⚠ **Pułapka, na którą trzeba uważać przy kolejnych kluczach w `defaults`:**
+        `load()` robi płytki `Object.assign`, więc stare dane bez klucza `wymagania`
+        dostają w `S` **ten sam obiekt** co `defaults` — pisanie po nim zabrudziłoby
+        wzorzec. `wymState()` wykrywa ten przypadek (`S.wymagania===defaults.wymagania`)
+        i robi własną kopię. Istniejące klucze `matura`/`exams` mają ten sam problem,
+        tylko nikt na niego jeszcze nie wpadł.
+      - **Widok:** przełącznik 3 przedmiotów + pasek postępu, działy jako `<details>`
+        z licznikiem „7/12" i zielonym nagłówkiem przy pełnym odhaczeniu, filtry
+        (wszystkie/nieopanowane/opanowane, wyszukiwarka po treści, zakres
+        podstawowy/rozszerzony dla matematyki i geografii), przełącznik wymagań
+        fakultatywnych fizyki, notatka per wymaganie, „odhacz/wyczyść cały dział",
+        eksport i import samego postępu do pliku JSON.
+      - **Postęp** liczy wymagania szczegółowe + twierdzenia do dowodzenia; cele ogólne
+        i 11 fakultatywnych wymagań fizyki — nie (matematyka 140, geografia 233,
+        fizyka 184 pozycji do odhaczenia).
+      - **Wydajność:** cały przedmiot budowany jednym `innerHTML`, przełączanie
+        checkboxów i notatek przez delegację zdarzeń na `#wymList`, filtry działają
+        na gotowym DOM-ie. Zmierzone: pierwsze wejście 35 ms, przełączenie przedmiotu
+        4 ms, filtrowanie 1 ms.
+      - **Sprawdzone w przeglądarce:** odhaczanie pojedyncze i całym działem, klik
+        w treść, wszystkie filtry, notatki, oba motywy, brak poziomego przewijania
+        przy 375 px, checkbox 24×24 px z obszarem kliku 273×144 px na telefonie,
+        wczytanie starych danych bez klucza `wymagania`, round-trip eksport→import
+        oraz odrzucenie nieprawidłowego pliku.
+      - **DO ZROBIENIA:** `npm run publish` (czeka na akceptację) — zmiany są tylko
+        w źródłowym `DayMenu.html`.
+- [ ] Wrzesień 2026: sprawdzić na stronie CKE, czy dla matury 2027 nie pojawił się aneks
+      do informatorów zmieniający zakres wymagań. **Dane wbudowane w zakładkę „Wymagania"
+      pochodzą z podstawy programowej po zmianie z 28 czerwca 2024 r. (Dz.U. z 2024 r.
+      poz. 1019)** — jeśli aneks się pojawi, trzeba poprawić pliki `.md` w
+      `wymagania-maturalne-2027/`, przepuścić je przez `build_json.py` i ponownie wbudować
+      `wymagania-2027.slim.json` w blok `<script id="maturaReq">` w `DayMenu.html`.
+      Identyfikatory wymagań (`mat.`/`geo.`/`fiz.`) są kluczami postępu użytkownika —
+      **nie wolno ich zmieniać**, bo odhaczone tematy przestaną się wiązać z treścią.
+- [ ] Pre-istniejąca drobnica zauważona przy okazji (nie ruszana, bo poza zakresem):
+      dwa elementy mają `id="sbMsg"` w zakładce Konto, a handler `#themeBtn` czyta
+      `S.appearance.theme` bez zabezpieczenia na `null` (wywala się po imporcie danych
+      bez klucza `appearance`, mimo że `applyTheme()` taki przypadek obsługuje)
 
 ### Proces publikacji (zweryfikowany i naprawiony w tej sesji)
 
@@ -348,6 +411,52 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-02 (sesja 13)**: Wdrożono zakładkę **„Wymagania maturalne"** — listę 635 pozycji
+  z podstawy programowej (matematyka, geografia, fizyka na poziomie rozszerzonym)
+  z odhaczaniem tego, co już rozumiem. Dane z `wymagania-2027.slim.json` wbudowane
+  w `DayMenu.html` jako blok `<script type="application/json" id="maturaReq">` — nic nie
+  leci z sieci, bo apka ma działać offline i jest jednym plikiem; plik urósł ze 147 do
+  272 kB. Postęp trzymany jako mapa `id wymagania -> data odhaczenia` w `S.wymagania`,
+  zapisywany zwykłym `save()`, więc synchronizacja z chmurą działa bez dodatkowego kodu.
+  Widok: przełącznik przedmiotów z paskiem postępu, działy jako `<details>` z licznikami,
+  filtry (status / wyszukiwarka / zakres podstawowy-rozszerzony), przełącznik wymagań
+  fakultatywnych fizyki (domyślnie ukryte, nie liczą się do postępu), notatki per
+  wymaganie, odhaczanie i czyszczenie całego działu, eksport/import samego postępu.
+  Wszystko przetestowane na żywo w przeglądarce (oba motywy, szerokość 375 px, stare dane
+  bez klucza `wymagania`, round-trip eksport→import). Przy okazji trafiona pułapka
+  `Object.assign` w `load()`: brakujący klucz daje w `S` **ten sam obiekt** co `defaults`,
+  więc pisanie po nim brudzi wzorzec — `wymState()` to wykrywa i klonuje. Kod tylko
+  w źródłowym `DayMenu.html`, `npm run publish` czeka na akceptację użytkowniczki
+  (build podbija się sam w `publish.js`).
+
+- **2026-08-02 (sesja 12, dogrywka)**: Użytkowniczka przesłała 5 oficjalnych plików CKE
+  (informatory maturalne matematyki/fizyki/geografii, wyciąg z Dziennika Ustaw dla
+  matematyki, tablice matematyczne) w odpowiedzi na pytanie, czy dane z research'u są
+  na pewno kompletne. Zweryfikowano: fizyka potwierdzona w 100% (struktura egzaminu,
+  obszary tematyczne, materiały/przybory), matematyka potwierdzona w 100% w strukturze
+  egzaminu + dział I znak w znak z oryginałem (pozostałe 12 działów nie porównywane
+  obraz-po-obrazie), geografia potwierdzona w strukturze egzaminu i liście obszarów
+  tematycznych z numeracją działów (sama treść wymagań nadal opiera się na zpe.gov.pl,
+  nie na oryginale). Odkryto i uzupełniono lukę: sekcje „Materiały i przybory
+  pomocnicze" (linijka, cyrkiel/lupa, kalkulator prosty/naukowy, wzory/tablice
+  dozwolone na egzaminie) nie były wcześniej nigdzie w plikach udokumentowane — dodano
+  do README. Techniczna trudność: `cke-zakres-2025.pdf` źle się ekstrahował przez
+  `pdftotext` mimo poprawnych metadanych fontów — obejście przez renderowanie stron do
+  PNG (`pdftoppm`) i odczyt wizualny. README zaktualizowane o nową sekcję weryfikacji
+  i uczciwą listę tego, co nadal niepotwierdzone. Kodu aplikacji nadal nie ruszano.
+
+- **2026-08-02 (sesja 12)**: Research wymagań maturalnych na 2027 r. dla matematyki,
+  geografii i fizyki na poziomie rozszerzonym. Ustalono, że maturę 2027 (Formuła 2023)
+  wyznacza podstawa programowa po zmianie z 28 czerwca 2024 r. (Dz.U. 2024 poz. 1019) —
+  osobne „wymagania egzaminacyjne" z lat 2023-2024 już nie obowiązują, a informatory CKE
+  „od roku szkolnego 2024/2025" powołują się wprost na to rozporządzenie. Powstał katalog
+  `wymagania-maturalne-2027/`: trzy pliki .md z pełnymi listami wymagań (matematyka 119
+  wymagań szczegółowych + 21 twierdzeń do dowodzenia, geografia 233, fizyka 195 w tym 11
+  fakultatywnych nieobjętych maturą), skrypt `build_json.py`, `wymagania-2027.json`,
+  odchudzony `wymagania-2027.slim.json` (118 kB, do wbudowania w `DayMenu.html`), README
+  ze źródłami i listą rzeczy niezweryfikowanych oraz `PROMPT-DLA-CLAUDE-CODE.md`. Kodu
+  aplikacji jeszcze nie ruszano — zakładka do zrobienia w kolejnej sesji.
 
 - **2026-07-27 (sesja 11, dogrywka APK)**: Użytkownik uruchomił `npm run publish` (build 34) —
   web/desktop opublikowane OK, ale build APK padl na tym samym mylącym błędzie Gradle
