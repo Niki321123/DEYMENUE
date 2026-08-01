@@ -167,6 +167,8 @@ label.fld{display:block;font-size:var(--fs-1);font-weight:600;color:var(--text-2
 .chat-msg{max-width:85%;padding:var(--sp-2) var(--sp-3);border-radius:var(--radius-s);white-space:pre-wrap;font-size:var(--fs-2)}
 .chat-msg.me{align-self:flex-end;background:var(--primary);color:var(--primary-text)}
 .chat-msg.ai{align-self:flex-start;background:var(--surface-2)}
+.ai-box{background:var(--surface-2);border-radius:var(--radius-s);padding:var(--sp-3) var(--sp-4);margin-top:var(--sp-3)}
+.ai-box p{margin-top:6px}
 
 .stars button{background:none;border:none;font-size:20px;padding:2px;color:var(--text-3)}
 .stars button.on{color:var(--warn)}
@@ -212,15 +214,22 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 .wym-item:hover{background:var(--surface-2)}
 .wym-item input[type=checkbox]{width:20px;height:20px;flex:none;margin-top:2px;accent-color:var(--primary);cursor:pointer}
 .wym-item .wym-tresc{flex:1;min-width:0;line-height:1.4;font-size:var(--fs-2)}
-.wym-item .wym-id{font-size:11px;color:var(--text-3);font-variant-numeric:tabular-nums;display:block}
 .wym-row.done .wym-tresc{color:var(--text-2)}
 .wym-row.fak .wym-tresc{color:var(--text-3)}
+.wym-row.wym-focus{background:var(--primary-soft)}
 .wym-row .wym-note{flex:none;align-self:flex-start;margin-top:8px}
 .wym-note.has{color:var(--accent)}
 .wym-note-box{padding:0 0 10px 33px}
 .wym-note-box textarea{min-height:64px;font-size:var(--fs-1)}
 .wym-top{display:flex;align-items:flex-start;gap:var(--sp-2)}
 .wym-legend{font-size:var(--fs-1);color:var(--text-2)}
+.wym-ai-subj{border:1px solid var(--border);border-radius:var(--radius-s);padding:var(--sp-3);margin-top:var(--sp-3);background:var(--surface)}
+.wym-ai-subj h3{font-size:var(--fs-2);margin-bottom:var(--sp-2)}
+.wym-ai-item{border-top:1px solid var(--border);padding:var(--sp-3) 0}
+.wym-ai-item:first-of-type{border-top:none}
+.wym-ai-item .wym-ai-head{display:flex;gap:var(--sp-2);align-items:flex-start;justify-content:space-between}
+.wym-ai-item .wym-ai-title{font-weight:600;line-height:1.35}
+.wym-ai-item .wym-ai-actions{display:flex;gap:var(--sp-2);align-items:center;flex:none}
 
 /* ===== TELEFON ===== */
 @media(max-width:760px){
@@ -554,6 +563,17 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     <div class="progress"><div class="g-good" id="wymProgBar" style="width:0%"></div></div>
   </div>
 
+  <div class="card" id="wymAiCard" data-ai-only hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-start">
+      <div>
+        <h2 style="margin-bottom:2px">AI: co opanować dziś</h2>
+        <p class="muted">AI sprawdzi dzisiejszy plan z zakładki „Nauka”, ominie odhaczone wymagania i dobierze tematy pod liczbę godzin z matematyki, fizyki i geografii.</p>
+      </div>
+      <button class="btn accent" id="wymAiPlan" style="flex:none">✨ Zaproponuj</button>
+    </div>
+    <div id="wymAiResult"></div>
+  </div>
+
   <div class="card">
     <input type="text" id="wymSearch" placeholder="Szukaj w treści wymagań…" style="margin-bottom:var(--sp-3)">
     <div class="row">
@@ -725,7 +745,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=35;
+const DM_BUILD=36;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -913,7 +933,7 @@ function show(v){
   // od rana) — checkAiAccess() normalnie leci tylko przy logowaniu, więc tutaj
   // doświeżamy go przy każdym wejściu w zakładkę korzystającą z AI, żeby nowo
   // nadany dostęp pojawił się bez konieczności wylogowania.
-  if((v==="books"||v==="matura")&&typeof checkAiAccess==="function")checkAiAccess().then(()=>renderers[v]&&renderers[v]());
+  if((v==="books"||v==="matura"||v==="wymagania")&&typeof checkAiAccess==="function")checkAiAccess().then(()=>renderers[v]&&renderers[v]());
   renderers[v]&&renderers[v]();
   $("#main").scrollTop=0;
 }
@@ -1883,7 +1903,7 @@ function wymRowHTML(wy,w){
   return `<div class="wym-row${done?" done":""}${wy.fakultatywne?" fak":""}" data-id="${esc(wy.id)}">`
     +`<div class="wym-top">`
     +`<label class="wym-item"><input type="checkbox" data-id="${esc(wy.id)}"${done?" checked":""}>`
-    +`<span class="wym-tresc"><span class="wym-id">${esc(wy.id)}</span>${esc(wy.tresc)}`
+    +`<span class="wym-tresc">${esc(wy.tresc)}`
     +(wy.fakultatywne?` <span class="badge b-warn">fakultatywne — nie ma tego na maturze</span>`:"")
     +`</span></label>`
     +`<button class="icon-btn wym-note${nota?" has":""}" data-note="1" title="Notatka">✎</button>`
@@ -1949,6 +1969,119 @@ function wymRenderProgress(){
 function wymSet(id,on){
   const w=wymState();
   if(on)w.opanowane[id]=today();else delete w.opanowane[id];
+}
+
+function wymNorm(s){
+  return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+}
+function wymTopicSubject(name){
+  const n=wymNorm(name);
+  if(n.includes("matma")||n.includes("matem"))return "matematyka";
+  if(/\bmat\b/.test(n))return "matematyka";
+  if(n.includes("fiz"))return "fizyka";
+  if(n.includes("geo"))return "geografia";
+  return "";
+}
+function wymSubjectLabel(id){
+  const p=wymData().przedmioty.find(x=>x.id===id);
+  return p?p.nazwa:id;
+}
+function wymTodayPlanContext(){
+  matRecompute();
+  const dow=(new Date().getDay()+6)%7,wk=weekId();
+  const ctx={dow,blocks:[],budgets:{},unknown:[],done:0};
+  const todayBlocks=S.matura.plan.filter(b=>b.day===dow).sort((a,b)=>a.hour-b.hour);
+  for(const b of todayBlocks){
+    if(b.doneWeek===wk){ctx.done++;continue}
+    const t=S.matura.topics.find(x=>x.id===b.topicId);
+    const subj=wymTopicSubject(t&&t.name);
+    if(!subj){ctx.unknown.push({hour:b.hour,nazwa:t?t.name:"Nieznany przedmiot"});continue}
+    ctx.blocks.push({hour:b.hour,subjectId:subj,nazwa:t.name});
+    ctx.budgets[subj]=(ctx.budgets[subj]||0)+60;
+  }
+  return ctx;
+}
+function wymAiCandidates(subjectIds){
+  const w=wymState(),out=[],map={};
+  for(const p of wymData().przedmioty){
+    if(!subjectIds.includes(p.id))continue;
+    let taken=0;
+    for(const dz of p.dzialy){
+      if(!WYM_LICZONE[dz.grupa])continue;
+      for(const wy of dz.wymagania){
+        if(wy.fakultatywne||w.opanowane[wy.id])continue;
+        const item={id:wy.id,subjectId:p.id,przedmiot:p.nazwa,dzial:dz.nazwa,zakres:dz.zakres||"",tresc:wy.tresc};
+        const nota=w.notatki[wy.id];
+        if(nota)item.nota=String(nota).slice(0,220);
+        out.push(item);map[item.id]=item;
+        taken++;
+        if(taken>=120)break;
+      }
+      if(taken>=120)break;
+    }
+  }
+  return {list:out,map};
+}
+function wymAiErr(e){
+  return e.message==="NOLOGIN"
+    ?"Zaloguj się do konta w chmurze (zakładka Konto), aby użyć AI."
+    :e.message==="NO_AI_ACCESS"
+    ?"Ta wersja aplikacji nie ma dostępu do AI."
+    :"Błąd AI: "+esc(e.message||e);
+}
+function wymSanitizeAiPlan(j,candMap,budgets){
+  const used=new Set(),groups=[];
+  for(const g of (j&&Array.isArray(j.przedmioty)?j.przedmioty:[])){
+    const subjectId=budgets[g.subjectId]?g.subjectId:"";
+    if(!subjectId)continue;
+    const items=[];
+    for(const it of (Array.isArray(g.items)?g.items:[])){
+      const c=candMap[it.id];
+      if(!c||c.subjectId!==subjectId||used.has(c.id)||wymState().opanowane[c.id])continue;
+      used.add(c.id);
+      items.push({
+        ...c,
+        minutes:Math.max(10,Math.min(240,Math.round(+it.minutes||45))),
+        dlaczego:String(it.dlaczego||"Pasuje do dzisiejszego bloku nauki.").slice(0,220),
+        jak:String(it.jak||"Przerób teorię, a potem zrób kilka zadań kontrolnych.").slice(0,260)
+      });
+    }
+    if(items.length)groups.push({
+      subjectId,
+      nazwa:wymSubjectLabel(subjectId),
+      planMin:budgets[subjectId],
+      razemMin:items.reduce((a,x)=>a+x.minutes,0),
+      items
+    });
+  }
+  if(!groups.length)throw new Error("AI nie zwróciło poprawnych wymagań do nauki.");
+  return {podsumowanie:String(j.podsumowanie||"Plan dobrany do dzisiejszego harmonogramu.").slice(0,320),przedmioty:groups};
+}
+function wymRenderAiPlan(plan){
+  $("#wymAiResult").innerHTML=`<div class="ai-box"><strong>Propozycja na dziś</strong><p>${esc(plan.podsumowanie)}</p></div>`
+    +plan.przedmioty.map(g=>`<div class="wym-ai-subj"><h3>${esc(g.nazwa)} <span class="badge b-muted">${fmtMin(g.razemMin)} / plan ${fmtMin(g.planMin)}</span></h3>`
+      +g.items.map(it=>`<div class="wym-ai-item" data-ai-req="${esc(it.id)}"><div class="wym-ai-head"><div class="wym-ai-title">${esc(it.tresc)}</div><div class="wym-ai-actions"><span class="badge b-primary">${fmtMin(it.minutes)}</span><button class="btn ghost small" data-wym-show="${esc(it.id)}">Pokaż</button></div></div>`
+        +`<p class="muted"><strong>Dział:</strong> ${esc(it.dzial)}${it.zakres?` · ${esc(it.zakres)}`:""}</p>`
+        +`<p class="muted"><strong>Dlaczego dziś:</strong> ${esc(it.dlaczego)}</p>`
+        +`<p class="muted"><strong>Jak opanować:</strong> ${esc(it.jak)}</p></div>`).join("")
+      +`</div>`).join("");
+}
+function wymShowReq(id){
+  const d=wymData(),w=wymState();
+  const subj=d.przedmioty.find(p=>p.dzialy.some(dz=>dz.wymagania.some(x=>x.id===id)));
+  if(!subj)return;
+  w.ostatnioOtwarty=subj.id;
+  wymFilter={status:"all",zakres:"all",q:""};
+  $("#wymSearch").value="";
+  renderWymagania();
+  setTimeout(()=>{
+    const row=$(`#wymList .wym-row[data-id="${CSS.escape(id)}"]`);
+    if(!row)return;
+    const dz=row.closest(".wym-dzial");if(dz)dz.open=true;
+    row.scrollIntoView({behavior:"smooth",block:"center"});
+    row.classList.add("wym-focus");
+    setTimeout(()=>row.classList.remove("wym-focus"),1800);
+  },30);
 }
 
 /* ---- zdarzenia (delegacja na kontenerze — 635 osobnych handlerów byłoby marnotrawstwem) ---- */
@@ -2023,6 +2156,39 @@ $("#wymToggleAll").onclick=()=>{
   $$("#wymList .wym-dzial").forEach(d=>d.open=!zwin);
   $("#wymToggleAll").textContent=zwin?"Rozwiń wszystkie":"Zwiń wszystkie";
 };
+$("#wymAiPlan").onclick=async()=>{
+  const btn=$("#wymAiPlan"),res=$("#wymAiResult");
+  btn.disabled=true;res.innerHTML=`<p class="muted" style="margin-top:var(--sp-3)">AI sprawdza dzisiejszy harmonogram i nieopanowane wymagania…</p>`;
+  try{
+    try{await librusSyncSchedule(false)}catch(e){}
+    const ctx=wymTodayPlanContext();
+    const subjectIds=Object.keys(ctx.budgets);
+    if(!subjectIds.length){
+      const extra=ctx.unknown.length?` Nie rozpoznałem przedmiotów: ${ctx.unknown.map(x=>x.nazwa).join(", ")}.`:"";
+      res.innerHTML=`<div class="ai-box"><strong>Brak dzisiejszych bloków do dobrania wymagań</strong><p>W zakładce „Nauka” zaplanuj na dziś matematykę, fizykę lub geografię, a potem wróć tutaj.${extra}</p></div>`;
+      return;
+    }
+    const {list,map}=wymAiCandidates(subjectIds);
+    if(!list.length){
+      res.innerHTML=`<div class="ai-box"><strong>Nie ma czego sugerować</strong><p>Wszystkie wymagania z dzisiejszych przedmiotów są już odhaczone albo pozostały tylko pozycje fakultatywne.</p></div>`;
+      return;
+    }
+    const budgets=subjectIds.map(id=>({subjectId:id,nazwa:wymSubjectLabel(id),minutes:ctx.budgets[id],godziny:ctx.blocks.filter(b=>b.subjectId===id).map(b=>b.hour)}));
+    const sys=`Jesteś trenerem maturalnym w aplikacji Day Menu. Dobierasz na DZISIAJ konkretne wymagania z podstawy programowej do opanowania. Masz budżet minut dla każdego przedmiotu z harmonogramu użytkownika. Wymagania podane w kandydaci są NIEOPANOWANE; nie wolno wymyślać innych id ani wybierać wymagań spoza listy. Dobierz tyle pozycji, żeby szacowany czas był możliwie blisko budżetu każdego przedmiotu (tolerancja około 15 minut). Szacuj realistycznie: prosty punkt 20-40 min, trudniejszy 45-75 min, duży dział lub dowód 90-120 min. Odpowiadasz wyłącznie poprawnym JSON, bez markdown. Format: {"podsumowanie":"1-2 zdania po polsku","przedmioty":[{"subjectId":"matematyka","items":[{"id":"...","minutes":60,"dlaczego":"krótko dlaczego akurat dziś","jak":"konkretny sposób opanowania"}]}]}`;
+    const text=await aiCall(sys,[{role:"user",content:
+      `Dzisiejszy plan godzinowy: ${JSON.stringify(ctx.blocks)}\n`
+      +`Budżety minut według przedmiotów: ${JSON.stringify(budgets)}\n`
+      +`Kandydaci do wyboru (tylko nieopanowane wymagania): ${JSON.stringify(list)}\n`
+      +`Zaproponuj wymagania do opanowania dziś. Pamiętaj: nie sugeruj pozycji opanowanych ani spoza listy kandydatów.`}],3500);
+    wymRenderAiPlan(wymSanitizeAiPlan(aiJson(text),map,ctx.budgets));
+  }catch(e){
+    res.innerHTML=`<p class="muted" style="margin-top:var(--sp-3)">${wymAiErr(e)}</p>`;
+  }finally{btn.disabled=false}
+};
+$("#wymAiResult").addEventListener("click",e=>{
+  const b=e.target.closest("[data-wym-show]");
+  if(b)wymShowReq(b.dataset.wymShow);
+});
 
 /* ---- eksport / import samego postępu (osobno od pełnej kopii danych aplikacji) ---- */
 $("#wymExport").onclick=()=>{
