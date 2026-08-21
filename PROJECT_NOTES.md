@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-02 (sesja 13 — zakładka „Wymagania maturalne" wdrożona w `DayMenu.html`)_
+_Ostatnia aktualizacja: 2026-08-21 (sesja 14 — zakładka „Materiały" wdrożona w `DayMenu.html`)_
 
 ## Czym jest projekt
 
@@ -338,6 +338,13 @@ sprzed tej sesji, już nieużywany przez apkę, można zignorować/skasować.
       wyciągach Nowej Ery / zpe.gov.pl, nie na oryginale z Dziennika Ustaw). Szczegóły
       w `wymagania-maturalne-2027/README.md`, sekcja „Weryfikacja względem oficjalnych
       plików CKE".
+- [x] **Wdrożono zakładkę „Materiały" w `DayMenu.html` (sesja 14):** wybór przedmiotu,
+      nazwa materiału i opcjonalna liczba zadań; przy podanej liczbie zadań siatka tylu
+      ponumerowanych pól do odhaczania (612 zadań = 612 pól) z paskiem postępu.
+      Stan w `S.materialy` (tablica `{id,subject,name,tasks,done,added}`), zapis zwykłym
+      `save()`. Siatka rysowana leniwie po rozwinięciu `<details>`, kliknięcia przez
+      delegację na `#matsList`. `matsList()` chroni przed pułapką płytkiego `Object.assign`
+      (jak `wymState()`). **DO ZROBIENIA:** `npm run publish`.
 - [x] **Wdrożono zakładkę „Wymagania maturalne" w `DayMenu.html` (sesja 13):**
       - **Dane** wbudowane w plik jako `<script type="application/json" id="maturaReq">`
         (114 kB, cała zawartość `wymagania-2027.slim.json`, 635 pozycji) — parsowane
@@ -411,6 +418,32 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-21 (sesja 14)**: Dodano zakładkę **„Materiały"** (`data-view="mats"`, widok
+  `#view-mats`, `renderMats` w mapie `renderers`, nowy klucz stanu `S.materialy` = tablica
+  `{id,subject,name,tasks,done,added}`). Spis materiałów do nauki: wybór przedmiotu
+  (lista = przedmioty już użyte + przedmioty z zakładki Nauka + baza Matematyka/Geografia/Fizyka,
+  plus opcja „➕ Inny przedmiot…" odsłaniająca pole tekstowe), nazwa materiału i **opcjonalna**
+  liczba zadań. Jeśli liczba zadań jest podana, materiał dostaje siatkę tylu ponumerowanych
+  kwadracików do odhaczania (np. 612 zadań = 612 pól) + pasek postępu i licznik „4/612";
+  odhaczone trzymane jako posortowana lista numerów w `m.done`. Zmniejszenie liczby zadań
+  poniżej odhaczonych pyta o potwierdzenie i przycina `done`. Lista pogrupowana po przedmiocie
+  z licznikiem „2 materiały · 4/1224 zadania" i zakładkami filtra po przedmiocie; nazwę
+  i liczbę zadań da się edytować w miejscu, materiał usunąć.
+  - **Wydajność:** siatka zadań rysuje się **leniwie** — dopiero po rozwinięciu `<details>`
+    (`matsFillGrid`), jednym `innerHTML`, a kliknięcia obsługuje delegacja na `#matsList`
+    (żadnych 612 handlerów). Zmierzone: rozwinięcie 612 kwadracików 1 ms, dodanie materiału 1 ms.
+    Po odhaczeniu odświeżają się tylko liczniki (`matsRefreshCounts`), nie cała lista.
+  - **Pułapka płytkiego `Object.assign`** (ta sama co przy `wymagania`): `matsList()` wykrywa
+    `S.materialy===defaults.materialy` i robi własną kopię, żeby nie zabrudzić wzorca.
+  - Zapis zwykłym `save()`, więc chmura i eksport/import całych danych działają bez dodatkowego kodu.
+  - **Sprawdzone na żywo w przeglądarce:** dodawanie z listy i przez „Inny przedmiot",
+    materiał bez zadań (brak siatki), 612 kwadracików, odhaczanie/odznaczanie pojedyncze,
+    „Odhacz wszystkie"/„Wyczyść", trwałość w localStorage, anulowanie i potwierdzenie
+    zmniejszenia liczby zadań, filtry przedmiotów, brak poziomego przewijania przy 375 px
+    i kwadraciki 44×44 px pod palec. Dane testowe po testach wyczyszczone.
+  - **DO ZROBIENIA:** `npm run publish` (czeka na akceptację) — zmiany są tylko w źródłowym
+    `DayMenu.html`.
 
 - **2026-08-02 (sesja 13)**: Wdrożono zakładkę **„Wymagania maturalne"** — listę 635 pozycji
   z podstawy programowej (matematyka, geografia, fizyka na poziomie rozszerzonym)

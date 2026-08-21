@@ -231,6 +231,20 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 .wym-ai-item .wym-ai-title{font-weight:600;line-height:1.35}
 .wym-ai-item .wym-ai-actions{display:flex;gap:var(--sp-2);align-items:center;flex:none}
 
+/* materiały — spis materiałów + siatka zadań do odhaczania */
+.mats-item{border-top:1px solid var(--border);padding:var(--sp-3) 0}
+.mats-item:first-of-type{border-top:none;padding-top:0}
+.mats-prog{display:flex;align-items:center;gap:var(--sp-3);margin-top:var(--sp-2)}
+.mats-prog .muted{flex:none;font-variant-numeric:tabular-nums}
+.mats-det>summary{list-style:none;cursor:pointer;user-select:none;display:flex;align-items:center;gap:var(--sp-2);padding:8px 2px;min-height:36px;color:var(--text-2);font-size:var(--fs-1)}
+.mats-det>summary::-webkit-details-marker{display:none}
+.mats-det>summary::before{content:"▸";color:var(--text-3);font-size:12px;flex:none;transition:transform .15s}
+.mats-det[open]>summary::before{transform:rotate(90deg)}
+.mats-tasks{display:flex;flex-wrap:wrap;gap:5px;padding:var(--sp-2) 0 var(--sp-3)}
+.mats-tasks button{width:40px;min-height:36px;padding:0;border:1px solid var(--border);border-radius:var(--radius-s);background:var(--surface);color:var(--text-2);font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;cursor:pointer;transition:background .12s,color .12s,border-color .12s}
+.mats-tasks button:hover{border-color:var(--primary);color:var(--primary)}
+.mats-tasks button.on{background:var(--good);border-color:var(--good);color:#fff}
+
 /* ===== TELEFON ===== */
 @media(max-width:760px){
   body{flex-direction:column}
@@ -274,6 +288,9 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   .wym-item{padding:12px 2px;min-height:48px}
   .wym-item input[type=checkbox]{width:24px;height:24px;min-height:0}
   .wym-note-box{padding-left:37px}
+  /* materiały: kwadraciki zadań pod palec */
+  .mats-tasks{gap:6px}
+  .mats-tasks button{width:44px;min-height:44px;font-size:13px}
   .wym-acts .btn{flex:1}
 }
 </style>
@@ -308,6 +325,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     <button class="nav-btn" data-view="matura">Nauka</button>
     <button class="nav-btn" data-view="exams">Sprawdziany</button>
     <button class="nav-btn" data-view="wymagania">Wymagania</button>
+    <button class="nav-btn" data-view="mats">Materiały</button>
   </div>
   <div class="nav-group"><h3>Produktywność</h3>
     <button class="nav-btn" data-view="time">Analiza czasu</button>
@@ -609,6 +627,30 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   </div>
 </section>
 
+<!-- ============ MATERIAŁY ============ -->
+<section class="view" id="view-mats">
+  <h1>Materiały</h1>
+  <p class="sub">Spis materiałów do nauki — arkusze, zbiory zadań, karty pracy. Wybierz przedmiot, wpisz nazwę materiału i (jeśli chcesz) liczbę zadań, które zawiera. Gdy podasz liczbę zadań, dostaniesz tyle samo kwadracików do odhaczania — widać, ile z materiału zostało zrobione.</p>
+
+  <div class="card">
+    <h2>Dodaj materiał</h2>
+    <div class="row">
+      <select id="matsSubj" style="width:200px"></select>
+      <input type="text" id="matsNewSubj" class="field" style="width:180px" placeholder="Nazwa przedmiotu" hidden>
+      <input type="text" id="matsName" class="field" placeholder="Np. Arkusz CKE maj 2024">
+      <div class="row" style="flex:none;flex-wrap:nowrap;gap:6px;width:auto">
+        <input type="number" id="matsTasks" min="0" max="999" step="1" placeholder="—" style="width:90px">
+        <span class="muted">zadań</span>
+      </div>
+      <button class="btn" id="matsAdd">Dodaj</button>
+    </div>
+    <p class="muted" style="margin-top:var(--sp-2)">Liczba zadań jest opcjonalna — zostaw puste, jeśli materiał nie ma zadań albo nie chcesz ich liczyć. Możesz ją dopisać albo zmienić później.</p>
+  </div>
+
+  <div class="tabs" id="matsTabs"></div>
+  <div id="matsList"></div>
+</section>
+
 <!-- ============ TIME ANALYSIS ============ -->
 <section class="view" id="view-time">
   <h1>Analiza czasu</h1><p class="sub">Wszystkie wskaźniki na jednym wykresie giełdowym — zaznacz, które linie chcesz widzieć, osobno lub nałożone na siebie.</p>
@@ -745,7 +787,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=36;
+const DM_BUILD=37;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -809,7 +851,7 @@ const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 "use strict";
 /* ================= DATA ================= */
 const KEY="daymenu_v1";
-const defaults={theme:"light",moods:[],goals:[],books:[],timelog:[],sleep:[],appearance:null,habits:[],account:null,lastCloudSync:null,matura:{grid:{},topics:[],plan:[],sessions:[],pomo:{work:25,break:5},prefs:""},exams:{librus:[],fetchedAt:null,err:null,manual:[],retakes:{}},wymagania:{opanowane:{},notatki:{},ukryjFakultatywne:true,ostatnioOtwarty:"matematyka"}};
+const defaults={theme:"light",moods:[],goals:[],books:[],timelog:[],sleep:[],appearance:null,habits:[],account:null,lastCloudSync:null,matura:{grid:{},topics:[],plan:[],sessions:[],pomo:{work:25,break:5},prefs:""},exams:{librus:[],fetchedAt:null,err:null,manual:[],retakes:{}},wymagania:{opanowane:{},notatki:{},ukryjFakultatywne:true,ostatnioOtwarty:"matematyka"},materialy:[]};
 let S=load();
 let sbSession=null; // zadeklarowane WCZEŚNIE — save()→cloudQueuePush() bywa wołane już przy starcie (matMigrate), zanim wykona się sekcja chmury
 function load(){try{const d=JSON.parse(localStorage.getItem(KEY));return Object.assign({},defaults,d||{})}catch(e){return {...defaults}}}
@@ -923,7 +965,7 @@ $("#themeBtn").onclick=()=>{
 applyTheme();loadBg();
 
 /* ================= NAV ================= */
-const renderers={dash:renderDash,mood:renderMood,goals:renderGoals,books:renderBooks,time:renderTime,sleep:renderSleep,look:renderLook,habits:renderHabits,account:renderAccount,matura:renderMatura,exams:renderExams,wymagania:renderWymagania};
+const renderers={dash:renderDash,mood:renderMood,goals:renderGoals,books:renderBooks,time:renderTime,sleep:renderSleep,look:renderLook,habits:renderHabits,account:renderAccount,matura:renderMatura,exams:renderExams,wymagania:renderWymagania,mats:renderMats};
 $$(".nav-btn").forEach(b=>b.onclick=()=>show(b.dataset.view));
 function show(v){
   $$(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
@@ -2227,6 +2269,206 @@ $("#wymImportFile").onchange=e=>{
   };
   r.readAsText(f);
 };
+
+/* ================= MATERIAŁY (spis materiałów do nauki: przedmiot, nazwa, zadania do odhaczania) ================= */
+/* Ta sama pułapka co przy `wymagania`: load() robi płytki Object.assign, więc dane
+   zapisane przed dodaniem tej zakładki dostają w S.materialy TEN SAM obiekt co
+   defaults — dopisanie materiału zabrudziłoby wzorzec. Stąd własna kopia. */
+function matsList(){
+  if(!Array.isArray(S.materialy)||S.materialy===defaults.materialy)S.materialy=[];
+  return S.materialy;
+}
+const MATS_BASE_SUBJ=["Matematyka","Geografia","Fizyka"]; // punkt startu, gdy nie ma jeszcze żadnych przedmiotów
+const MATS_OTHER="__inny__";
+let matsFilter="all";
+const matsOpen=new Set(); // które materiały mają rozwiniętą siatkę zadań (siatka rysuje się dopiero po rozwinięciu)
+function matsPlural(n,one,few,many){
+  const d=n%10,s=n%100;
+  return n===1?one:(d>=2&&d<=4&&(s<10||s>=20)?few:many);
+}
+// przedmioty do wyboru: te już użyte w materiałach + przedmioty z zakładki Nauka + baza
+function matsSubjects(){
+  const set=new Set();
+  matsList().forEach(m=>m.subject&&set.add(m.subject));
+  (S.matura&&S.matura.topics||[]).forEach(t=>t.name&&set.add(t.name.trim()));
+  MATS_BASE_SUBJ.forEach(s=>set.add(s));
+  return [...set].sort((a,b)=>a.localeCompare(b,"pl"));
+}
+// odhaczone zadania trzymamy jako listę numerów (1..tasks); porządkujemy przy każdym odczycie,
+// żeby zmiana liczby zadań w dół nie zostawiała numerów spoza zakresu
+function matsDone(m){
+  if(!Array.isArray(m.done))m.done=[];
+  const max=m.tasks||0;
+  m.done=[...new Set(m.done.filter(n=>Number.isInteger(n)&&n>=1&&n<=max))].sort((a,b)=>a-b);
+  return m.done;
+}
+// przy 612 zadaniach kilka odhaczonych to ułamek procenta — zaokrąglamy w górę do 1%,
+// żeby pasek w ogóle było widać (dokładną liczbę i tak pokazuje licznik obok)
+function matsPct(m){
+  const t=m.tasks||0;if(!t)return 0;
+  const zr=matsDone(m).length;
+  return zr?Math.max(1,Math.round(zr/t*100)):0;
+}
+function matsSubjLine(items){
+  const zad=items.reduce((a,m)=>a+(m.tasks||0),0);
+  const zr=items.reduce((a,m)=>a+matsDone(m).length,0);
+  return `${items.length} ${matsPlural(items.length,"materiał","materiały","materiałów")}`
+    +(zad?` · ${zr}/${zad} ${matsPlural(zad,"zadanie","zadania","zadań")}`:"");
+}
+function renderMats(){
+  const list=matsList(),subs=matsSubjects();
+  // lista wyboru przedmiotu (zachowujemy to, co user miał wybrane)
+  const sel=$("#matsSubj"),prev=sel.value;
+  sel.innerHTML=subs.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join("")
+    +`<option value="${MATS_OTHER}">➕ Inny przedmiot…</option>`;
+  sel.value=[...subs,MATS_OTHER].includes(prev)?prev:(subs[0]||MATS_OTHER);
+  matsSyncOther();
+
+  // zakładki filtra — tylko przedmioty, które faktycznie mają materiały
+  const used=[...new Set(list.map(m=>m.subject))].sort((a,b)=>a.localeCompare(b,"pl"));
+  if(matsFilter!=="all"&&!used.includes(matsFilter))matsFilter="all";
+  $("#matsTabs").innerHTML=[["all","Wszystkie"],...used.map(s=>[s,s])]
+    .map(([k,l])=>`<button data-mf="${esc(k)}"${k===matsFilter?' class="on"':""}>${esc(l)}</button>`).join("");
+  $$("#matsTabs button").forEach(b=>b.onclick=()=>{matsFilter=b.dataset.mf;renderMats()});
+
+  const shown=used.filter(s=>matsFilter==="all"||s===matsFilter);
+  $("#matsList").innerHTML=shown.length?shown.map(s=>{
+    const items=list.filter(m=>m.subject===s);
+    return `<div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:var(--sp-3)">
+        <h2 style="margin:0">${esc(s)}</h2>
+        <span class="muted" data-mhead="${esc(s)}">${matsSubjLine(items)}</span>
+      </div>
+      ${items.map(m=>matsItemHtml(m)).join("")}
+    </div>`;
+  }).join(""):`<div class="empty">${list.length?"Brak materiałów dla tego przedmiotu.":"Nie masz jeszcze żadnych materiałów — dodaj pierwszy powyżej."}</div>`;
+
+  // siatki zadań dla materiałów, które były rozwinięte przed przerysowaniem
+  shown.forEach(s=>list.filter(m=>m.subject===s&&matsOpen.has(m.id)).forEach(matsFillGrid));
+
+  $$("#matsList [data-mnm]").forEach(i=>i.onchange=()=>{
+    const m=matsList().find(x=>x.id===i.dataset.mnm);if(!m)return;
+    const v=i.value.trim();
+    if(!v){i.value=m.name;return toast("Nazwa nie może być pusta")}
+    m.name=v;save();toast("Zapisano ✓");
+  });
+  $$("#matsList [data-mtk]").forEach(i=>i.onchange=()=>{
+    const m=matsList().find(x=>x.id===i.dataset.mtk);if(!m)return;
+    const stare=m.tasks||0,nowe=matsParseTasks(i.value)||0;
+    const gubione=matsDone(m).filter(n=>n>nowe).length;
+    if(gubione&&!confirm(`Zmniejszenie liczby zadań do ${nowe} skasuje odhaczenie ${gubione} ${matsPlural(gubione,"zadania","zadań","zadań")}. Kontynuować?`)){
+      i.value=stare||"";return;
+    }
+    m.tasks=matsParseTasks(i.value);
+    matsDone(m); // przycina odhaczone do nowego zakresu
+    save();renderMats();
+  });
+  $$("#matsList [data-mdel]").forEach(b=>b.onclick=()=>{
+    const m=matsList().find(x=>x.id===b.dataset.mdel);if(!m)return;
+    if(!confirm(`Usunąć materiał „${m.name}”?`))return;
+    S.materialy=matsList().filter(x=>x.id!==m.id);matsOpen.delete(m.id);save();renderMats();
+  });
+  // siatka zadań rysuje się leniwie — przy 600 zadaniach nie ma sensu trzymać jej w DOM-ie na zapas
+  $$("#matsList .mats-det").forEach(d=>d.ontoggle=()=>{
+    const m=matsList().find(x=>x.id===d.dataset.mdet);if(!m)return;
+    if(d.open){matsOpen.add(m.id);matsFillGrid(m)}else matsOpen.delete(m.id);
+  });
+  $$("#matsList [data-mall]").forEach(b=>b.onclick=()=>{
+    const m=matsList().find(x=>x.id===b.dataset.mall);if(!m||!m.tasks)return;
+    const wszystkie=b.dataset.v==="1";
+    m.done=wszystkie?Array.from({length:m.tasks},(_,i)=>i+1):[];
+    save();
+    if(matsOpen.has(m.id))matsFillGrid(m);
+    matsRefreshCounts(m);
+  });
+}
+function matsItemHtml(m){
+  const t=m.tasks||0,zr=matsDone(m).length;
+  return `<div class="mats-item">
+    <div class="row" style="flex-wrap:nowrap;gap:var(--sp-2)">
+      <input type="text" data-mnm="${m.id}" class="field" style="flex:1;min-width:0" value="${esc(m.name)}">
+      <div class="row" style="flex:none;flex-wrap:nowrap;gap:6px;width:auto">
+        <input type="number" data-mtk="${m.id}" min="0" max="999" step="1" placeholder="—" style="width:80px" value="${m.tasks==null?"":m.tasks}">
+        <span class="muted">zad.</span>
+      </div>
+      <button class="icon-btn del" data-mdel="${m.id}" title="Usuń materiał">✕</button>
+    </div>
+    ${t?`
+    <div class="mats-prog">
+      <div class="progress"><div class="g-good" data-mbar="${m.id}" style="width:${matsPct(m)}%"></div></div>
+      <span class="muted" data-mcnt="${m.id}">${zr}/${t}</span>
+    </div>
+    <details class="mats-det" data-mdet="${m.id}"${matsOpen.has(m.id)?" open":""}>
+      <summary>Zadania — odhacz zrobione</summary>
+      <div class="row" style="gap:var(--sp-2);margin-bottom:var(--sp-2)">
+        <button class="btn ghost small" data-mall="${m.id}" data-v="1">Odhacz wszystkie</button>
+        <button class="btn ghost small" data-mall="${m.id}" data-v="0">Wyczyść</button>
+      </div>
+      <div class="mats-tasks" data-mgrid="${m.id}"></div>
+    </details>`:""}
+  </div>`;
+}
+// jeden innerHTML na całą siatkę + delegacja kliknięć na #matsList (przy 600 zadaniach
+// osobne handlery na każdym kwadraciku byłyby marnotrawstwem)
+function matsFillGrid(m){
+  const g=$(`#matsList [data-mgrid="${m.id}"]`);
+  if(!g||!m.tasks)return;
+  const done=new Set(matsDone(m));
+  let h="";
+  for(let n=1;n<=m.tasks;n++)h+=`<button type="button" data-mtask="${m.id}" data-n="${n}"${done.has(n)?' class="on"':""} aria-pressed="${done.has(n)}">${n}</button>`;
+  g.innerHTML=h;
+}
+// po odhaczeniu odświeżamy tylko liczniki, nie całą listę
+function matsRefreshCounts(m){
+  const t=m.tasks||0,zr=matsDone(m).length;
+  const cnt=$(`#matsList [data-mcnt="${m.id}"]`),bar=$(`#matsList [data-mbar="${m.id}"]`);
+  if(cnt)cnt.textContent=`${zr}/${t}`;
+  if(bar)bar.style.width=matsPct(m)+"%";
+  const head=$(`#matsList [data-mhead="${CSS.escape(m.subject)}"]`);
+  if(head)head.textContent=matsSubjLine(matsList().filter(x=>x.subject===m.subject));
+}
+$("#matsList").onclick=e=>{
+  const b=e.target.closest("[data-mtask]");
+  if(!b)return;
+  const m=matsList().find(x=>x.id===b.dataset.mtask);if(!m)return;
+  const n=+b.dataset.n,done=matsDone(m),i=done.indexOf(n);
+  if(i>=0)done.splice(i,1);else done.push(n);
+  done.sort((a,b2)=>a-b2);
+  b.classList.toggle("on",i<0);
+  b.setAttribute("aria-pressed",String(i<0));
+  matsRefreshCounts(m);
+  save();
+};
+// puste pole = brak zadań (null), a nie zero
+function matsParseTasks(v){
+  const s=String(v??"").trim();
+  if(!s)return null;
+  const n=Math.round(+s);
+  return isNaN(n)?null:Math.max(0,Math.min(999,n));
+}
+function matsSyncOther(){
+  const other=$("#matsSubj").value===MATS_OTHER;
+  $("#matsNewSubj").hidden=!other;
+  if(!other)$("#matsNewSubj").value="";
+}
+$("#matsSubj").onchange=()=>{matsSyncOther();if(!$("#matsNewSubj").hidden)$("#matsNewSubj").focus()};
+$("#matsAdd").onclick=()=>{
+  const own=$("#matsSubj").value===MATS_OTHER;
+  const subject=(own?$("#matsNewSubj").value:$("#matsSubj").value).trim();
+  if(!subject)return toast("Wpisz nazwę przedmiotu");
+  const name=$("#matsName").value.trim();
+  if(!name)return toast("Wpisz nazwę materiału");
+  matsList().push({id:uid(),subject,name,tasks:matsParseTasks($("#matsTasks").value),done:[],added:today()});
+  save();
+  $("#matsName").value="";$("#matsTasks").value="";
+  matsFilter="all";
+  renderMats();
+  $("#matsSubj").value=subject;matsSyncOther();
+  toast("Materiał dodany ✓");
+};
+$("#matsName").onkeydown=e=>{if(e.key==="Enter")$("#matsAdd").click()};
+$("#matsTasks").onkeydown=e=>{if(e.key==="Enter")$("#matsAdd").click()};
+$("#matsNewSubj").onkeydown=e=>{if(e.key==="Enter")$("#matsName").focus()};
 
 /* ================= WYKRES (multi-linia: produktywność, sen, nauka, nastrój, humor) ================= */
 function studyHours(ds){return S.matura.sessions.filter(s=>s.date===ds).reduce((a,s)=>a+s.minutes,0)/60}
