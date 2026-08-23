@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-21 (sesja 14 — zakładka „Materiały" wdrożona w `DayMenu.html`)_
+_Ostatnia aktualizacja: 2026-08-23 (sesja 15 — las pomodoro + wtyczka LockTask, czeka na publish i nowy APK)_
 
 ## Czym jest projekt
 
@@ -418,6 +418,41 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-23 (sesja 15)**: Wdrożono **„Las pomodoro"** — gamifikację sesji nauki
+  (widok Nauka): każda faza pracy pomodoro sadzi drzewo (`S.forest`, top-level klucz
+  obok `matura`; element `{id,topicId,date,status,ts}`, status `growing|alive|withered`).
+  Ukończenie fazy pracy = drzewo `alive` (toast „Drzewo wyrosło 🌳"), ręczne „Zatrzymaj
+  sesję" w trakcie pracy = `confirm()` z ostrzeżeniem i uschnięcie po potwierdzeniu,
+  wyjście z apki (Home/przełącznik — `visibilitychange`+`hidden`) = ciche uschnięcie
+  (blokujący dialog na tej ścieżce jest niemożliwy na Androidzie — świadome ograniczenie).
+  Przejście przerwa→praca sadzi kolejne drzewo; start nowej sesji ususza porzucone
+  `growing`. Nowa karta „🌲 Twój las" pod kartą pomodoro (`#matForestGrid`,
+  `#matForestStats`, CSS `.forest-tree` ze stanami i pulsowaniem `growing`),
+  render podpięty w `renderMatura()`. Przerwy nie sadzą/nie ususzają drzew;
+  `matMarkDone`/`matUnmarkDone` nietknięte.
+  - **Screen Pinning (część natywna):** nowa wtyczka Capacitor
+    `android-app/.../LockTaskPlugin.java` (`LockTask.startPin/stopPin` →
+    `startLockTask()`/`stopLockTask()`), zarejestrowana w `MainActivity.java` obok
+    `WidgetPlugin` — **w Javie, nie Kotlinie** (projekt nie ma toolchaina Kotlin).
+    JS woła ją defensywnie (`lockTaskPin(on)`, wzorzec jak `DayMenuWidget`): przypięcie
+    przy starcie sesji, odpięcie dopiero przy realnym zamknięciu karty pomodoro (przerwy
+    zostają przypięte). Wymaga jednorazowego włączenia „Przypinania ekranu" w Ustawieniach
+    Androida przez użytkownika. **Ta część wymaga przebudowy i podpisania APK** —
+    live-update jej nie dostarczy.
+  - Zmiany w `DayMenu.html` (źródło, DM_BUILD zostawiony na 37 — `publish.js` podbije)
+    oraz skopiowane do `docs/app.html` (DM_BUILD=38 + `version.json` 38, do podglądu;
+    publish i tak je nadpisze tym samym).
+  - **Przetestowane na żywo w przeglądarce** (http-server + konsola): sadzenie/wzrost/
+    uschnięcie, guard podwójnego zamknięcia, pełna 2-sekundowa sesja end-to-end
+    (drzewo `alive`, przejście na przerwę), symulowany `visibilitychange` (uschnięcie,
+    stop timera), obie ścieżki `confirm` przycisku „Zatrzymaj", sadzenie przy
+    przerwa→praca, render siatki/statystyk/stanu pustego, animacja `forestPulse`,
+    trwałość w localStorage, brak regresji w pozostałych widokach, zero błędów konsoli.
+    Dane testowe wyczyszczone.
+  - **DO ZROBIENIA:** `npm run publish` (dostarczy las przez live-update) oraz
+    przebudowa+podpisanie APK (`npm run android` / dogrywka jak przy buildach 34/37),
+    żeby zadziałało przypinanie ekranu; `versionCode` w manifeście warto podbić.
 
 - **2026-08-21 (sesja 14)**: Dodano zakładkę **„Materiały"** (`data-view="mats"`, widok
   `#view-mats`, `renderMats` w mapie `renderers`, nowy klucz stanu `S.materialy` = tablica

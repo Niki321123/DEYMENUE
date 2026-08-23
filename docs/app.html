@@ -131,6 +131,12 @@ label.fld{display:block;font-size:var(--fs-1);font-weight:600;color:var(--text-2
 .mastery-pick button{border:none;background:none;padding:6px 12px;border-radius:6px;color:var(--text-2);font-weight:600;font-size:12px;min-height:30px}
 .mastery-pick button.on{background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
 .mat-active-pomo{border:2px solid var(--primary);background:var(--primary-soft)}
+.forest-grid{display:flex;flex-wrap:wrap;gap:6px}
+.forest-tree{width:34px;height:34px;border-radius:var(--radius-s);display:flex;align-items:center;justify-content:center;font-size:19px;background:var(--surface-2)}
+.forest-tree.alive{background:var(--good-soft)}
+.forest-tree.withered{background:var(--bad-soft);opacity:.85}
+.forest-tree.growing{background:var(--warn-soft);animation:forestPulse 1.4s ease-in-out infinite}
+@keyframes forestPulse{0%,100%{opacity:1}50%{opacity:.55}}
 .mat-cell.avail{background:var(--good-soft);border-color:var(--good)}
 .mat-cell.school{background:var(--primary-soft);border-color:var(--primary)}
 .mat-cell.plan{display:flex;align-items:center;justify-content:center;gap:2px;font-size:10px;font-weight:700;color:var(--good);overflow:hidden;text-align:center;line-height:1.05;padding:1px 3px;white-space:nowrap;text-overflow:ellipsis}
@@ -440,6 +446,14 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
       <button class="btn" id="matPomoStart">Start</button>
       <button class="btn ghost" id="matPomoStop">Zatrzymaj sesję</button>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;margin-bottom:var(--sp-2)">
+      <h2 style="margin:0">🌲 Twój las</h2>
+      <p class="muted" id="matForestStats" style="margin:0"></p>
+    </div>
+    <div id="matForestGrid" class="forest-grid"></div>
   </div>
 
   <div id="matSched">
@@ -787,7 +801,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=37;
+const DM_BUILD=38;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -851,7 +865,7 @@ const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 "use strict";
 /* ================= DATA ================= */
 const KEY="daymenu_v1";
-const defaults={theme:"light",moods:[],goals:[],books:[],timelog:[],sleep:[],appearance:null,habits:[],account:null,lastCloudSync:null,matura:{grid:{},topics:[],plan:[],sessions:[],pomo:{work:25,break:5},prefs:""},exams:{librus:[],fetchedAt:null,err:null,manual:[],retakes:{}},wymagania:{opanowane:{},notatki:{},ukryjFakultatywne:true,ostatnioOtwarty:"matematyka"},materialy:[]};
+const defaults={theme:"light",moods:[],goals:[],books:[],timelog:[],sleep:[],appearance:null,habits:[],account:null,lastCloudSync:null,forest:[],matura:{grid:{},topics:[],plan:[],sessions:[],pomo:{work:25,break:5},prefs:""},exams:{librus:[],fetchedAt:null,err:null,manual:[],retakes:{}},wymagania:{opanowane:{},notatki:{},ukryjFakultatywne:true,ostatnioOtwarty:"matematyka"},materialy:[]};
 let S=load();
 let sbSession=null; // zadeklarowane WCZEŚNIE — save()→cloudQueuePush() bywa wołane już przy starcie (matMigrate), zanim wykona się sekcja chmury
 function load(){try{const d=JSON.parse(localStorage.getItem(KEY));return Object.assign({},defaults,d||{})}catch(e){return {...defaults}}}
@@ -1571,7 +1585,7 @@ function matUnmarkDone(blk){
   delete blk.doneWeek;delete blk.sessionId;
 }
 /* ---- pomodoro powiązane z blokiem z planu (ukończenie pracy odhacza godzinę) ---- */
-let matPomo={topicId:null,day:null,hour:null,mode:"work",left:25*60,total:25*60,running:false,iv:null};
+let matPomo={topicId:null,day:null,hour:null,mode:"work",left:25*60,total:25*60,running:false,iv:null,treeId:null};
 function matPomoLen(m){return(m==="work"?S.matura.pomo.work:S.matura.pomo.break)*60}
 function matPomoDraw(){
   const mm=String(Math.floor(matPomo.left/60)).padStart(2,"0"),ss=String(matPomo.left%60).padStart(2,"0");
@@ -1593,20 +1607,71 @@ function matPomoToggle(){
         if(blk){if(blk.doneWeek!==weekId())matMarkDone(blk);}
         else S.matura.sessions.push({id:uid(),topicId:matPomo.topicId,date:today(),minutes:min,completed:true});
         if(t)S.timelog.push({id:uid(),name:"Nauka: "+t.name,category:"Nauka",estimate:null,actual:min,date:today()});
-        save();toast("Sesja ukończona! Godzina odhaczona.");notify("Pomodoro ukończone",t?`${t.name} — dobra robota.`:"Dobra robota — czas na przerwę.");
+        if(matPomo.treeId){forestFinish(matPomo.treeId,"alive");matPomo.treeId=null;}
+        save();toast("Sesja ukończona! Drzewo wyrosło 🌳");notify("Pomodoro ukończone",t?`${t.name} — dobra robota.`:"Dobra robota — czas na przerwę.");
         renderMatStats();renderMatSched();
         matPomo.mode="break";matPomo.left=matPomo.total=matPomoLen("break");matPomoDraw();
       }else{
         toast("Przerwa skończona — wróć do nauki!");notify("Koniec przerwy","Wracamy do nauki.");
         matPomo.mode="work";matPomo.left=matPomo.total=matPomoLen("work");matPomoDraw();
+        matPomo.treeId=forestPlant(matPomo.topicId).id; // nowe drzewo na kolejną rundę pracy
       }
     }
   },1000);
 }
+/* ---- LAS: gamifikacja pomodoro — jedna ukończona sesja pracy = jedno drzewo ---- */
+function forestPlant(topicId){
+  const tr={id:uid(),topicId:topicId||null,date:today(),status:"growing",ts:Date.now()};
+  S.forest.push(tr);save();renderForest();
+  return tr;
+}
+function forestFinish(id,status){
+  const tr=S.forest.find(x=>x.id===id);
+  if(!tr||tr.status!=="growing")return; // zabezpieczenie przed podwójnym zamknięciem
+  tr.status=status;save();renderForest();
+}
+function renderForest(){
+  const grid=$("#matForestGrid");if(!grid)return;
+  const trees=S.forest||[];
+  if(!trees.length){
+    grid.innerHTML='<p class="muted">Ukończ pierwszą sesję pomodoro, żeby zasadzić drzewo.</p>';
+  }else{
+    grid.innerHTML=trees.slice(-60).map(t=>{
+      const icon=t.status==="alive"?"🌳":t.status==="withered"?"🥀":"🌱";
+      const topic=S.matura.topics.find(x=>x.id===t.topicId);
+      const label=(topic?topic.name+" — ":"")+t.date+(t.status==="withered"?" (przerwana)":t.status==="growing"?" (w trakcie)":"");
+      return `<div class="forest-tree ${t.status}" title="${esc(label)}">${icon}</div>`;
+    }).join("");
+  }
+  const alive=trees.filter(t=>t.status==="alive").length;
+  const withered=trees.filter(t=>t.status==="withered").length;
+  const stats=$("#matForestStats");if(stats)stats.textContent=`🌳 ${alive} 🥀 ${withered}`;
+}
+// Wyjście z apki (Home / przełącznik aplikacji / powiadomienia) w trakcie fazy pracy = uschnięcie.
+// Nie da się tu pokazać blokującego pytania — Android nie pozwala przechwycić tej ścieżki,
+// więc reagujemy po fakcie, a komunikat użytkownik zobaczy po powrocie (uschnięte drzewo w lesie).
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden&&matPomo.running&&matPomo.mode==="work"&&matPomo.treeId){
+    forestFinish(matPomo.treeId,"withered");
+    matPomoStop();
+    matPomo.treeId=null;
+  }
+});
+/* ---- przypinanie ekranu (Android Screen Pinning) przez natywną wtyczkę LockTask;
+   w przeglądarce/dev brak pluginu = nic się nie dzieje, jak przy DayMenuWidget ---- */
+function lockTaskPin(on){
+  try{
+    const P=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.LockTask;
+    if(P)(on?P.startPin():P.stopPin()).catch(e=>console.error("LockTask:",e));
+  }catch(e){console.error("LockTask:",e)}
+}
 function matStartPomo(blk){
+  if(matPomo.treeId)forestFinish(matPomo.treeId,"withered"); // porzucona poprzednia sesja
   matPomoStop();
   matPomo.topicId=blk.topicId;matPomo.day=blk.day;matPomo.hour=blk.hour;matPomo.mode="work";
   matPomo.left=matPomo.total=matPomoLen("work");
+  matPomo.treeId=forestPlant(blk.topicId).id;
+  lockTaskPin(true);
   const t=S.matura.topics.find(x=>x.id===blk.topicId);
   $("#matPomoTopic").textContent=t?`${t.name} — ${MAT_DAYS[blk.day]} ${String(blk.hour).padStart(2,"0")}:00`:"—";
   $("#matPomoCard").hidden=false;
@@ -1614,7 +1679,15 @@ function matStartPomo(blk){
   $("#matPomoCard").scrollIntoView({behavior:"smooth",block:"nearest"});
 }
 $("#matPomoStart").onclick=matPomoToggle;
-$("#matPomoStop").onclick=()=>{matPomoStop();$("#matPomoCard").hidden=true;matPomo.topicId=null;matPomo.day=null;matPomo.hour=null};
+$("#matPomoStop").onclick=()=>{
+  if(matPomo.mode==="work"&&matPomo.treeId){
+    if(!confirm("Sesja pomodoro jeszcze trwa — jeśli zakończysz teraz, drzewo uschnie. Na pewno chcesz przerwać?"))return;
+    forestFinish(matPomo.treeId,"withered");
+    toast("Drzewo uschło 🥀 — następnym razem się uda.");
+  }
+  matPomoStop();$("#matPomoCard").hidden=true;matPomo.topicId=null;matPomo.day=null;matPomo.hour=null;matPomo.treeId=null;
+  lockTaskPin(false);
+};
 
 /* ---- statystyki ---- */
 function matStreak(){
@@ -1652,7 +1725,7 @@ $$("#matTabs button").forEach(b=>b.onclick=()=>{
 });
 function renderMatura(){
   $("#matPrefs").value=S.matura.prefs||"";
-  renderMatGrid();renderMatPlanProgress();renderMatSubjects();renderMatStats();matChatRender();
+  renderMatGrid();renderMatPlanProgress();renderMatSubjects();renderMatStats();matChatRender();renderForest();
 }
 
 /* ================= SPRAWDZIANY (zapowiedzi z terminarza Librusa + poprawy) ================= */
