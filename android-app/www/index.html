@@ -431,29 +431,32 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   <div class="tabs" id="matTabs">
     <button data-mt="sched" class="on">Harmonogram</button>
     <button data-mt="subjects">Przedmioty</button>
+    <button data-mt="forest">Las</button>
     <button data-mt="stats">Statystyki</button>
   </div>
 
-  <div id="matPomoCard" class="card mat-active-pomo" hidden>
-    <div class="row" style="justify-content:space-between">
-      <div>
-        <h2 style="margin-bottom:2px" id="matPomoTopic">—</h2>
-        <p class="muted" id="matPomoPhase">Praca</p>
+  <div id="matForestView" hidden>
+    <div id="matPomoCard" class="card mat-active-pomo" hidden>
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <h2 style="margin-bottom:2px" id="matPomoTopic">—</h2>
+          <p class="muted" id="matPomoPhase">Praca</p>
+        </div>
+        <div class="pomo-time" id="matPomoTime" style="font-size:40px">25:00</div>
       </div>
-      <div class="pomo-time" id="matPomoTime" style="font-size:40px">25:00</div>
+      <div class="row" style="margin-top:var(--sp-3)">
+        <button class="btn" id="matPomoStart">Start</button>
+        <button class="btn ghost" id="matPomoStop">Zatrzymaj sesję</button>
+      </div>
     </div>
-    <div class="row" style="margin-top:var(--sp-3)">
-      <button class="btn" id="matPomoStart">Start</button>
-      <button class="btn ghost" id="matPomoStop">Zatrzymaj sesję</button>
-    </div>
-  </div>
 
-  <div class="card">
-    <div class="row" style="justify-content:space-between;margin-bottom:var(--sp-2)">
-      <h2 style="margin:0">🌲 Twój las</h2>
-      <p class="muted" id="matForestStats" style="margin:0"></p>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:var(--sp-2)">
+        <h2 style="margin:0">🌲 Twój las</h2>
+        <p class="muted" id="matForestStats" style="margin:0"></p>
+      </div>
+      <div id="matForestGrid" class="forest-grid"></div>
     </div>
-    <div id="matForestGrid" class="forest-grid"></div>
   </div>
 
   <div id="matSched">
@@ -801,7 +804,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=38;
+const DM_BUILD=39;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1675,6 +1678,7 @@ function matStartPomo(blk){
   const t=S.matura.topics.find(x=>x.id===blk.topicId);
   $("#matPomoTopic").textContent=t?`${t.name} — ${MAT_DAYS[blk.day]} ${String(blk.hour).padStart(2,"0")}:00`:"—";
   $("#matPomoCard").hidden=false;
+  matShowTab("forest");
   matPomoDraw();matPomoToggle();
   $("#matPomoCard").scrollIntoView({behavior:"smooth",block:"nearest"});
 }
@@ -1717,12 +1721,14 @@ function renderMatStats(){
 
 /* ---- zakładki ---- */
 function renderMatSched(){matRecompute();renderMatGrid();renderMatPlanProgress();}
-$$("#matTabs button").forEach(b=>b.onclick=()=>{
-  $$("#matTabs button").forEach(x=>x.classList.toggle("on",x===b));
-  $("#matSched").hidden=b.dataset.mt!=="sched";
-  $("#matSubjects").hidden=b.dataset.mt!=="subjects";
-  $("#matStats").hidden=b.dataset.mt!=="stats";
-});
+function matShowTab(mt){
+  $$("#matTabs button").forEach(x=>x.classList.toggle("on",x.dataset.mt===mt));
+  $("#matSched").hidden=mt!=="sched";
+  $("#matSubjects").hidden=mt!=="subjects";
+  $("#matForestView").hidden=mt!=="forest";
+  $("#matStats").hidden=mt!=="stats";
+}
+$$("#matTabs button").forEach(b=>b.onclick=()=>matShowTab(b.dataset.mt));
 function renderMatura(){
   $("#matPrefs").value=S.matura.prefs||"";
   renderMatGrid();renderMatPlanProgress();renderMatSubjects();renderMatStats();matChatRender();renderForest();

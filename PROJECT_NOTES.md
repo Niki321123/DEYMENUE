@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-23 (sesja 15 — las pomodoro + wtyczka LockTask, czeka na publish i nowy APK)_
+_Ostatnia aktualizacja: 2026-08-23 (sesja 15 — las pomodoro dostał własną zakładkę „Las", czeka na publish)_
 
 ## Czym jest projekt
 
@@ -450,9 +450,35 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
     przerwa→praca, render siatki/statystyk/stanu pustego, animacja `forestPulse`,
     trwałość w localStorage, brak regresji w pozostałych widokach, zero błędów konsoli.
     Dane testowe wyczyszczone.
-  - **DO ZROBIENIA:** `npm run publish` (dostarczy las przez live-update) oraz
-    przebudowa+podpisanie APK (`npm run android` / dogrywka jak przy buildach 34/37),
-    żeby zadziałało przypinanie ekranu; `versionCode` w manifeście warto podbić.
+  - **`npm run publish` wykonany (build 38):** web/desktop opublikowane od razu,
+    ale `npm run android`/Gradle w środku publish padło ze znanym mylącym błędem
+    "SDK location not found... Directory does not exist" (ten sam wzorzec co przy
+    buildach 34/35/36 — stary Gradle Daemon z poprzedniego builda, mimo że
+    `local.properties` i SDK są poprawne). **Dogrywka**: `node build-android.js`
+    puszczony jeszcze raz osobno — tym razem `BUILD SUCCESSFUL`, `DayMenu.apk`
+    z lasem+LockTask gotowy. Skopiowany do `docs/DayMenu.apk`, commit
+    „build 38 APK (dogrywka po nieudanym npm run publish)" i push (pierwszy `git push`
+    padł na `Could not resolve host: github.com` — przejściowy DNS, drugi push
+    poszedł bez problemu). Build 38 (las + wtyczka LockTask) jest teraz w pełni
+    opublikowany: web, desktop i APK.
+  - **DO ZROBIENIA:** na telefonie zainstalować/pozwolić zaktualizować się nowemu
+    APK (build 38) i **ręcznie włączyć** „Przypinanie ekranu" w Ustawieniach
+    Androida, żeby zadziałała blokada ekranu na czas sesji pomodoro.
+  - **Poprawka (jeszcze ta sama sesja):** las i karta pomodoro były wcześniej
+    zawsze widoczne w zakładce Harmonogram (nad siatką), zamiast żyć w osobnym
+    miejscu. Dodano nową zakładkę **„Las"** w `#matTabs` (obok Harmonogram/
+    Przedmioty/Statystyki) — karta pomodoro + `#matForestGrid` przeniesione do
+    nowego kontenera `#matForestView`, chowanego/pokazywanego jak reszta zakładek
+    przez nowy helper `matShowTab(mt)` (używany też przez sam handler kliknięcia
+    zakładek). `matStartPomo` teraz woła `matShowTab("forest")`, więc podwójny
+    klik na godzinę w Harmonogramie automatycznie przełącza widok na zakładkę
+    Las, żeby użytkownik widział startujący zegar. Przetestowane w przeglądarce:
+    domyślnie tylko Harmonogram widoczny, przełączanie zakładek chowa/pokazuje
+    właściwe kontenery, start pomodoro z Harmonogramu przełącza na Las i pokazuje
+    kartę, brak regresji w innych widokach, zero błędów konsoli.
+    **DO ZROBIENIA:** `npm run publish` (ta poprawka jeszcze nie opublikowana —
+    build w `DayMenu.html` wciąż na 38, `docs/app.html` ma tymczasowy build 39
+    tylko do testu lokalnego, publish nadpisze go swoim numerem).
 
 - **2026-08-21 (sesja 14)**: Dodano zakładkę **„Materiały"** (`data-view="mats"`, widok
   `#view-mats`, `renderMats` w mapie `renderers`, nowy klucz stanu `S.materialy` = tablica
