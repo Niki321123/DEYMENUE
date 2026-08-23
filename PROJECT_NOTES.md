@@ -419,6 +419,42 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 
 ## Historia sesji (skrót)
 
+- **2026-08-23 (sesja 15, hotfix backendu):** Zdiagnozowano i naprawiono **„Błąd
+  sieci"** przy próbie „Połącz z Librusem" (karta w zakładce Konto). Przyczyna:
+  Edge Function `librus-timetable` (w przeciwieństwie do `daymenu-ai`) nie miała
+  **żadnej obsługi CORS** — brak odpowiedzi na `OPTIONS` i brak nagłówka
+  `Access-Control-Allow-Origin` na żadnej odpowiedzi. Przeglądarka blokowała więc
+  odpowiedź na `POST` z `Authorization` (preflight), a `fetch()` w kliencie
+  (`librusConnect()` w `DayMenu.html`) rzucał wyjątkiem sieciowym łapanym przez
+  `catch`, stąd komunikat „Błąd sieci — spróbuj ponownie." niezależnie od tego,
+  czy login/hasło do Librusa były poprawne. Zweryfikowane w logach: funkcja
+  faktycznie działa (cronowe wywołania co godzinę zwracają 401 z poprawnym JSON,
+  nie błąd — to inny, znany problem z `LIBRUS_CRON_KEY`, do sprawdzenia osobno).
+  - **Fix:** dodano `corsHeaders` (wzorowane na `daymenu-ai`), obsługę
+    `OPTIONS` na starcie handlera i doklejenie tych nagłówków do `ok()`/`deny()`.
+    Przed wdrożeniem cały ~680-linijkowy plik przepisany ręcznie do pliku
+    tymczasowego i **zdiffowany z oryginałem**, żeby wykluczyć błąd transkrypcji
+    — diff pokazał wyłącznie 3 zamierzone zmiany CORS. Wdrożone przez
+    `mcp__supabase__deploy_edge_function` jako **wersja 10** (`verify_jwt=false`,
+    bez zmian w tej flagi). Zweryfikowane `curl`-em: `OPTIONS` → 200 +
+    `Access-Control-Allow-Origin: *`, `POST` (nawet błąd 401) też ma ten
+    nagłówek — dokładnie to, czego brakowało.
+  - Kod klienta (`librusConnect`/`librusDisconnect` w `DayMenu.html`) **nie
+    wymagał zmian** — problem był wyłącznie po stronie Edge Function. Nic do
+    publikowania przez `npm run publish` z tego powodu.
+
+
+- **2026-08-23 (sesja 15, admin backendu):** Na prośbę użytkownika zresetowano
+  statystyki nauki konta `mikolaj.sledziewski@gmail.com` (user_id
+  `26d683a7-6056-4fa7-9d71-802c67618918`) w `public.daymenu_data` na
+  `jkpwboekztpkfxivueql` — `forest` i `matura.sessions` wyczyszczone (`UPDATE`
+  z `jsonb_set`, potwierdzone `RETURNING`: oba na 0). Przed zmianą sprawdzono
+  zawartość (1 drzewo, 3 sesje, 0 zaznaczonych godzin w planie, 0 wpisów
+  timelogu „Nauka") i uzyskano wyraźne potwierdzenie usera — nieodwracalna
+  operacja na danych innego konta. Przedmioty, harmonogram/plan i ustawienia
+  pomodoro tego konta nietknięte. Konto zsynchronizuje wyczyszczone dane przy
+  najbliższym pull z chmury (auto-pull co 15s / po powrocie do apki).
+
 - **2026-08-23 (sesja 15)**: Wdrożono **„Las pomodoro"** — gamifikację sesji nauki
   (widok Nauka): każda faza pracy pomodoro sadzi drzewo (`S.forest`, top-level klucz
   obok `matura`; element `{id,topicId,date,status,ts}`, status `growing|alive|withered`).
@@ -497,6 +533,20 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
     wybranym przedmiotem poprawnie sadzi drzewo i przełącza karty, „Zatrzymaj
     sesję" wraca do karty bezczynności, brak regresji w innych widokach, zero
     błędów konsoli. Dane testowe wyczyszczone.
+  - **Kolejna poprawka (jeszcze ta sama sesja):** dodano możliwość ustawienia
+    minut pracy i przerwy sesji pomodoro — dwa pola liczbowe (`#matPomoWorkMin`,
+    `#matPomoBreakMin`) w karcie „Sesja pomodoro" w zakładce Las, powiązane
+    z już istniejącym (ale wcześniej bez UI) `S.matura.pomo.work/break`
+    (odczytywanym przez `matPomoLen()`). Wypełniane przy `renderMatura()`
+    (`matFillPomoLen()`), zapisywane `onchange` z przycięciem do sensownego
+    zakresu (praca 1–180 min, przerwa 1–60 min) i `save()`. Zmiana działa tylko
+    na przyszłe starty faz (bieżąca aktywna sesja nie jest przerywana), a pola
+    są niedostępne, gdy sesja trwa (karta bezczynności jest wtedy schowana przez
+    `matPomoSetActive`). Przetestowane w przeglądarce: domyślne 25/5, zmiana
+    persystuje w localStorage, start sesji faktycznie używa nowych minut
+    (`matPomo.total` = ustawione minuty × 60), przycinanie granic (0/puste→1,
+    >180→180, >60 dla przerwy→60), brak regresji w innych widokach, zero błędów
+    konsoli.
 
 - **2026-08-21 (sesja 14)**: Dodano zakładkę **„Materiały"** (`data-view="mats"`, widok
   `#view-mats`, `renderMats` w mapie `renderers`, nowy klucz stanu `S.materialy` = tablica

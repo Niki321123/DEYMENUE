@@ -439,6 +439,10 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     <div id="matPomoIdleCard" class="card">
       <h2 style="margin-bottom:2px">Sesja pomodoro</h2>
       <p class="muted" style="margin-bottom:var(--sp-3)">Wybierz przedmiot (opcjonalnie) i zacznij — ukończona faza pracy sadzi drzewo.</p>
+      <div class="row" style="margin-bottom:var(--sp-3)">
+        <div class="field"><label class="fld">Praca (min)</label><input type="number" id="matPomoWorkMin" min="1" max="180" step="1"></div>
+        <div class="field"><label class="fld">Przerwa (min)</label><input type="number" id="matPomoBreakMin" min="1" max="60" step="1"></div>
+      </div>
       <div class="row">
         <select id="matPomoTopicPick"><option value="">— bez przedmiotu —</option></select>
         <button class="btn" id="matPomoQuickStart">Start</button>
@@ -813,7 +817,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=41;
+const DM_BUILD=42;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1689,6 +1693,20 @@ function matFillPomoTopicPick(){
     S.matura.topics.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("");
   if(S.matura.topics.some(t=>t.id===prev))sel.value=prev;
 }
+function matFillPomoLen(){
+  $("#matPomoWorkMin").value=S.matura.pomo.work;
+  $("#matPomoBreakMin").value=S.matura.pomo.break;
+}
+$("#matPomoWorkMin").onchange=()=>{
+  const v=Math.round(+$("#matPomoWorkMin").value);
+  S.matura.pomo.work=Math.max(1,Math.min(180,Number.isFinite(v)?v:25));
+  $("#matPomoWorkMin").value=S.matura.pomo.work;save();
+};
+$("#matPomoBreakMin").onchange=()=>{
+  const v=Math.round(+$("#matPomoBreakMin").value);
+  S.matura.pomo.break=Math.max(1,Math.min(60,Number.isFinite(v)?v:5));
+  $("#matPomoBreakMin").value=S.matura.pomo.break;save();
+};
 function matStartPomo(blk){
   if(matPomo.treeId)forestFinish(matPomo.treeId,"withered"); // porzucona poprzednia sesja
   matPomoStop();
@@ -1753,7 +1771,7 @@ function matShowTab(mt){
 $$("#matTabs button").forEach(b=>b.onclick=()=>matShowTab(b.dataset.mt));
 function renderMatura(){
   $("#matPrefs").value=S.matura.prefs||"";
-  renderMatGrid();renderMatPlanProgress();renderMatSubjects();renderMatStats();matChatRender();renderForest();
+  renderMatGrid();renderMatPlanProgress();renderMatSubjects();renderMatStats();matChatRender();renderForest();matFillPomoLen();
 }
 
 /* ================= SPRAWDZIANY (zapowiedzi z terminarza Librusa + poprawy) ================= */
@@ -3121,6 +3139,7 @@ async function firstSync(){
    urządzenia) i zastosuj ją bez klikania "Pobierz z chmury". Pomijamy, gdy user właśnie coś
    wpisuje w pole tekstowe, żeby mu nie podmienić danych w trakcie edycji. */
 let cloudPollTimer=null;
+let librusPollTimer=null; // zadeklarowane WCZEŚNIE — startCloudPolling()→startLibrusPolling() odpala się już przy starcie (if(sbSession)...), zanim wykona się sekcja Librus (ten sam wzorzec TDZ co sbSession)
 async function cloudAutoPull(){
   if(!sbSession||cloudBusy)return;
   const ae=document.activeElement;
@@ -3278,7 +3297,6 @@ async function librusSyncSchedule(force){
   return {days,units:row.units.length};
 }
 
-let librusPollTimer=null;
 function librusTick(){librusPollEvents();librusSyncSchedule(false);}
 function startLibrusPolling(){
   if(librusPollTimer)return;
