@@ -436,6 +436,15 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   </div>
 
   <div id="matForestView" hidden>
+    <div id="matPomoIdleCard" class="card">
+      <h2 style="margin-bottom:2px">Sesja pomodoro</h2>
+      <p class="muted" style="margin-bottom:var(--sp-3)">Wybierz przedmiot (opcjonalnie) i zacznij — ukończona faza pracy sadzi drzewo.</p>
+      <div class="row">
+        <select id="matPomoTopicPick"><option value="">— bez przedmiotu —</option></select>
+        <button class="btn" id="matPomoQuickStart">Start</button>
+      </div>
+    </div>
+
     <div id="matPomoCard" class="card mat-active-pomo" hidden>
       <div class="row" style="justify-content:space-between">
         <div>
@@ -804,7 +813,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=39;
+const DM_BUILD=40;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1405,6 +1414,7 @@ function renderMatSubjects(){
     const t=S.matura.topics.find(x=>x.id===inp.dataset.mtpct);
     t.percent=Math.max(0,Math.min(100,Math.round(+inp.value||0)));save();renderMatSubjects();
   });
+  matFillPomoTopicPick();
 }
 $("#matTopicAdd").onclick=()=>{
   const n=$("#matTopicName").value.trim();
@@ -1668,6 +1678,17 @@ function lockTaskPin(on){
     if(P)(on?P.startPin():P.stopPin()).catch(e=>console.error("LockTask:",e));
   }catch(e){console.error("LockTask:",e)}
 }
+function matPomoSetActive(active){
+  $("#matPomoCard").hidden=!active;
+  $("#matPomoIdleCard").hidden=active;
+}
+function matFillPomoTopicPick(){
+  const sel=$("#matPomoTopicPick");if(!sel)return;
+  const prev=sel.value;
+  sel.innerHTML='<option value="">— bez przedmiotu —</option>'+
+    S.matura.topics.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("");
+  if(S.matura.topics.some(t=>t.id===prev))sel.value=prev;
+}
 function matStartPomo(blk){
   if(matPomo.treeId)forestFinish(matPomo.treeId,"withered"); // porzucona poprzednia sesja
   matPomoStop();
@@ -1676,12 +1697,13 @@ function matStartPomo(blk){
   matPomo.treeId=forestPlant(blk.topicId).id;
   lockTaskPin(true);
   const t=S.matura.topics.find(x=>x.id===blk.topicId);
-  $("#matPomoTopic").textContent=t?`${t.name} — ${MAT_DAYS[blk.day]} ${String(blk.hour).padStart(2,"0")}:00`:"—";
-  $("#matPomoCard").hidden=false;
+  $("#matPomoTopic").textContent=t?blk.day!=null?`${t.name} — ${MAT_DAYS[blk.day]} ${String(blk.hour).padStart(2,"0")}:00`:t.name:"—";
+  matPomoSetActive(true);
   matShowTab("forest");
   matPomoDraw();matPomoToggle();
   $("#matPomoCard").scrollIntoView({behavior:"smooth",block:"nearest"});
 }
+$("#matPomoQuickStart").onclick=()=>matStartPomo({topicId:$("#matPomoTopicPick").value||null,day:null,hour:null});
 $("#matPomoStart").onclick=matPomoToggle;
 $("#matPomoStop").onclick=()=>{
   if(matPomo.mode==="work"&&matPomo.treeId){
@@ -1689,7 +1711,7 @@ $("#matPomoStop").onclick=()=>{
     forestFinish(matPomo.treeId,"withered");
     toast("Drzewo uschło 🥀 — następnym razem się uda.");
   }
-  matPomoStop();$("#matPomoCard").hidden=true;matPomo.topicId=null;matPomo.day=null;matPomo.hour=null;matPomo.treeId=null;
+  matPomoStop();matPomoSetActive(false);matPomo.topicId=null;matPomo.day=null;matPomo.hour=null;matPomo.treeId=null;
   lockTaskPin(false);
 };
 

@@ -479,6 +479,24 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
     **DO ZROBIENIA:** `npm run publish` (ta poprawka jeszcze nie opublikowana —
     build w `DayMenu.html` wciąż na 38, `docs/app.html` ma tymczasowy build 39
     tylko do testu lokalnego, publish nadpisze go swoim numerem).
+  - **Kolejna poprawka (jeszcze ta sama sesja):** po dodaniu zakładki Las okazało
+    się, że w niej faktycznie nie ma jak wystartować pomodoro — karta z zegarem
+    (`#matPomoCard`) pokazywała się wyłącznie po podwójnym kliknięciu godziny
+    w Harmonogramie (wymagała `blk` z przypisanym przedmiotem). Dodano nową kartę
+    **„Sesja pomodoro"** (`#matPomoIdleCard`, zawsze widoczna w zakładce Las, gdy
+    sesja nie trwa) z selectem przedmiotu (`#matPomoTopicPick`, wypełniany przez
+    `matFillPomoTopicPick()` wołane z `renderMatSubjects()`) i przyciskiem Start
+    (`#matPomoQuickStart` → `matStartPomo({topicId,day:null,hour:null})`, przedmiot
+    opcjonalny — „— bez przedmiotu —"). Nowy helper `matPomoSetActive(active)`
+    przełącza widoczność karty bezczynności vs karty aktywnej sesji (używany
+    zarówno przez `matStartPomo`, jak i przez handler „Zatrzymaj sesję"), zamiast
+    ręcznego `hidden=true/false` w dwóch miejscach. Etykieta przedmiotu w aktywnej
+    karcie nie dopisuje już dnia/godziny, gdy sesja wystartowała bez bloku planu
+    (`blk.day==null`). Przetestowane w przeglądarce: karta bezczynności widoczna
+    domyślnie w zakładce Las, select z poprawnymi opcjami przedmiotów, start z
+    wybranym przedmiotem poprawnie sadzi drzewo i przełącza karty, „Zatrzymaj
+    sesję" wraca do karty bezczynności, brak regresji w innych widokach, zero
+    błędów konsoli. Dane testowe wyczyszczone.
 
 - **2026-08-21 (sesja 14)**: Dodano zakładkę **„Materiały"** (`data-view="mats"`, widok
   `#view-mats`, `renderMats` w mapie `renderers`, nowy klucz stanu `S.materialy` = tablica
