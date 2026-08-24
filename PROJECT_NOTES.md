@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-25 (sesja 16, cd. — pierwsze realne uruchomienie AI ujawniło 2 bugi, build 54)_
+_Ostatnia aktualizacja: 2026-08-25 (sesja 16, cd. — ukryta zakładka „Lista książek", build 55)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,14 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-25 (sesja 16, cd. — ukryta „Lista książek", build 55):** Analogicznie do
+  „Wymagań" (build 50): przycisk `data-view="books"` dostał `style="display:none"`
+  (atrybut `hidden` nie działa — `.nav-btn{display:flex}` go przebija). Widok, dane
+  `S.books` (8 pozycji) i cała logika zostają nietknięte — wraca jedną linijką.
+  Dodatkowo zdjęty kafelek **„Książki w trakcie" z Pulpitu**, bo prowadziłby do zakładki,
+  której nie ma w nawigacji; usunięta też osierocona zmienna `reading`.
+  **Opublikowano build 55.**
 
 - **2026-08-25 (sesja 16, cd. — pierwsze realne wywołanie AI w zakładce Lekcja, build 54):**
   Użytkownik pierwszy raz użył „Zaproponuj plan" na żywym modelu i zgłosił dwa objawy:
