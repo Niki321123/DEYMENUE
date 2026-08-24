@@ -817,7 +817,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=42;
+const DM_BUILD=43;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1293,6 +1293,9 @@ function matMigrate(){
     if("mastery"in t){delete t.mastery;ch=true;}
   }
   if(!m.pomo){m.pomo={work:25,break:5};ch=true;}
+  if(!Array.isArray(m.attendanceLessons)){m.attendanceLessons=[];ch=true;}
+  if(!m.attendanceFreq||typeof m.attendanceFreq!=="object"){m.attendanceFreq={};ch=true;}
+  if(!Array.isArray(m.lessonSubjects)){m.lessonSubjects=[];ch=true;}
   // Dwie warstwy harmonogramu: base = stały szkielet (Librus + ręczny pędzel),
   // ovr = nadpisania z czatu AI ważne tylko w bieżącym tygodniu. `grid` jest wyliczane.
   if(!m.base){m.base={...(m.grid||{})};ch=true;}         // istniejąca siatka staje się bazą
@@ -3268,23 +3271,42 @@ function librusApplyExams(row){
   if($("#view-exams").classList.contains("active"))renderExams();
   return true;
 }
+/* Frekwencja (zrealizowane lekcje) — jedzie tym samym snapshotem co plan/terminarz.
+   attendanceLessons: lekcje bieżącego tygodnia (przedmiot/temat/obecność), attendanceFreq:
+   kumulatywne liczniki obecności per przedmiot budowane od podłączenia konta. Zapis
+   tylko przy realnej zmianie, jak librusApplyExams. */
+function librusApplyAttendance(row){
+  if(!row)return false;
+  const lessons=Array.isArray(row.attendance_lessons)?row.attendance_lessons:[];
+  const freq=row.attendance_freq&&typeof row.attendance_freq==="object"?row.attendance_freq:{};
+  const before=JSON.stringify([S.matura.attendanceLessons,S.matura.attendanceFreq]);
+  S.matura.attendanceLessons=lessons;
+  S.matura.attendanceFreq=freq;
+  if(JSON.stringify([S.matura.attendanceLessons,S.matura.attendanceFreq])===before)return false;
+  save();
+  return true;
+}
 async function librusSyncSchedule(force){
   if(!sbSession)return null;
   let tok; try{tok=await sbToken()}catch(e){return null}
   if(!tok)return null;
   let row;
   try{
-    const r=await fetch(`${SB_URL}/rest/v1/librus_snapshot?select=week,units,fetched_at,exams,exams_fetched_at,exams_error`,{
+    const r=await fetch(`${SB_URL}/rest/v1/librus_snapshot?select=week,units,fetched_at,exams,exams_fetched_at,exams_error,attendance_lessons,attendance_freq`,{
       headers:{apikey:SB_KEY,Authorization:"Bearer "+tok}
     });
     if(!r.ok)return null;             // brak dostępu/sieci nie może wywalić apki
     row=(await r.json())[0];
   }catch(e){return null}
   librusApplyExams(row);              // zapowiedzi sprawdzianów jadą tym samym snapshotem
+  librusApplyAttendance(row);         // frekwencja jedzie tym samym snapshotem
   if(!row||!Array.isArray(row.units))return null;
   if(!force&&S.matura.librusAppliedAt===row.fetched_at)return {days:0,skipped:true};
   const days=librusUnitsToBase(row.units);
   S.matura.librusAppliedAt=row.fetched_at;
+  // Przedmioty z godzin lekcyjnych (nazwy z planu, nie z zakładki Przedmioty) — gotowe
+  // do wykorzystania np. jako podpowiedzi przy dodawaniu przedmiotu do nauki.
+  S.matura.lessonSubjects=[...new Set(row.units.map(u=>u.name).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pl"));
   matRecompute();
   // Bez AI: gdy plan lekcji się zmienił, usuń zaplanowane godziny nauki, które trafiły
   // na godziny szkolne/niedostępne (np. dostawiona lekcja). Odwołane lekcje zwalniają

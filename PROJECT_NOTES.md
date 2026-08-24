@@ -419,6 +419,33 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 
 ## Historia sesji (skrót)
 
+- **2026-08-24 (sesja 15, cd. — naprawa crona Librusa):** Po naprawie TDZ użytkownik
+  połączył konto Librus (login 11036707, status ok). Przy weryfikacji wyszły dwa fakty:
+  (1) pierwsze pobranie planu przy connect nie zapisało snapshotu, (2) **godzinowy
+  pg_cron od tygodni dostawał 401** — klucz `librus_cron_key` w Vault (używany przez
+  crona) różnił się od sekretu env `LIBRUS_CRON_KEY` w funkcji (miały być identyczne,
+  wpis z sesji 8 o „tej samej wartości" był nieaktualny/błędny). Potwierdzone testem
+  w całości wewnątrz Postgresa (net.http_post z kluczem z Vault → 401).
+  - **Fix (wariant z tabelą, zatwierdzony przez użytkownika):** migracja
+    `librus_cron_secret_table` — tabela `public.librus_cron_secret(id bool pk, key)`,
+    RLS włączone bez polityk (czyta tylko service_role), zasiana wartością z Vault
+    SQL-em `insert ... select decrypted_secret from vault.decrypted_secrets` (klucz
+    nigdy nie opuścił Postgresa). Funkcja `librus-timetable` **v11**: tryb cron czyta
+    oczekiwany klucz z tej tabeli przez REST (nagłówki service_role), fallback na env
+    `LIBRUS_CRON_KEY` gdyby tabela była pusta. Jedno źródło prawdy = nie ma się jak
+    rozjechać. Env można kiedyś usunąć z sekretów funkcji, ale nie trzeba.
+  - **Test end-to-end:** net.http_post z kluczem z Vault + `?force=1` → **200**,
+    `{accounts:1, processed:0, errors:1}` — autoryzacja działa, a przetwarzanie konta
+    kończy się teraz UCZCIWYM błędem z Librusa zapisanym w `librus_accounts`:
+    `session: Sesja Librusa wygasla lub token odrzucony (Brak dostępu)`. Czyli
+    logowanie do Librusa przechodzi, ale strona planu lekcji zwraca „Brak dostępu" —
+    najpewniej dlatego, że są wakacje i Synergia nie udostępnia jeszcze planu
+    (hipoteza użytkownika potwierdzona dla tej części). Cron będzie próbował co
+    godzinę i sam załapie plan, gdy Librus go opublikuje przed wrześniem.
+  - Karta Librusa w zakładce Konto pokazuje ten błąd użytkownikowi (tekst podpowiada
+    „sprawdź hasło", co w wakacyjnym przypadku jest myląca — ewentualna kosmetyka
+    na przyszłość: osobny komunikat dla `status=session` poza rokiem szkolnym).
+
 - **2026-08-23 (sesja 15, hotfix backendu):** Zdiagnozowano i naprawiono **„Błąd
   sieci"** przy próbie „Połącz z Librusem" (karta w zakładce Konto). Przyczyna:
   Edge Function `librus-timetable` (w przeciwieństwie do `daymenu-ai`) nie miała
@@ -442,6 +469,28 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
   - Kod klienta (`librusConnect`/`librusDisconnect` w `DayMenu.html`) **nie
     wymagał zmian** — problem był wyłącznie po stronie Edge Function. Nic do
     publikowania przez `npm run publish` z tego powodu.
+  - **Ciąg dalszy — „Błąd sieci" nie zniknął po fixie CORS.** Użytkownik przysłał
+    zrzut konsoli DevTools i tam była prawdziwa, DRUGA przyczyna:
+    `ReferenceError: Cannot access 'librusPollTimer' before initialization` —
+    klasyczny TDZ, ten sam wzorzec co kiedyś z `sbSession` (jest o tym wpis w
+    auto-pamięci). `let librusPollTimer` był zadeklarowany w sekcji Librus
+    (~linia 3299), a `if(sbSession)startCloudPolling()` w sekcji Konto
+    (~linia 3189) woła `startLibrusPolling()` już w trakcie ewaluacji skryptu.
+    U ZALOGOWANEGO użytkownika skrypt wywalał się w tym miejscu i cała reszta
+    pliku się nie wykonywała — m.in. `const LIBRUS_FN` zostawał w TDZ, więc klik
+    „Połącz z Librusem" rzucał ReferenceError wewnątrz `try` w `librusConnect`
+    i lądował w `catch` jako „Błąd sieci". (Niezalogowany user nie wchodził w tę
+    ścieżkę — dlatego bug był niewidoczny w testach bez konta.) Fix CORS z
+    wcześniejszego wpisu też był realny i potrzebny — po prostu były DWA bugi.
+  - **Fix:** deklaracja `let librusPollTimer=null` przeniesiona na górę, obok
+    `let cloudPollTimer=null` (z komentarzem „zadeklarowane WCZEŚNIE", jak przy
+    `sbSession`). Zweryfikowane w przeglądarce z podstawioną sztuczną sesją w
+    `localStorage` (`daymenu_sb_session`): przed fixem ReferenceError przy
+    starcie, po fixie skrypt ewaluuje się do końca (`DM_BUILD` i `LIBRUS_FN`
+    zdefiniowane, polling wystartowany). **Opublikowane jako build 42**
+    (`npm run publish` — tym razem APK zbudował się od razu, bez dogrywki;
+    Pages potwierdzone: `version.json` → 42). Użytkownik musi zamknąć i
+    otworzyć apkę (raz na pobranie, drugi raz na załadowanie nowej wersji).
 
 
 - **2026-08-23 (sesja 15, admin backendu):** Na prośbę użytkownika zresetowano
