@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-24 (sesja 16 — import kursów video „Wielka Powtórka" do zakładki Materiały, build 49)_
+_Ostatnia aktualizacja: 2026-08-24 (sesja 16, cd. — ukryto zakładkę „Wymagania" z nawigacji, build 50)_
 
 ## Czym jest projekt
 
@@ -441,6 +441,17 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-24 (sesja 16, cd. — ukryto „Wymagania" z nawigacji, build 50):** Na prośbę
+  użytkownika ("usuń zakładkę wymagania, tylko żeby jej nie było wizualnie") przycisk
+  `data-view="wymagania"` w grupie Edukacja dostał `style="display:none"` — sam widok
+  (`#view-wymagania`), dane (`S.wymagania`) i renderer zostają nietknięte, więc funkcja
+  wraca w jednej linijce, jeśli będzie potrzebna. Uwaga przy odkrywaniu: atrybut `hidden`
+  NIE zadziałał — `.nav-btn{display:flex}` w arkuszu strony ma tę samą specyficzność co
+  domyślna reguła `[hidden]{display:none}` z UA-stylesheetu i wygrywa jako zdefiniowana
+  później, dlatego trzeba było `style="display:none"` (wyższa specyficzność, zawsze wygrywa).
+  Zweryfikowane w przeglądarce: przycisk zniknął z menu, reszta zakładek Edukacji bez zmian.
+  **Opublikowano build 50.**
 
 - **2026-08-24 (sesja 16 — import kursów „Wielka Powtórka" do Materiałów, build 49):**
   Użytkownik kupił kurs video na wielkapowtorka.pl (matematyka rozszerzona + fizyka) i
