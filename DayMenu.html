@@ -836,7 +836,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=46;
+const DM_BUILD=47;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1486,7 +1486,11 @@ function matGeneratePlan(){
     blocks.push({day:slots[i].day,hour:slots[i].hour,topicId:pick.id});
     pick.left--;lastIdx[pick.id]=i;
   }
-  return{blocks,msg:`Ułożono ${blocks.length} godzin nauki na ${slots.length} dostępnych godzin w tygodniu.`};
+  // "Godzina" w gridzie to godzina zegarowa (slot), ale realny czas nauki w niej to
+  // S.matura.pomo.work minut (pomodoro z przerwami), nie 60 — komunikat musi liczyć
+  // po realnym czasie, inaczej "4h dziennie" w głowie użytkownika ≠ to, co faktycznie ułożono.
+  const realMin=blocks.length*(S.matura.pomo.work||60);
+  return{blocks,msg:`Ułożono ${blocks.length} sesji na ${slots.length} dostępnych godzin w tygodniu — to ${fmtMin(realMin)} realnej nauki (${S.matura.pomo.work} min/sesję).`};
 }
 /* ---- AI (Haiku 4.5 przez funkcję serwerową — klucz nie opuszcza serwera) ---- */
 async function aiCall(system,messages,maxTokens){
@@ -1507,12 +1511,13 @@ function aiJson(text){
   if(a<0||b<=a)throw new Error("Nieprawidłowa odpowiedź AI");
   return JSON.parse(text.slice(a,b+1));
 }
-const MAT_AI_RULES=`Jesteś planerem nauki w aplikacji Day Menu. Dni tygodnia: 0=Pon, 1=Wt, 2=Śr, 3=Czw, 4=Pt, 5=Sob, 6=Nd. Godziny 6-22, każdy blok trwa 1h ("hour" = godzina rozpoczęcia). Harmonogram powtarza się co tydzień. Zasady planowania: planuj naukę WYŁĄCZNIE w godzinach dostępnych (slots); NIGDY w godzinach szkolnych (school) ani poza dostępnymi — w godzinach szkolnych użytkownik jest w szkole i może uczyć się dopiero po ich zakończeniu; przydzielaj każdemu przedmiotowi czas proporcjonalnie do jego procentu (np. 80% vs 20% = 4× więcej godzin dla pierwszego); rozkładaj każdy przedmiot na różne dni zamiast kumulować; rób przerwy między sesjami tego samego przedmiotu; bezwzględnie szanuj preferencje użytkownika. Odpowiadasz WYŁĄCZNIE poprawnym JSON, bez markdown i bez komentarzy.`;
+const MAT_AI_RULES=`Jesteś planerem nauki w aplikacji Day Menu. Dni tygodnia: 0=Pon, 1=Wt, 2=Śr, 3=Czw, 4=Pt, 5=Sob, 6=Nd. Godziny 6-22, każdy blok ("hour") to godzina ZEGAROWA rozpoczęcia — NIE 60 minut realnej nauki. Realna nauka w jednym bloku to sesja pomodoro, jej długość w minutach dostajesz jako "pomoWorkMin" w kontekście (reszta godziny to przerwa/margines). Gdy użytkownik podaje preferencję w godzinach/minutach realnej nauki (np. "chcę się uczyć 4h dziennie"), PRZELICZ to na liczbę bloków wzorem: liczba_blokow = round(pożądane_minuty / pomoWorkMin) — NIE zakładaj, że 1 blok = 1h realnej nauki. Harmonogram powtarza się co tydzień. Zasady planowania: planuj naukę WYŁĄCZNIE w godzinach dostępnych (slots); NIGDY w godzinach szkolnych (school) ani poza dostępnymi — w godzinach szkolnych użytkownik jest w szkole i może uczyć się dopiero po ich zakończeniu; przydzielaj każdemu przedmiotowi czas proporcjonalnie do jego procentu (np. 80% vs 20% = 4× więcej blokow dla pierwszego); rozkładaj każdy przedmiot na różne dni zamiast kumulować; rób przerwy między sesjami tego samego przedmiotu; bezwzględnie szanuj preferencje użytkownika, w tym przeliczenie godzin realnej nauki opisane wyżej. Odpowiadasz WYŁĄCZNIE poprawnym JSON, bez markdown i bez komentarzy.`;
 function matAiContext(){
   return {
     subjects:S.matura.topics.filter(t=>(t.percent||0)>0).map(t=>({id:t.id,nazwa:t.name,procent:t.percent})),
     slots:matFreeSlots(),
-    school:matSchoolSlots()
+    school:matSchoolSlots(),
+    pomoWorkMin:S.matura.pomo.work||60
   };
 }
 function matSanitizeBlocks(blocks){
@@ -1529,7 +1534,7 @@ async function aiPlan(prefs){
   const ctx=matAiContext();
   const text=await aiCall(
     MAT_AI_RULES+' Format odpowiedzi: {"blocks":[{"day":0,"hour":18,"topicId":"..."}]}',
-    [{role:"user",content:`Godziny dostępne (day/hour): ${JSON.stringify(ctx.slots)}\nGodziny szkolne (nie planuj tu nauki): ${JSON.stringify(ctx.school)}\nPrzedmioty (id/nazwa/procent): ${JSON.stringify(ctx.subjects)}\nPreferencje użytkownika: ${prefs||"brak"}\nUłóż plan nauki na tydzień.`}],
+    [{role:"user",content:`Godziny dostępne (day/hour): ${JSON.stringify(ctx.slots)}\nGodziny szkolne (nie planuj tu nauki): ${JSON.stringify(ctx.school)}\nPrzedmioty (id/nazwa/procent): ${JSON.stringify(ctx.subjects)}\nRealny czas nauki w jednym bloku (pomoWorkMin): ${ctx.pomoWorkMin} min\nPreferencje użytkownika: ${prefs||"brak"}\nUłóż plan nauki na tydzień.`}],
     2500
   );
   const out=matSanitizeBlocks(aiJson(text).blocks);
@@ -1582,7 +1587,7 @@ $("#matChatSend").onclick=async()=>{
   try{
     const ctx=matAiContext();
     const now=new Date();const todayDay=(now.getDay()+6)%7;
-    const sys=MAT_AI_RULES+` Dziś jest ${MAT_DAYS[todayDay]} (day=${todayDay}), godzina ${now.getHours()}:00. Harmonogram — godziny dostępne: ${JSON.stringify(ctx.slots)}; godziny szkolne: ${JSON.stringify(ctx.school)}. Aktualny plan tygodnia: ${JSON.stringify(S.matura.plan.map(b=>({day:b.day,hour:b.hour,topicId:b.topicId})))}. Przedmioty: ${JSON.stringify(ctx.subjects)}. Użytkownik prosi o zmiany w harmonogramie lub planie albo zadaje pytania. Format odpowiedzi: {"reply":"krótka odpowiedź po polsku","grid":{"3_17":"unavail"}|null,"blocks":[...]|null}. "grid" to WYŁĄCZNIE zmieniane komórki harmonogramu (klucz "dzień_godzina", wartość "avail"/"school"/"unavail") — po zmianie harmonogramu ułóż też nowy "blocks". Zmiany w "grid" obowiązują TYLKO w bieżącym tygodniu i resetują się w następnym (stały szkielet z planu lekcji wraca) — informuj o tym użytkownika przy zmianach dostępności. "blocks" to CAŁY nowy plan tygodnia (wszystkie bloki). Jeśli coś ma zostać bez zmian, ustaw je na null.`;
+    const sys=MAT_AI_RULES+` Dziś jest ${MAT_DAYS[todayDay]} (day=${todayDay}), godzina ${now.getHours()}:00. Harmonogram — godziny dostępne: ${JSON.stringify(ctx.slots)}; godziny szkolne: ${JSON.stringify(ctx.school)}. Aktualny plan tygodnia: ${JSON.stringify(S.matura.plan.map(b=>({day:b.day,hour:b.hour,topicId:b.topicId})))}. Przedmioty: ${JSON.stringify(ctx.subjects)}. Realny czas nauki w jednym bloku (pomoWorkMin): ${ctx.pomoWorkMin} min. Użytkownik prosi o zmiany w harmonogramie lub planie albo zadaje pytania. Format odpowiedzi: {"reply":"krótka odpowiedź po polsku","grid":{"3_17":"unavail"}|null,"blocks":[...]|null}. "grid" to WYŁĄCZNIE zmieniane komórki harmonogramu (klucz "dzień_godzina", wartość "avail"/"school"/"unavail") — po zmianie harmonogramu ułóż też nowy "blocks". Zmiany w "grid" obowiązują TYLKO w bieżącym tygodniu i resetują się w następnym (stały szkielet z planu lekcji wraca) — informuj o tym użytkownika przy zmianach dostępności. "blocks" to CAŁY nowy plan tygodnia (wszystkie bloki). Jeśli coś ma zostać bez zmian, ustaw je na null.`;
     const hist=matChat.filter(m=>m.text!=="…").slice(-8).map(m=>({role:m.role==="user"?"user":"assistant",content:m.text}));
     while(hist.length&&hist[0].role!=="user")hist.shift();
     const j=aiJson(await aiCall(sys,hist,2500));

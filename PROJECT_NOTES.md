@@ -575,6 +575,28 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
     pusta aż do pierwszej udanej synchronizacji z Librusem (patrz wpis wyżej —
     wciąż wakacje, cron nie doszedł jeszcze do kodu frekwencji na żywych danych).
 
+- **2026-08-24 (sesja 15, cd. — bugfix zawyżonego czasu nauki):** Kolejny problem
+  zgłoszony przez użytkownika: „uczę się 45 minut, a odznacza się to jako pełna
+  godzina". Przyczyna: `matMarkDone(blk)` miała **na sztywno wpisane `minutes:60`**
+  w tworzonym wpisie `S.matura.sessions`, niezależnie od tego, czy blok był
+  odhaczany ręcznym kliknięciem w gridzie (tam 60 min ma sens — to deklaracja
+  „zrobiłem całą zaplanowaną godzinę") czy przez zakończoną sesję pomodoro
+  (gdzie realny czas pracy, np. 45 min, był policzony w `matPomoToggle` jako
+  `min=Math.round(matPomo.total/60)`, ale **nigdzie dalej nie przekazany**).
+  Skutek: statystyki („Łączny czas nauki", „Czas wg przedmiotu") zawyżały czas
+  o różnicę między długością bloku w gridzie (60 min) a realną długością rundy
+  pomodoro — u tego użytkownika o 15 min za każdą odhaczoną w ten sposób godzinę.
+  - **Fix:** `matMarkDone(blk, minutes)` — nowy opcjonalny parametr, domyślnie 60
+    (zachowuje stare zachowanie dla ręcznego klikania w `matCellToggleDone`, jedyne
+    drugie miejsce wołające tę funkcję). Wywołanie z `matPomoToggle` przekazuje
+    teraz realny `min` — jedna dopisana linijka (`matMarkDone(blk,min)`), zero zmian
+    poza tym.
+  - **Przetestowane w przeglądarce:** symulowana 45-minutowa runda pomodoro na
+    bloku z planu → sesja zapisana z `minutes:45` (wcześniej byłoby 60); osobny
+    blok odhaczony ręcznie (`matCellToggleDone`) → wciąż `minutes:60`, jak trzeba.
+    Zero regresji na 14 widokach, zero błędów konsoli. Dane testowe wyczyszczone.
+  - **Opublikowano build 46** (`npm run publish`, APK od razu).
+
 - **2026-08-23 (sesja 15, hotfix backendu):** Zdiagnozowano i naprawiono **„Błąd
   sieci"** przy próbie „Połącz z Librusem" (karta w zakładce Konto). Przyczyna:
   Edge Function `librus-timetable` (w przeciwieństwie do `daymenu-ai`) nie miała
