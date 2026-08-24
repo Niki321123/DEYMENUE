@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-23 (sesja 15 — las pomodoro dostał własną zakładkę „Las", czeka na publish)_
+_Ostatnia aktualizacja: 2026-08-24 (sesja 16 — import kursów video „Wielka Powtórka" do zakładki Materiały, build 48)_
 
 ## Czym jest projekt
 
@@ -394,6 +394,29 @@ sprzed tej sesji, już nieużywany przez apkę, można zignorować/skasować.
       dwa elementy mają `id="sbMsg"` w zakładce Konto, a handler `#themeBtn` czyta
       `S.appearance.theme` bez zabezpieczenia na `null` (wywala się po imporcie danych
       bez klucza `appearance`, mimo że `applyTheme()` taki przypadek obsługuje)
+- [x] **Sesja 15, dokończenie (buildy 44-47):** naprawiono `matMarkDone` (zawsze zapisywał
+      60 min niezależnie od realnego czasu sesji pomodoro), utratę danych przy
+      wielorundowym pomodoro (`matPomo.day/hour` nie czyszczone po 1. rundzie),
+      zbudowano zakładkę **Frekwencja** jako pozycję najwyższego poziomu w grupie
+      Edukacja (nie pod-zakładkę Nauki — poprawka po uwadze użytkownika), oraz
+      poprawiono niedopasowanie 45 min (sesja pomodoro) vs 60 min (slot grafiku) na
+      poziomie **generowania planu** — `MAT_AI_RULES`/`matAiContext`/`aiPlan`/czat AI
+      dostają `pomoWorkMin` i przeliczają realny czas nauki, planer lokalny liczy i
+      pokazuje realne minuty (`fmtMin`) zamiast zakładać 60 min/blok.
+- [x] **Sesja 16 (2026-08-24, build 48):** zaimportowano do zakładki **Materiały** pełną
+      treść dwóch kupionych kursów video z serwisu wielkapowtorka.pl (Matematyka
+      rozszerzenie — 85 lekcji, Fizyka — 169 lekcji) — nazwa, link do każdej lekcji i
+      czas trwania. Model materiału rozszerzony o `link`/`lessons[{name,url,dur,section}]`;
+      gdy `lessons` jest ustawione, karta materiału renderuje pogrupowaną (po modułach)
+      listę z checkboxami „obejrzane" i linkami otwierającymi lekcję na wielkapowtorka.pl,
+      zamiast ponumerowanej siatki zadań. Dane wgrane jednorazowo przez `matsSeedWP()`
+      (idempotentne po `source`, uruchamiane raz — flaga `S.matura.wpMatsSeeded` — więc
+      ręczne usunięcie materiału przez użytkownika jest trwałe, nie wraca po restarcie).
+      **Uwaga:** jeśli użytkownik wcześniej ręcznie dodał puste placeholdery dla tych
+      samych kursów w Materiałach, mogą być teraz zduplikowane — do skasowania ręcznie.
+      Zweryfikowane w przeglądarce (plik lokalny, bez chmury): obie listy renderują się
+      z poprawnymi modułami/czasami, checkbox + pasek postępu działają, link otwiera się
+      w nowej karcie. **Opublikowano build 48** (`npm run publish`).
 
 ### Proces publikacji (zweryfikowany i naprawiony w tej sesji)
 
@@ -418,6 +441,57 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-24 (sesja 16 — import kursów „Wielka Powtórka" do Materiałów, build 48):**
+  Użytkownik kupił kurs video na wielkapowtorka.pl (matematyka rozszerzona + fizyka) i
+  poprosił o wyciągnięcie nazw wszystkich lekcji wraz z linkami i czasem trwania, i
+  wgranie tego do zakładki Materiały. Serwis to platforma Circle.so — lekcje nie mają
+  zwykłych `<a href>`, więc dane wyciągnięto przez wewnętrzne `internal_api/spaces/{id}`
+  (JSON z `course_sections[].lessons[]`, pole `featured_media.duration`), a URL każdej
+  lekcji zrekonstruowano ze wzorca `/c/{slug}/sections/{sectionId}/lessons/{lessonId}`
+  (potwierdzonego klikiem w prawdziwą lekcję i odczytem `location.href`). Matematyka:
+  85 lekcji/14 modułów, 34 h 30 min. Fizyka: 169 lekcji/19 modułów, 36 h 57 min.
+  - **Model danych:** materiał (`S.materialy[]`) dostał opcjonalne `link` (URL kursu) i
+    `lessons:[{name,url,dur,section}]`. `m.tasks` = `lessons.length`, więc istniejący
+    mechanizm `matsDone`/`matsPct`/„odhacz wszystkie" działa bez zmian — lekcja o
+    indeksie `n` to po prostu zadanie „numer n" pod maską.
+  - **UI:** `matsItemHtml`/`matsFillGrid` rozgałęzione — gdy `m.lessons` niepuste,
+    renderują pogrupowaną (nagłówek modułu) listę z checkboxem, linkiem (`target=_blank`)
+    i czasem trwania, plus link „Otwórz kurs ↗" i sumaryczny czas (`matsFmtDur`) w
+    nagłówku, zamiast ponumerowanej siatki kwadratów. Stary tryb (zbiory zadań) bez zmian.
+  - **Import:** `matsSeedWP()` — upsert po polu `source` (`wp-matematyka`/`wp-fizyka`),
+    wywołany raz przy starcie (`S.matura.wpMatsSeeded`), więc ręczne usunięcie materiału
+    przez użytkownika jest trwałe. Dane kursu (nazwy/id/czas) wpisane jako stała w kodzie
+    — nie odświeżają się automatycznie, jeśli serwis doda nowe lekcje (trzeba by powtórzyć
+    scraping ręcznie w kolejnej sesji).
+  - Zweryfikowane w przeglądarce (lokalny plik, poza chmurą — `localStorage` niedostępny
+    w tym trybie testowym, ale to ograniczenie sandboksa testowego, nie apki): obie listy
+    renderują moduły/lekcje/czasy poprawnie, checkbox + pasek postępu + licznik działają.
+  - **Opublikowano build 48** (`npm run publish`).
+
+- **2026-08-24 (sesja 15, dokończenie — drobne poprawki pomodoro/frekwencji/AI, buildy 44-47):**
+  Rekonstrukcja z podsumowania poprzedniej sesji (notatki nie zostały dopisane na czas
+  przez przycięcie kontekstu) — cztery kolejne poprawki po sesji z naprawą crona Librusa:
+  1. `matMarkDone` przyjmuje teraz opcjonalny parametr `minutes` — wpis pomodoro loguje
+     realny czas trwania sesji, nie zahardkodowane 60 min; ręczne odhaczenie w
+     Harmonogramie wciąż domyślnie liczy 60 min.
+  2. Naprawiono utratę danych przy wielorundowym pomodoro: `matPomo.day`/`matPomo.hour`
+     nie były czyszczone po zaliczeniu 1. rundy, więc przy konfiguracji pracy+przerwa=60 min
+     (np. 45+15, jak u użytkownika) kolejne runda błędnie próbowała dopisać się do tego
+     samego bloku planu.
+  3. Zbudowano zakładkę **Frekwencja** — po uwadze użytkownika („to ma być zakładka do
+     Edukacji, a nie pod-zakładka") jako pozycja najwyższego poziomu w grupie Edukacja,
+     nie pod-widok Nauki. Pokazuje ogólną i per-przedmiot frekwencję (`S.matura.attendanceFreq`)
+     oraz listę zrealizowanych lekcji (`S.matura.attendanceLessons`) z backendu Librusa.
+  4. Niedopasowanie 45 min (realna sesja pomodoro) vs 60 min (1 slot grafiku) na poziomie
+     **generowania planu**: `MAT_AI_RULES` przepisane (usunięte fałszywe „1 blok = 1h",
+     dodana instrukcja przeliczenia przez `pomoWorkMin`), `matAiContext`/`aiPlan`/czat AI
+     dostają realny czas sesji w kontekście, planer lokalny (`matGeneratePlan`) pokazuje
+     realne minuty (`fmtMin`) w komunikacie zamiast zakładać 60 min/blok. Zweryfikowane
+     tylko na poziomie logiki/promptu — brak dostępu AI na koncie testowym, więc żywe
+     zachowanie modelu z preferencją „Xh dziennie" nie zostało sprawdzone end-to-end.
+  - **Opublikowano buildy 44-47** (`npm run publish` po każdej poprawce, potwierdzone
+    commitami git — brak szczegółowych wiadomości poza „build N").
 
 - **2026-08-24 (sesja 15, cd. — naprawa crona Librusa):** Po naprawie TDZ użytkownik
   połączył konto Librus (login 11036707, status ok). Przy weryfikacji wyszły dwa fakty:
@@ -596,6 +670,40 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
     blok odhaczony ręcznie (`matCellToggleDone`) → wciąż `minutes:60`, jak trzeba.
     Zero regresji na 14 widokach, zero błędów konsoli. Dane testowe wyczyszczone.
   - **Opublikowano build 46** (`npm run publish`, APK od razu).
+
+- **2026-08-24 (sesja 15, cd. — realny czas nauki w planowaniu):** Pytanie
+  użytkownika: „napiszę AI że chcę się uczyć 4h dziennie, a tak naprawdę będę się
+  uczył 3h, bo w tej godzinie jest tylko 45 min nauki" — czyli ten sam problem
+  co przy `matMarkDone`, ale na poziomie **generowania planu**, nie zapisu.
+  Zaproponowałem dwuczęściowe rozwiązanie (1: nowe pole liczbowe „ile godzin
+  dziennie", 2: przeliczenie w obu planerach na realną długość slotu); użytkownik
+  wybrał **wariant 2 bez nowego pola** — czyli naprawić przeliczanie w
+  istniejącym mechanizmie (wolny tekst → AI), bez dodawania UI.
+  - **Przyczyna:** `MAT_AI_RULES` (prompt systemowy planera AI) miał wpisane
+    dosłownie *„każdy blok trwa 1h"* — AI, licząc się z tą (nieprawdziwą już)
+    zasadą, na prośbę „4h dziennie" przydzielał 4 sloty = 4h zegarowe, czyli
+    4×`pomo.work` (45 min) = 3h realnej nauki. Planer lokalny (`matGeneratePlan`)
+    miał ten sam błąd w samej WIADOMOŚCI wynikowej („Ułożono X godzin nauki" —
+    liczył sloty, nie minuty), choć sam nie ma koncepcji „X h dziennie" (wypełnia
+    wszystkie dostępne sloty, bez limitu — to nie zmieniane w tej sesji, bo
+    wymagałoby nowego pola z wariantu 1, odrzuconego).
+  - **Fix:** `MAT_AI_RULES` przepisane — usunięte fałszywe „1 blok = 1h", dodana
+    jawna instrukcja: slot to godzina zegarowa, realny czas nauki to `pomoWorkMin`
+    (nowe pole w `matAiContext()`, czytane z `S.matura.pomo.work`), a preferencje
+    typu „Xh dziennie" mają być przeliczane wzorem `round(minuty/pomoWorkMin)`,
+    nie zakładać 60 min/slot. `pomoWorkMin` dopisane do wiadomości użytkownika w
+    `aiPlan()` i do promptu czatu AI (edycja harmonogramu) — obie ścieżki AI
+    planowania mają teraz tę informację. Komunikat `matGeneratePlan()` przepisany
+    na `fmtMin()`-owe realne godziny/minuty („Ułożono 8 sesji... to 6 h 0 min
+    realnej nauki (45 min/sesję)"), zamiast mylącego liczenia slotów jako godzin.
+  - **Przetestowane w przeglądarce:** lokalny planer na 8 dostępnych slotach z
+    `pomo.work=45` → poprawny komunikat (8 sesji, 6h realnej nauki); `matAiContext()`
+    zwraca `pomoWorkMin:45`; `MAT_AI_RULES` nie zawiera już starego fałszywego
+    zapisu i zawiera nową formułę przeliczania. Zero regresji na 14 widokach, zero
+    błędów konsoli. Realnej rozmowy z AI (`ai_access`) nie da się zweryfikować na
+    tym koncie testowym bez allowlisty — logika promptu jest poprawna, ale
+    faktyczne zachowanie modelu przy „4h dziennie" nie zostało sprawdzone na żywo.
+  - **Opublikowano build 47** (`npm run publish`, APK od razu).
 
 - **2026-08-23 (sesja 15, hotfix backendu):** Zdiagnozowano i naprawiono **„Błąd
   sieci"** przy próbie „Połącz z Librusem" (karta w zakładce Konto). Przyczyna:

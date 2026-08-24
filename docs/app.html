@@ -250,6 +250,14 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 .mats-tasks button{width:40px;min-height:36px;padding:0;border:1px solid var(--border);border-radius:var(--radius-s);background:var(--surface);color:var(--text-2);font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;cursor:pointer;transition:background .12s,color .12s,border-color .12s}
 .mats-tasks button:hover{border-color:var(--primary);color:var(--primary)}
 .mats-tasks button.on{background:var(--good);border-color:var(--good);color:#fff}
+.mats-lessons{display:flex;flex-direction:column;gap:2px;padding:var(--sp-2) 0 var(--sp-3)}
+.mats-lesson-sec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--text-3);padding:var(--sp-2) 2px 2px;margin-top:4px}
+.mats-lesson-row{display:flex;align-items:center;gap:var(--sp-2);padding:6px 2px;border-radius:var(--radius-s)}
+.mats-lesson-row:hover{background:var(--surface)}
+.mats-lesson-row input[type=checkbox]{flex:none;width:18px;height:18px;accent-color:var(--good);cursor:pointer}
+.mats-lesson-row a{flex:1;min-width:0;color:var(--text-1);text-decoration:none;font-size:var(--fs-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mats-lesson-row a:hover{color:var(--primary);text-decoration:underline}
+.mats-lesson-row .muted{flex:none;font-size:12px;font-variant-numeric:tabular-nums}
 
 /* ===== TELEFON ===== */
 @media(max-width:760px){
@@ -836,7 +844,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=47;
+const DM_BUILD=49;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -2433,6 +2441,349 @@ function matsList(){
   if(!Array.isArray(S.materialy)||S.materialy===defaults.materialy)S.materialy=[];
   return S.materialy;
 }
+
+/* ---- jednorazowy import kursów video (Wielka Powtórka) — lekcje z nazwą, linkiem i czasem trwania ---- */
+function matsWpBuild(slug,sections){
+  const out=[];
+  for(const[secName,secId,lessons]of sections)
+    for(const[name,id,dur]of lessons)
+      out.push({name,url:`https://www.wielkapowtorka.pl/c/${slug}/sections/${secId}/lessons/${id}`,dur,section:secName});
+  return out;
+}
+const MATSWP_MATEMATYKA=matsWpBuild("m-matematyka-pr",[
+  ["Witaj w kursie!",697908,[["Poznajmy się!",2639829,"00:57"]]],
+  ["Lekcja wprowadzająca",663708,[
+    ["Wprowadzenie do modułu",2639847,"00:14"],
+    ["Jak wygląda matura 2027 z matematyki na poziomie rozszerzonym?",2514683,"23:36"],
+  ]],
+  ["Liczby rzeczywiste",660732,[
+    ["Wprowadzenie do modułu",2639859,"00:17"],
+    ["Dowody algebraiczne na maturze",2502772,"37:33"],
+    ["Dowody algebraiczne związane z podzielnością",2502773,"28:27"],
+    ["Zadania: Udowodnij, że dana liczba jest wymierna",2502799,"24:17"],
+    ["Dowodzenie prawdziwości równań i nierówności",2502800,"41:56"],
+    ["QUIZ",2502798,null],
+    ["Quiz - omówienie",2502803,"25:28"],
+  ]],
+  ["Funkcje",660843,[
+    ["Wprowadzenie do modułu",2640082,"00:16"],
+    ["Funkcja liniowa i wartość bezwzględna na maturze",2503027,"25:10"],
+    ["Funkcja liniowa na maturze rozszerzonej",2503028,"32:30"],
+    ["Dziedzina i rysowanie funkcji",2503033,"30:25"],
+    ["Wartość bezwględna",2503035,"48:22"],
+    ["QUIZ",2503036,null],
+    ["Quiz - omówienie",2503037,"14:53"],
+  ]],
+  ["Funkcja kwadratowa",660853,[
+    ["Wprowadzenie do modułu",2640083,"00:25"],
+    ["Funkcja kwadratowa na maturze",2503071,"35:23"],
+    ["Funkcja kwadratowa na maturze rozszerzonej",2503212,"30:35"],
+    ["Wzory Viete'a",2503221,"01:06:21"],
+    ["QUIZ",2503223,null],
+    ["Quiz - omówienie",2503226,"23:33"],
+  ]],
+  ["Wielomiany i wyrażenia algebraiczne",660878,[
+    ["Wprowadzenie do modułu",2640087,"00:25"],
+    ["Wielomiany i ułamki algebraiczne na maturze",2503290,"19:44"],
+    ["Twierdzenie o reszcie i twierdzenie Bezout'a",2503292,"41:41"],
+    ["Zadania z parametrem",2503294,"37:15"],
+    ["Wyrażenia wymierne",2503295,"34:03"],
+    ["QUIZ",2503336,null],
+    ["Quiz - omówienie",2503337,"17:27"],
+  ]],
+  ["Funkcja wykładnicza i logarytmiczna",660900,[
+    ["Wprowadzenie do modułu",2640089,"00:21"],
+    ["Funkcja wykładnicza i logarytmiczna na maturze",2503357,"36:17"],
+    ["Funkcja wykładnicza",2503360,"44:25"],
+    ["Funkcja logarytmiczna",2503362,"39:43"],
+    ["QUIZ",2503368,null],
+    ["Quiz - omówienie",2503370,"18:16"],
+  ]],
+  ["Trygonometria",660907,[
+    ["Wprowadzenie do modułu",2640094,"00:22"],
+    ["Trygonometria na maturze",2503431,"30:54"],
+    ["Własności funkcji trygonometrycznych",2503436,"28:37"],
+    ["Równania trygonometryczne",2503438,"57:22"],
+    ["QUIZ",2503441,null],
+    ["Quiz - omówienie",2503442,"17:42"],
+  ]],
+  ["Ciągi",660918,[
+    ["Wprowadzenie do modułu",2640098,"00:22"],
+    ["Ciągi na maturze",2503471,"29:08"],
+    ["Ciąg arytmetyczny i geometryczny",2503473,"44:47"],
+    ["Granica ciągu, twierdzenie o 3 ciągach",2503474,"55:42"],
+    ["Szereg geometryczny",2503478,"53:08"],
+    ["QUIZ",2503481,null],
+    ["Quiz - omówienie",2503483,"21:33"],
+  ]],
+  ["Planimetria",663608,[
+    ["Wprowadzenie do modułu",2640100,"00:24"],
+    ["Planimetria na maturze",2514351,"40:41"],
+    ["Własności trójkątów oraz twierdzenie cosinusów i sinusów",2514353,"46:48"],
+    ["Czworokąty i zadania z okręgami",2514354,"46:21"],
+    ["Dowody geometryczne",2514355,"52:27"],
+    ["QUIZ",2514356,null],
+    ["Quiz - omówienie",2514357,"30:54"],
+  ]],
+  ["Geometria analityczna",663609,[
+    ["Wprowadzenie do modułu",2640108,"00:24"],
+    ["Geometria analityczna na maturze",2514360,"39:18"],
+    ["Odległość punktu od prostej oraz wielokąty w układzie współrzędnych",2514361,"01:04:22"],
+    ["Równanie okręgu i obliczanie stycznych do okręgu",2514362,"01:00:49"],
+    ["QUIZ",2514363,null],
+    ["Quiz - omówienie",2514365,"22:55"],
+  ]],
+  ["Stereometria",663611,[
+    ["Wprowadzenie do modułu",2640115,"00:20"],
+    ["Stereometria na maturze",2514369,"36:46"],
+    ["Graniastosłupy",2514370,"44:30"],
+    ["Ostrosłupy",2514371,"38:58"],
+    ["Figury obrotowe - walec, stożek, kula",2514372,"30:51"],
+    ["QUIZ",2514374,null],
+    ["Quiz - omówienie",2514375,"17:22"],
+  ]],
+  ["Analiza matematyczna",663612,[
+    ["Wprowadzenie do modułu",2640120,"00:27"],
+    ["Liczenie pochodnych i granic funkcji",2514376,"50:56"],
+    ["Styczna do wykresu funkcji",2514377,"35:16"],
+    ["Ekstrema funkcji i zadania optymalizacyjne",2514378,"01:13:07"],
+    ["Twierdzenie Darboux",2514379,"22:01"],
+    ["QUIZ",2514380,null],
+    ["Quiz - omówienie",2514381,"15:54"],
+  ]],
+  ["Rachunek prawdopodobieństwa i statystyka",663613,[
+    ["Wprowadzenie do modułu",2640126,"00:25"],
+    ["Rachunek prawdopodobieństwa na maturze",2514382,"28:08"],
+    ["Kombinatoryka",2514383,"37:38"],
+    ["Własności prawdopodobieństwa",2514384,"50:49"],
+    ["Schemat Bernoulliego i prawdopodobieństwo warunkowe",2514385,"36:06"],
+    ["Statystyka",2514386,"08:58"],
+    ["QUIZ",2514387,null],
+    ["Quiz - omówienie",2514388,"16:03"],
+    ["Powodzenia na maturze!",2781646,"00:11"],
+  ]],
+]);
+const MATSWP_FIZYKA=matsWpBuild("m-fizyka",[
+  ["Witaj w kursie!",697858,[["Poznajmy się!",2639631,"00:42"]]],
+  ["Lekcja wprowadzająca",672301,[
+    ["Wprowadzenie do modułu",2639640,"00:05"],
+    ["Jak wygląda matura 2027 z fizyki?",2547299,"13:49"],
+  ]],
+  ["Kinematyka",672302,[
+    ["Wprowadzenie do modułu",2639642,"00:11"],
+    ["Ruch jednostajny prostoliniowy",2547303,"18:11"],
+    ["Ruch jednostajnie zmienny cz. 1",2547304,"22:50"],
+    ["Ruch jednostajnie zmienny cz. 2",2547305,"26:40"],
+    ["Względność ruchu",2547306,"23:08"],
+    ["Ruchy złożone jako suma ruchów prostych",2547308,"17:40"],
+    ["Rzut poziomy",2547309,"20:36"],
+    ["Ruch po okręgu",2547312,"20:55"],
+    ["Kinematyka - zadania maturalne",2547313,"24:58"],
+    ["QUIZ",2547314,null],
+    ["Quiz - omówienie",2547315,"12:27"],
+  ]],
+  ["Dynamika",674737,[
+    ["Wprowadzenie do modułu",2639649,"00:11"],
+    ["Siła – graficzne wyznaczanie siły wypadkowej",2556105,"17:05"],
+    ["Zasady dynamiki Newtona cz.1",2556106,"19:34"],
+    ["Zasady dynamiki Newtona cz.2",2556107,"21:07"],
+    ["Siła tarcia",2556115,"21:16"],
+    ["Siły na równi pochyłej",2556116,"21:01"],
+    ["Siła dośrodkowa",2556117,"21:03"],
+    ["Układy inercjalne a nieinercjalne – siła bezwładności",2556118,"17:55"],
+    ["Jeszcze kilka zadań maturalnych – podsumowanie",2556120,"25:06"],
+    ["QUIZ",2556122,null],
+    ["Quiz - omówienie",2556123,"08:30"],
+  ]],
+  ["Energia i pęd",674741,[
+    ["Wprowadzenie do modułu",2639674,"00:11"],
+    ["Praca i moc",2556127,"19:26"],
+    ["Związek pracy z energią mechaniczną",2556129,"21:56"],
+    ["Zasada zachowania energii mechanicznej",2556130,"16:13"],
+    ["Pęd ciała a impulsowe działanie siły",2556131,"22:09"],
+    ["Zasada zachowania pędu w zderzeniach niesprężystych",2556132,"21:28"],
+    ["Zasada zachowania pędu w zderzeniach sprężystych",2556133,"17:59"],
+    ["Jeszcze kilka zadań maturalnych – podsumowanie",2556134,"18:40"],
+    ["QUIZ",2556135,null],
+    ["Quiz - omówienie",2556136,"05:39"],
+  ]],
+  ["Mechanika bryły sztywnej",674744,[
+    ["Wprowadzenie do modułu",2639681,"00:11"],
+    ["Bryła sztywna, środek masy i moment bezwładności",2556137,"14:37"],
+    ["Kinematyka ruchu obrotowego – ruch jednostajny i niejednostajny",2556138,"14:02"],
+    ["Moment siły – warunki równowagi bryły sztywnej",2556141,"18:41"],
+    ["Dynamika ruchu obrotowego bryły sztywnej cz.1",2556142,"20:37"],
+    ["Dynamika ruchu obrotowego bryły sztywnej cz.2",2556144,"15:55"],
+    ["Energia w ruchu obrotowym bryły sztywnej",2556145,"19:45"],
+    ["Toczenie na równi pochyłej",2556146,"22:01"],
+    ["Zasada zachowania momentu pędu",2556149,"15:32"],
+    ["Jeszcze kilka zadań maturalnych – podsumowanie",2556151,"22:15"],
+    ["QUIZ",2556152,null],
+    ["Quiz - omówienie",2556153,"09:04"],
+  ]],
+  ["Hydrostatyka",674752,[
+    ["Wprowadzenie do modułu",2639686,"00:10"],
+    ["Ciśnienie – prawo Pascala",2556171,"17:44"],
+    ["Ciśnienie hydrostatyczne i równowaga w naczyniach połączonych",2556172,"16:55"],
+    ["Prawo Archimedesa cz.1",2556173,"19:03"],
+    ["Prawo Archimedesa cz.2",2556174,"17:06"],
+    ["Jeszcze kilka zadań maturalnych – podsumowanie",2556177,"21:17"],
+    ["QUIZ",2556179,null],
+    ["Quiz - omówienie",2556181,"06:26"],
+  ]],
+  ["Termodynamika",674759,[
+    ["Wprowadzenie do modułu",2639693,"00:12"],
+    ["Wprowadzenie do termodynamiki",2556189,"18:56"],
+    ["Bilans cieplny",2556191,"18:22"],
+    ["Gaz doskonały – równanie stanu gazu doskonałego cz.1",2556194,"15:45"],
+    ["Gaz doskonały – równanie stanu gazu doskonałego cz.2",2556197,"28:39"],
+    ["I zasada termodynamiki",2556207,"22:11"],
+    ["Ciepło molowe i praca",2556209,"19:33"],
+    ["Silniki cieplne i pompy ciepła",2556213,"19:54"],
+    ["Jeszcze kilka zadań maturalnych – podsumowanie",2556215,"21:40"],
+    ["QUIZ",2556218,null],
+    ["Quiz - omówienie",2556222,"07:36"],
+  ]],
+  ["Ruch drgający",674764,[
+    ["Wprowadzenie do modułu",2639703,"00:11"],
+    ["Ruch harmoniczny cz.1",2556228,"17:33"],
+    ["Ruch harmoniczny cz.2",2556231,"20:55"],
+    ["Energia w ruchu drgającym",2556234,"18:04"],
+    ["Wahadło matematyczne",2556238,"12:08"],
+    ["Rezonans mechaniczny",2556250,"14:05"],
+    ["Jeszcze kilka zadań maturalnych – podsumowanie",2556260,"23:17"],
+    ["QUIZ",2556265,null],
+    ["Quiz - omówienie",2556266,"04:56"],
+  ]],
+  ["Fale mechaniczne",674768,[
+    ["Wprowadzenie do modułu",2639711,"00:11"],
+    ["Fale poprzeczne i podłużne, równanie fali",2556274,"16:50"],
+    ["Rozchodzenie się fal, natężenie fali",2556275,"24:45"],
+    ["Prawo odbicia i załamania fali",2556279,"16:44"],
+    ["Dyfrakcja i interferencja",2556281,"17:59"],
+    ["Zjawisko Dopplera",2556284,"24:03"],
+    ["Jeszcze kilka zadań maturalnych – podsumowanie",2556287,"19:45"],
+    ["QUIZ",2556291,null],
+    ["Quiz - omówienie",2556293,"07:51"],
+  ]],
+  ["Grawitacja i elementy astronomii",674778,[
+    ["Wprowadzenie do modułu",2639712,"00:12"],
+    ["Prawo powszechnego ciążenia i przyspieszenie grawitacyjne",2556300,"20:22"],
+    ["Prędkość na orbicie kołowej cz.1",2556302,"10:11"],
+    ["Prędkość na orbicie kołowej cz.2",2556304,"17:08"],
+    ["Energia potencjalna grawitacji a praca w polu grawitacyjnym",2556305,"22:16"],
+    ["Prędkość na orbicie eliptycznej",2556306,"22:42"],
+    ["Prędkość ucieczki",2556307,"15:02"],
+    ["Stan nieważkości i przeciążenia",2556309,"18:30"],
+    ["Układ Słoneczny, Galaktyki i jednostki odległości w astronomii",2556310,"17:33"],
+    ["Wielki Wybuch i prawo Hubble`a",2556312,"14:15"],
+    ["Jeszcze kilka zadań maturalnych – podsumowanie",2556313,"21:17"],
+    ["QUIZ",2556314,null],
+    ["Quiz - omówienie",2556315,"06:08"],
+  ]],
+  ["Elektrostatyka",674782,[
+    ["Wprowadzenie do modułu",2639720,"00:12"],
+    ["Elektryzowanie ciał. Zasada zachowania ładunku",2556318,"12:32"],
+    ["Prawo Coulomba",2556319,"16:05"],
+    ["Natężenie pola elektrostatycznego",2556320,"14:59"],
+    ["Energia potencjalna i potencjał pola elektrycznego",2556322,"10:48"],
+    ["Ruch ładunku w polu elektrycznym",2556324,"21:01"],
+    ["Jeszcze kilka zadań maturalnych – podsumowanie",2556325,"18:46"],
+    ["QUIZ",2556326,null],
+    ["Quiz - omówienie",2556328,"11:18"],
+  ]],
+  ["Prąd elektryczny",674795,[
+    ["Wprowadzenie do modułu",2639725,"00:11"],
+    ["Natężenie, napięcie i opór elektryczny. I prawo Kirchhoffa",2556338,"12:06"],
+    ["Łączenie oporników",2556339,"14:13"],
+    ["Proste obwody elektryczne",2556341,"15:36"],
+    ["Praca i moc prądu",2556343,"19:53"],
+    ["Siła elektromotoryczna",2556351,"14:15"],
+    ["II prawo Kirchhoffa",2556353,"10:49"],
+    ["Jeszcze kilka zadań maturalnych – podsumowanie",2556355,"20:52"],
+    ["QUIZ",2556357,null],
+    ["Quiz - omówienie",2556358,"09:15"],
+  ]],
+  ["Magnetyzm",674801,[
+    ["Wprowadzenie do modułu",2639734,"00:10"],
+    ["Pole magnetyczne magnesu i przewodnika z prądem",2556420,"19:43"],
+    ["Siła elektrodynamiczna",2556421,"11:10"],
+    ["Ruch ładunku w polu magnetycznym. Siła Lorentza",2556422,"11:41"],
+    ["Ruch ładunku w polu magnetycznym i elektrycznym",2556423,"18:50"],
+    ["Jeszcze o siłach (silnik elektryczny oraz oddziaływanie przewodników z prądem)",2556425,"18:04"],
+    ["Jeszcze kilka zadań maturalnych – podsumowanie",2556426,"12:54"],
+    ["QUIZ",2556427,null],
+    ["Quiz - omówienie",2556428,"06:07"],
+  ]],
+  ["Elektromagnetyzm",674804,[
+    ["Wprowadzenie do modułu",2639743,"00:11"],
+    ["Zjawisko indukcji elektromagnetycznej cz.1",2556435,"16:39"],
+    ["Zjawisko indukcji elektromagnetycznej cz.2",2556437,"12:28"],
+    ["Prąd przemienny",2556438,"11:08"],
+    ["Transformator",2556439,"09:41"],
+    ["Dioda",2556440,"15:38"],
+    ["Jeszcze kilka zadań maturalnych – podsumowanie",2556443,"25:59"],
+    ["QUIZ",2556446,null],
+    ["Quiz - omówienie",2556448,"10:17"],
+  ]],
+  ["Optyka",674808,[
+    ["Wprowadzenie do modułu",2639750,"00:10"],
+    ["Prawo odbicia i załamania światła.",2556453,"13:49"],
+    ["Całkowite wewnętrzne odbicie",2556457,"17:25"],
+    ["Zwierciadła",2556459,"20:10"],
+    ["Soczewki cz.1",2556460,"14:20"],
+    ["Soczewki cz.2",2556462,"16:38"],
+    ["Siatka dyfrakcyjna oraz polaryzacja światła",2556463,"23:12"],
+    ["Jeszcze kilka zadań maturalnych – podsumowanie",2556464,"14:01"],
+    ["QUIZ",2556465,null],
+    ["Quiz - omówienie",2556466,"11:11"],
+  ]],
+  ["Fizyka atomowa",674812,[
+    ["Wprowadzenie do modułu",2639755,"00:10"],
+    ["Fale elektromagnetyczne",2556475,"09:24"],
+    ["Zjawisko fotoelektryczne",2556476,"19:47"],
+    ["Foton jako cząstka",2556477,"11:49"],
+    ["Widma emisyjne i absorcyjne gazów",2556478,"17:39"],
+    ["Fale de Broglie`a",2556480,"13:48"],
+    ["Jeszcze kilka zadań maturalnych – podsumowanie",2556485,"15:10"],
+    ["QUIZ",2556489,null],
+    ["Quiz - omówienie",2556490,"06:54"],
+  ]],
+  ["Fizyka jądrowa i elementy fizyki relatywistycznej",674815,[
+    ["Wprowadzenie do modułu",2639764,"00:13"],
+    ["Budowa jądra atomowego i promieniowanie jądrowe. Wpłw promieniowania na organizmy żywe",2556498,"25:07"],
+    ["Prawo rozpadu promieniotwórczego",2556501,"14:00"],
+    ["Energia wiązania",2556504,"16:49"],
+    ["Reakcje jądrowe. Reakcje rozszczepienia i reakcje termojądrowe",2556505,"13:14"],
+    ["Energia jądrowa",2556506,"22:58"],
+    ["Energia relatywistyczna",2556507,"12:25"],
+    ["Jeszcze kilka zadań maturalnych – podsumowanie",2556509,"28:46"],
+    ["QUIZ",2556510,null],
+    ["Quiz - omówienie",2556511,"06:26"],
+  ]],
+  ["Wymagania przekrojowe",674820,[
+    ["Wprowadzenie do modułu",2639771,"00:10"],
+    ["Wymagania przekrojowe",2556514,"18:39"],
+    ["Jeszcze kilka zadań maturalnych – podsumowanie",2556516,"14:04"],
+    ["QUIZ",2556517,null],
+    ["Quiz - omówienie",2556523,"06:57"],
+    ["Powodzenia na maturze!",2639773,"00:20"],
+  ]],
+]);
+function matsSeedWP(){
+  const list=matsList();
+  const upsert=(source,subject,name,link,lessons)=>{
+    let m=list.find(x=>x.source===source);
+    if(!m){m={id:uid()};list.push(m);}
+    m.subject=subject;m.name=name;m.link=link;m.lessons=lessons;m.tasks=lessons.length;m.source=source;
+    if(!Array.isArray(m.done))m.done=[];
+  };
+  upsert("wp-matematyka","Matematyka","Wielka Powtórka — Matematyka (rozszerzenie)","https://www.wielkapowtorka.pl/c/m-matematyka-pr",MATSWP_MATEMATYKA);
+  upsert("wp-fizyka","Fizyka","Wielka Powtórka — Fizyka","https://www.wielkapowtorka.pl/c/m-fizyka",MATSWP_FIZYKA);
+}
+// jednorazowo — jeśli usunięty ręcznie, nie wraca (flaga trwała w S.matura, nie w S.materialy)
+if(!S.matura.wpMatsSeeded){matsSeedWP();S.matura.wpMatsSeeded=true;save();}
+
 const MATS_BASE_SUBJ=["Matematyka","Geografia","Fizyka"]; // punkt startu, gdy nie ma jeszcze żadnych przedmiotów
 const MATS_OTHER="__inny__";
 let matsFilter="all";
@@ -2440,6 +2791,19 @@ const matsOpen=new Set(); // które materiały mają rozwiniętą siatkę zadań
 function matsPlural(n,one,few,many){
   const d=n%10,s=n%100;
   return n===1?one:(d>=2&&d<=4&&(s<10||s>=20)?few:many);
+}
+// materiały typu "kurs video" (m.lessons) używają innej jednostki niż liczbowe zbiory zadań
+function matsUnit(m){return m.lessons&&m.lessons.length?["lekcja","lekcje","lekcji"]:["zadanie","zadania","zadań"]}
+function matsParseDur(s){
+  if(!s)return 0;
+  const p=String(s).split(":").map(Number);
+  if(p.some(isNaN))return 0;
+  return p.length===3?p[0]*3600+p[1]*60+p[2]:p[0]*60+p[1];
+}
+function matsTotalDur(lessons){return(lessons||[]).reduce((a,l)=>a+matsParseDur(l.dur),0)}
+function matsFmtDur(sec){
+  const h=Math.floor(sec/3600),m=Math.round((sec%3600)/60);
+  return h?`${h} h ${m} min`:`${m} min`;
 }
 // przedmioty do wyboru: te już użyte w materiałach + przedmioty z zakładki Nauka + baza
 function matsSubjects(){
@@ -2538,14 +2902,20 @@ function renderMats(){
   });
 }
 function matsItemHtml(m){
-  const t=m.tasks||0,zr=matsDone(m).length;
+  const hasLessons=Array.isArray(m.lessons)&&m.lessons.length>0;
+  const t=hasLessons?m.lessons.length:(m.tasks||0),zr=matsDone(m).length;
+  const[one,few,many]=matsUnit(m);
+  const dur=hasLessons?matsTotalDur(m.lessons):0;
   return `<div class="mats-item">
     <div class="row" style="flex-wrap:nowrap;gap:var(--sp-2)">
       <input type="text" data-mnm="${m.id}" class="field" style="flex:1;min-width:0" value="${esc(m.name)}">
+      ${hasLessons?`
+      <span class="muted" style="flex:none">${t} ${matsPlural(t,one,few,many)}${dur?` · ${esc(matsFmtDur(dur))}`:""}</span>
+      ${m.link?`<a href="${esc(m.link)}" target="_blank" rel="noopener" class="btn ghost small" style="flex:none">Otwórz kurs ↗</a>`:""}`:`
       <div class="row" style="flex:none;flex-wrap:nowrap;gap:6px;width:auto">
         <input type="number" data-mtk="${m.id}" min="0" max="999" step="1" placeholder="—" style="width:80px" value="${m.tasks==null?"":m.tasks}">
         <span class="muted">zad.</span>
-      </div>
+      </div>`}
       <button class="icon-btn del" data-mdel="${m.id}" title="Usuń materiał">✕</button>
     </div>
     ${t?`
@@ -2554,12 +2924,12 @@ function matsItemHtml(m){
       <span class="muted" data-mcnt="${m.id}">${zr}/${t}</span>
     </div>
     <details class="mats-det" data-mdet="${m.id}"${matsOpen.has(m.id)?" open":""}>
-      <summary>Zadania — odhacz zrobione</summary>
+      <summary>${hasLessons?"Lekcje — odhacz obejrzane":"Zadania — odhacz zrobione"}</summary>
       <div class="row" style="gap:var(--sp-2);margin-bottom:var(--sp-2)">
         <button class="btn ghost small" data-mall="${m.id}" data-v="1">Odhacz wszystkie</button>
         <button class="btn ghost small" data-mall="${m.id}" data-v="0">Wyczyść</button>
       </div>
-      <div class="mats-tasks" data-mgrid="${m.id}"></div>
+      <div class="${hasLessons?"mats-lessons":"mats-tasks"}" data-mgrid="${m.id}"></div>
     </details>`:""}
   </div>`;
 }
@@ -2567,8 +2937,23 @@ function matsItemHtml(m){
 // osobne handlery na każdym kwadraciku byłyby marnotrawstwem)
 function matsFillGrid(m){
   const g=$(`#matsList [data-mgrid="${m.id}"]`);
-  if(!g||!m.tasks)return;
+  if(!g)return;
   const done=new Set(matsDone(m));
+  if(Array.isArray(m.lessons)&&m.lessons.length){
+    let h="",prevSec="";
+    m.lessons.forEach((l,i)=>{
+      const n=i+1;
+      if(l.section&&l.section!==prevSec){h+=`<div class="mats-lesson-sec">${esc(l.section)}</div>`;prevSec=l.section;}
+      h+=`<div class="mats-lesson-row">
+        <input type="checkbox" data-mtask="${m.id}" data-n="${n}"${done.has(n)?" checked":""} aria-pressed="${done.has(n)}">
+        <a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.name)}</a>
+        <span class="muted">${l.dur?esc(l.dur):"—"}</span>
+      </div>`;
+    });
+    g.innerHTML=h;
+    return;
+  }
+  if(!m.tasks)return;
   let h="";
   for(let n=1;n<=m.tasks;n++)h+=`<button type="button" data-mtask="${m.id}" data-n="${n}"${done.has(n)?' class="on"':""} aria-pressed="${done.has(n)}">${n}</button>`;
   g.innerHTML=h;
