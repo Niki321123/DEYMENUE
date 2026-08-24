@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-24 (sesja 16, cd. — „Lekcja" sprzężona z Harmonogramem + zbiór zadań z działami, build 52)_
+_Ostatnia aktualizacja: 2026-08-24 (sesja 16, cd. — własne aktywności w Harmonogramie, build 53)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,45 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-24 (sesja 16, cd. — własne aktywności w Harmonogramie, build 53):** Użytkownik
+  chciał móc wpisywać w plan własne aktywności; przez `AskUserQuestion` doprecyzowane na
+  **pełną elastyczność**: i blokady, i formy nauki, i stałe, i jednorazowe.
+  - **Model:** definicje w `S.matura.acts=[{id,name,kind:"busy"|"study"}]`, a w siatce komórka
+    trzyma wartość `"a:<id>"` — czyli aktywność jest **zwykłym stanem komórki** obok
+    `avail`/`school`. Kluczowa decyzja projektowa: dzięki temu obie istniejące warstwy
+    (`base` = stały szkielet, `ovr` = tylko bieżący tydzień) i całe składanie siatki działają
+    bez zmian, a `matFreeSlots()` automatycznie omija te godziny (nie są `"avail"`), więc ani
+    generator lokalny, ani `matSanitizeBlocks` nie wstawią tam nauki. Żadnej równoległej
+    struktury danych.
+  - **`matRecompute` poprawione:** było `if(v==="avail"||v==="school")g[k]=v;else delete g[k]`,
+    czyli warstwa tygodniowa umiała przenieść tylko dwie wartości i **skasowałaby aktywność**.
+    Teraz `if(v==="unavail")delete g[k];else g[k]=v` — kasuje wyłącznie jawny `"unavail"`.
+  - **UI:** czwarty pędzel „Moja aktywność" + checkbox **„tylko w tym tygodniu"** (przełącza
+    zapis między `base` a `ovr` — wcześniej pędzel ręczny pisał zawsze do `base`, jednorazowe
+    zmiany umiał robić tylko czat AI). Pasek zarządzania: wybór aktywności, dodawanie
+    (nazwa + typ) i usuwanie. Malowanie do `base` kasuje nadpisanie tej komórki w `ovr` —
+    bez tego zmiana szkieletu byłaby niewidoczna, bo `ovr` by ją przykrywał.
+  - **Typ „nauka"** odhacza się pędzlem „Dostępny" (jak blok planu) i tworzy sesję 60 min
+    z `topicId="a:<id>"`, więc wchodzi do statystyk i streaka. Stan odhaczeń w
+    `S.matura.actDone={week,cells}` — reset co tydzień, jak `doneWeek` bloków planu.
+    `renderMatStats` dostał `matEntityName()`, inaczej pokazywałby „(usunięty)".
+  - **Usuwanie aktywności sprząta wszystko:** definicję, wystąpienia w `base` i `ovr`,
+    odhaczenia oraz powiązane sesje — żeby statystyki się zgadzały.
+  - **Zabezpieczenie przed czatem AI:** `matChatSend` przy nakładaniu `j.grid` **pomija
+    komórki z aktywnością** (`if(actOf(S.matura.grid[k]))continue`). Bez tego AI mogłoby
+    jednym „zrób mi więcej miejsca na naukę" wymazać trening. Prompt (`MAT_AI_RULES`) też
+    dostał regułę: `activities` są niedostępne, można się do nich odwoływać po nazwie.
+    Kontekst `matAiContext()` rozszerzony o `activities`, przekazywany w `aiPlan` i w czacie.
+  - **Zakładka Lekcja** pokazuje dzisiejsze aktywności w podglądzie dnia i przekazuje je do AI
+    jako „inne zajęcia dziś", żeby nie przeładowało planu.
+  - **Zweryfikowane w przeglądarce:** dodanie obu typów, malowanie, wypadanie z puli wolnych
+    slotów (28→25), render kafelków z klasami/podpowiedziami, odhaczanie i cofanie odhaczenia
+    własnej nauki, sesja 60 min trafiająca do statystyk pod właściwą nazwą, warstwa stała
+    kontra jednorazowa po symulowanej zmianie tygodnia (stała zostaje, jednorazowa znika),
+    usuwanie aktywności bez śladów, generator planu bez kolizji (25 bloków, 0 kolizji),
+    odparcie próby nadpisania komórki przez czat AI, regres 14 widoków + 5 pod-zakładek.
+  - **Opublikowano build 53.**
 
 - **2026-08-24 (sesja 16, cd. — „Lekcja" sprzężona z Harmonogramem, zbiór zadań z działami, build 52):**
   Rozbudowa zakładki „Lekcja" wg doprecyzowań użytkownika: plan ma być rozpisany **per sesja
