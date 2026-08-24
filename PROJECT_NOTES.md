@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-24 (sesja 16, cd. — zakładka „Lekcja" z planem dnia od AI, build 51)_
+_Ostatnia aktualizacja: 2026-08-24 (sesja 16, cd. — „Lekcja" sprzężona z Harmonogramem + zbiór zadań z działami, build 52)_
 
 ## Czym jest projekt
 
@@ -382,6 +382,13 @@ sprzed tej sesji, już nieużywany przez apkę, można zignorować/skasować.
         oraz odrzucenie nieprawidłowego pliku.
       - **DO ZROBIENIA:** `npm run publish` (czeka na akceptację) — zmiany są tylko
         w źródłowym `DayMenu.html`.
+- [ ] **Zbiór Zadań Maturalnych — dział 17 „Inne":** brakuje liczby zadań (użytkownik podał
+      tylko działy 1-16 = 605 zadań). Gdy poda, dopisać do `MATS_ZBIOR_SECTIONS` w
+      `DayMenu.html` — dopisanie na końcu jest bezpieczne, bo nie przesuwa zakresów
+      wcześniejszych działów (a więc nie psuje już odhaczonych numerów).
+- [ ] **Zakładka „Lekcja" — sprawdzić żywe wywołanie AI** przy pierwszym realnym użyciu:
+      czy model trzyma format JSON, czy sensownie mieści się w budżecie czasu sesji i czy
+      nie przeskakuje modułów. Cała logika klienta jest przetestowana, sam model — nie.
 - [ ] Wrzesień 2026: sprawdzić na stronie CKE, czy dla matury 2027 nie pojawił się aneks
       do informatorów zmieniający zakres wymagań. **Dane wbudowane w zakładkę „Wymagania"
       pochodzą z podstawy programowej po zmianie z 28 czerwca 2024 r. (Dz.U. z 2024 r.
@@ -441,6 +448,57 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-24 (sesja 16, cd. — „Lekcja" sprzężona z Harmonogramem, zbiór zadań z działami, build 52):**
+  Rozbudowa zakładki „Lekcja" wg doprecyzowań użytkownika: plan ma być rozpisany **per sesja
+  z Harmonogramu** (np. 3 bloki matmy + 2 fizyki = 5 osobnych rozpisek), a nie jeden ogólny
+  plan dnia.
+  - **Klasyfikacja pozycji kursu** (`lekKind`) — użytkownik rozrysował to na screenshocie działu:
+    zwykłe lekcje wideo → `lesson`; `QUIZ` i `Quiz - omówienie` → `quiz`, czyli liczą się jako
+    **praktyka/zadania**, nie jako lekcja; `Wprowadzenie do modułu`/`Poznajmy się`/`Powodzenia
+    na maturze` → `skip`, nie trafiają nigdzie. Rozpoznawanie: nazwa (regex) + czas trwania
+    < 2 min jako siatka bezpieczeństwa (najkrótsza realna lekcja w obu kursach ma 4:56, więc
+    próg jest bezpieczny). Zweryfikowane na całych kursach: matematyka 46 lekcji/24 quizy/
+    15 pominiętych, fizyka 115/34/20 — pominięte to wyłącznie wstępniaki i zakończenia.
+  - **Budżet czasu sesji:** sesja = `pomo.work` minut (z zakładki Las), lekcja zjada swój realny
+    `dur`, reszta idzie na zadania po `S.matura.minPerTask` minut (nowe pole, domyślnie 7 min,
+    edytowalne w zakładce Lekcja, backfill w `matMigrate`). Reguły w prompcie: lekcja dłuższa
+    od budżetu zajmuje całą sesję i nie dostaje zadań; sesja nie musi mieć lekcji (same zadania
+    są równie wartościowe); po lekcji kolejna sesja tego przedmiotu idzie na utrwalenie tego
+    samego tematu; nie otwieramy nowego modułu, dopóki bieżący nie ma obejrzanych lekcji ORAZ
+    zrobionych zadań z odpowiadającego działu.
+  - **Zbiór Zadań Maturalnych** (`matsSeedZbior`, `source:"zbior-mat"`, flaga `zbiorSeeded`):
+    605 zadań w 16 działach ze spisu treści podanego przez użytkownika. Dział 17 „Inne"
+    **świadomie pominięty** — użytkownik nie podał liczby zadań (do uzupełnienia).
+    Numeracja w książce **restartuje się w każdym dziale** (potwierdzone przez użytkownika),
+    więc wewnętrznie `m.done` trzyma numery globalne 1..605, a `matsSecRanges`/`matsLocalNo`
+    przeliczają je na to, co user widzi w książce. Siatka w Materiałach rysuje teraz nagłówki
+    działów z licznikiem i numeruje od 1 w każdym dziale; pole „liczba zadań" jest dla takiego
+    materiału tylko do odczytu (ręczna zmiana rozjechałaby zakresy).
+  - **Przepływ AI:** kontekst (`lekBuildCtx`, ~4,4 kB) zawiera dzisiejsze sesje z Harmonogramu,
+    przegląd wszystkich modułów kursu z postępem oraz szczegóły pozycji tylko z **3 pierwszych
+    nieprzerobionych** modułów (strukturalnie wymusza „nie skacz do przodu"), plus działy zbioru
+    zadań z licznikami. AI zwraca `{sessions:[{hour,subject,lessons:[idx],quiz:[idx],
+    tasks:[{materialId,section,count}],note}]}` — **nie podaje numerów zadań**, tylko dział
+    i ile; konkretne numery dobiera klient (`lekResolveTasks`), biorąc pierwsze niezrobione.
+  - **Znaleziony i naprawiony bug (w trakcie testów):** każda sesja dnia dostawała te same
+    „pierwsze niezrobione" zadania (3 sesje matmy → 450 / 450-451 / 450-455). Dodane rezerwacje
+    w obrębie jednego planu (`takenTasks`/`takenIdx`, sesje sortowane po godzinie przed
+    przydziałem) — po poprawce: 450 / 451-452 / 453-458, bez dubli; to samo zabezpieczenie
+    dla indeksów lekcji.
+  - **Drobne zabezpieczenie:** po utracie dostępu do AI (wylogowanie) przy otwartej zakładce
+    Lekcja `applyAiGating()` cofa na Harmonogram. Sam widok celowo NIE ma `data-ai-only` —
+    gating pokazałby go wtedy także przy aktywnej innej pod-zakładce.
+  - **Zweryfikowane w przeglądarce** (symulowana odpowiedź AI — brak dostępu AI na koncie
+    testowym): klasyfikacja pozycji na realnych danych obu kursów, filtrowanie harmonogramu do
+    dzisiejszego dnia, budowa kontekstu, brak dubli zadań między sesjami, render 5 sesji z
+    podziałem czasu („45 min · 38 min lekcje + ~7 min zadania"), quizy w osobnej sekcji
+    „praktyka", odhaczenie zadania i lekcji propagujące się do zakładki Materiały z poprawnym
+    numerem działowym (globalne 450 = dział 13 „Dowody algebra" nr 1), stany puste (brak
+    harmonogramu, plan z wcześniejszego dnia), regres 14 widoków + 5 pod-zakładek bez błędów.
+    **Nie zweryfikowano żywego wywołania modelu** — czy Haiku trzyma format JSON i sensownie
+    gospodaruje budżetem czasu, trzeba sprawdzić przy pierwszym realnym użyciu.
+  - **Opublikowano build 52.**
 
 - **2026-08-24 (sesja 16, cd. — nowa pod-zakładka „Lekcja" w Nauce, build 51):** Na
   prośbę użytkownika: pod-zakładka w grupie tabów Nauki (`#matTabs`, obok Harmonogram/
