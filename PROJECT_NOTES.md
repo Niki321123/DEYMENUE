@@ -544,6 +544,37 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
     widokach, zero błędów konsoli. Dane testowe wyczyszczone.
   - **Opublikowano build 44** (`npm run publish`, APK od razu bez dogrywki).
 
+- **2026-08-24 (sesja 15, cd. — zakładka Frekwencja):** Dobudowano zapowiedzianą
+  wcześniej zakładkę. Ważna decyzja: użytkownik sprecyzował, że to ma być
+  **osobna zakładka w grupie „Edukacja"** (jak Nauka/Sprawdziany/Wymagania/
+  Materiały), NIE pod-tab wewnątrz Nauki (moja pierwsza, błędna próba lokalizacji,
+  zatrzymana przez usera zanim zdążyłem ją zaimplementować).
+  - **HTML:** nowy `<button data-view="frekwencja">` w grupie Edukacja (nav),
+    nowa `<section id="view-frekwencja">` (wzorem istniejących widoków: `grid3`
+    stat cards + karta „Frekwencja wg przedmiotu" + karta „Ten tydzień").
+  - **JS:** `renderFrekwencja()` dodane do mapy `renderers`. Trzy sekcje:
+    1) zbiorcze stat-karty (frekwencja ogółem % + liczby obecności/nieobecności,
+       zsumowane z `S.matura.attendanceFreq`),
+    2) `.bar-row` per przedmiot, **sortowane rosnąco po %** (najgorsza frekwencja
+       na górze — najbardziej wymaga uwagi), kolor progowy `frekColor()`
+       (≥90% zielony, ≥75% żółty, poniżej czerwony — te same tokeny `--good/
+       --warn/--bad` co reszta apki),
+    3) lista lekcji **bieżącego tygodnia** (`S.matura.attendanceLessons`) z
+       przedmiotem/tematem/datą i odznaką Obecny (zielona) albo kodem nieobecności
+       (czerwona, np. „nb").
+    Pusty stan (brak danych) osobno dla obu list, z tekstem tłumaczącym że
+    dane zbierają się automatycznie po synchronizacji z Librusem.
+    `librusApplyAttendance()` odświeża widok na żywo, jeśli jest aktualnie
+    otwarty (ten sam wzorzec co `librusApplyExams`→`renderExams`).
+  - **Przetestowane w przeglądarce** na spreparowanych danych (3 przedmioty,
+    zróżnicowana frekwencja 71–100%): poprawne sortowanie, kolory progowe,
+    matematyka poprawna (33/39=85% ogółem), lista tygodnia z właściwymi
+    odznakami. Pusty stan też sprawdzony. Zero regresji na 14 widokach, zero
+    błędów konsoli. Dane testowe wyczyszczone.
+  - **Opublikowano build 45** (`npm run publish`, APK od razu). Zakładka będzie
+    pusta aż do pierwszej udanej synchronizacji z Librusem (patrz wpis wyżej —
+    wciąż wakacje, cron nie doszedł jeszcze do kodu frekwencji na żywych danych).
+
 - **2026-08-23 (sesja 15, hotfix backendu):** Zdiagnozowano i naprawiono **„Błąd
   sieci"** przy próbie „Połącz z Librusem" (karta w zakładce Konto). Przyczyna:
   Edge Function `librus-timetable` (w przeciwieństwie do `daymenu-ai`) nie miała

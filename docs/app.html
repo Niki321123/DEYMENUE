@@ -836,7 +836,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=45;
+const DM_BUILD=46;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1613,10 +1613,14 @@ $("#matChatSend").onclick=async()=>{
 $("#matChatInput").onkeydown=e=>{if(e.key==="Enter")$("#matChatSend").click()};
 
 /* ---- plan nauki jako lista z odhaczaniem (reset co tydzień) ---- */
-function matMarkDone(blk){
+function matMarkDone(blk,minutes){
   const wk=weekId();if(blk.doneWeek===wk)return;
   blk.doneWeek=wk;
-  const s={id:uid(),topicId:blk.topicId,date:today(),minutes:60,completed:true,planned:true};
+  // Ręczne odhaczenie w gridzie (bez podanych minutes) = deklaracja "zrobiłem całą
+  // zaplanowaną godzinę" → 60 min. Odhaczenie przez zakończoną sesję pomodoro podaje
+  // REALNY czas pracy (np. 45 min) — inaczej statystyki zawyżałyby czas nauki.
+  const min=Number.isFinite(minutes)?minutes:60;
+  const s={id:uid(),topicId:blk.topicId,date:today(),minutes:min,completed:true,planned:true};
   blk.sessionId=s.id;S.matura.sessions.push(s);
 }
 function matUnmarkDone(blk){
@@ -1643,7 +1647,7 @@ function matPomoToggle(){
       if(matPomo.mode==="work"){
         const min=Math.round(matPomo.total/60);
         const blk=matPomo.day!=null?S.matura.plan.find(b=>b.day===matPomo.day&&b.hour===matPomo.hour):null;
-        if(blk){if(blk.doneWeek!==weekId())matMarkDone(blk);}
+        if(blk){if(blk.doneWeek!==weekId())matMarkDone(blk,min);}
         else S.matura.sessions.push({id:uid(),topicId:matPomo.topicId,date:today(),minutes:min,completed:true});
         // Godzina z planu jest odhaczana tylko dla PIERWSZEJ rundy sesji — każda kolejna
         // (jeśli praca+przerwa akurat trafia w pełną godzinę, np. 45+15=60 min) nie ma już
