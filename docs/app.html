@@ -890,7 +890,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=53;
+const DM_BUILD=54;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -2087,20 +2087,22 @@ function lekResolveTasks(m,sectionName,count,reserved){
 const LEK_AI_RULES=`Jesteś nauczycielem-planerem w aplikacji Day Menu. Rozpisujesz naukę na DZISIAJ, sesja po sesji, na podstawie harmonogramu użytkownika.
 ZASADY:
 1) Dostajesz listę dzisiejszych SESJI (godzina + przedmiot). Rozpisz KAŻDĄ osobno. Nie dokładaj ani nie pomijaj sesji.
-2) Budżet czasu jednej sesji to "sesjaMin" minut. Lekcja z kursu zjada swój realny czas ("min"), a to, co zostaje, idzie na zadania. Jedno zadanie zajmuje "minNaZadanie" minut. Nie przekraczaj budżetu.
+2) Budżet czasu jednej sesji to "sesjaMin" minut. Lekcja z kursu zjada swój realny czas ("min"), a to, co zostaje, idzie na zadania. Jedno zadanie zajmuje "minNaZadanie" minut. Budżetu NIE WOLNO przekroczyć.
+   - ZANIM zwrócisz sesję: ZSUMUJ "min" wszystkich wybranych do niej lekcji i quizów. Jeśli suma przekracza "sesjaMin", USUWAJ pozycje od końca, aż się zmieści. Nigdy nie zwracaj sesji, w której suma jest większa niż "sesjaMin".
+   - Lepiej dać jedną lekcję i zero zadań niż wcisnąć trzy i przekroczyć czas. Nie „próbuj zmieścić" — albo się mieści, albo tego nie ma.
    - Jeśli lekcja trwa np. 35 min przy sesji 45 min, zostaje ~10 min, czyli maks 1-2 zadania.
-   - Jeśli lekcja jest DŁUŻSZA niż budżet sesji, ta lekcja zajmuje całą sesję i NIE dokładaj do niej zadań.
+   - Jeśli JUŻ PIERWSZA lekcja jest DŁUŻSZA niż budżet sesji, ta jedna lekcja zajmuje całą sesję (dokończysz ją na następnej) i NIE dokładaj do niej ani zadań, ani kolejnych lekcji.
    - Sesja NIE MUSI mieć lekcji. Sesje z samymi zadaniami są równie wartościowe.
 3) Zadania są równie ważne jak lekcje. Po obejrzeniu lekcji zaplanuj utrwalenie: kolejna sesja tego przedmiotu powinna iść w całości albo w dużej części na zadania z TEGO SAMEGO tematu. Nie odkładaj zadań "na koniec, jak zostanie czas".
-4) Idziemy po kolei i NIE otwieramy nowego modułu, dopóki bieżący nie jest przerobiony, czyli dopóki nie są obejrzane wszystkie jego lekcje ORAZ zrobione zadania z odpowiadającego mu działu zbioru zadań. Kolejność lekcji w module zachowuj.
+4) Gdy użytkownik NIE podał tematu: idziemy po kolei i NIE otwieramy nowego modułu, dopóki bieżący nie jest przerobiony, czyli dopóki nie są obejrzane wszystkie jego lekcje ORAZ zrobione zadania z odpowiadającego mu działu zbioru zadań. Kolejność lekcji w module zachowuj. (Ta zasada NIE obowiązuje, gdy użytkownik podał temat — patrz zasada 7.)
 5) Pozycje typu QUIZ i "Quiz - omówienie" to praktyka - traktuj je jako zadania (pole "quiz"), nie jako lekcje. One też zajmują swój czas.
 6) Dopasuj dział zbioru zadań tematycznie do modułu kursu (np. moduł "Funkcja kwadratowa" do działu "Funkcja kwadratowa"). Jeśli nic nie pasuje tematycznie, wybierz najbliższy sensowny i napisz to wprost w "note".
-7) Jeśli użytkownik podał temat na dziś, zacznij od modułu, którego nazwa najlepiej mu odpowiada (dopasowanie częściowe, ignoruj wielkość liter). Bez podanego tematu kontynuuj od pierwszego nieprzerobionego modułu.
+7) TEMAT OD UŻYTKOWNIKA MA PIERWSZEŃSTWO PRZED ZASADĄ 4. Jeśli podał temat na dziś, przejdź OD RAZU do modułu, którego nazwa najlepiej mu odpowiada (dopasowanie częściowe, ignoruj wielkość liter) — nawet jeśli wcześniejsze moduły nie są przerobione. NIE tłumacz, że „trzeba najpierw przejść moduł X" i NIE zaczynaj od modułów wcześniejszych: użytkownik świadomie wybrał ten temat i to on decyduje. Wszystkie sesje tego przedmiotu w danym dniu poświęć na wskazany temat. Bez podanego tematu kontynuuj od pierwszego nieprzerobionego modułu.
 Odpowiadasz WYŁĄCZNIE poprawnym JSON, bez markdown i bez komentarzy.
 Format: {"sessions":[{"hour":17,"subject":"Matematyka","lessons":[12,13],"quiz":[],"tasks":[{"materialId":"abc","section":"Funkcja kwadratowa","count":2}],"note":"krótkie uzasadnienie po polsku"}]}
 W "lessons" i "quiz" podajesz idx pozycji z listy kursu. W "tasks" nie podajesz numerów zadań, tylko dział i ile ich zrobić.`;
 
-function lekBuildCtx(){
+function lekBuildCtx(topic){
   const blocks=lekTodayBlocks();
   const sesjaMin=S.matura.pomo.work||60;
   const minNaZadanie=S.matura.minPerTask||7;
@@ -2117,10 +2119,19 @@ function lekBuildCtx(){
         const les=mo.items.filter(x=>x.kind==="lesson"),qz=mo.items.filter(x=>x.kind==="quiz");
         parts.push(`${i+1} | ${mo.name} | ${les.filter(x=>x.done).length}/${les.length} | ${qz.filter(x=>x.done).length}/${qz.length}`);
       });
-      // szczegóły tylko dla pierwszych nieprzerobionych modułów — dalsze i tak blokuje reguła 4
-      const open=mods.filter(mo=>!lekModDone(mo)).slice(0,3);
-      parts.push("Pozycje z najbliższych nieprzerobionych modułów (idx | typ | moduł | nazwa | min | obejrzane):");
-      open.forEach(mo=>mo.items.forEach(it=>{
+      /* Szczegóły (z numerami idx) tylko dla kilku modułów, żeby nie wysyłać całego kursu.
+         Jeśli użytkownik podał temat, moduł do niego pasujący MUSI się tu znaleźć — inaczej
+         model nie ma skąd wziąć numerów jego lekcji i siłą rzeczy zaproponuje coś innego. */
+      const open=mods.filter(mo=>!lekModDone(mo));
+      const q=String(topic||"").toLowerCase().trim();
+      const hit=q?open.filter(mo=>{const n=mo.name.toLowerCase();return n.includes(q)||q.includes(n)}):[];
+      const detail=hit.length
+        ? [...hit,...open.filter(mo=>!hit.includes(mo)).slice(0,2)]
+        : open.slice(0,3);
+      if(q&&hit.length)parts.push(`(Temat "${topic}" pasuje do modułu: ${hit.map(mo=>mo.name).join(", ")} — WSZYSTKIE dzisiejsze sesje tego przedmiotu poświęć na niego.)`);
+      else if(q)parts.push(`(Temat "${topic}" nie dotyczy tego przedmiotu — tutaj po prostu kontynuuj po kolei, bez tłumaczenia się z tematu.)`);
+      parts.push("Pozycje z modułów do rozplanowania (idx | typ | moduł | nazwa | min | obejrzane):");
+      detail.forEach(mo=>mo.items.forEach(it=>{
         parts.push(`${it.idx} | ${it.kind} | ${mo.name} | ${it.name} | ${it.min} | ${it.done?"tak":"nie"}`);
       }));
     }
@@ -2136,9 +2147,9 @@ function lekBuildCtx(){
 }
 
 async function lekAskAI(){
-  const ctx=lekBuildCtx();
-  if(!ctx.blocks.length){$("#lekStatus").textContent="Na dziś nie ma nic w Harmonogramie — wygeneruj plan tygodnia w zakładce Harmonogram.";return}
   const topic=$("#lekTopic").value.trim();
+  const ctx=lekBuildCtx(topic);
+  if(!ctx.blocks.length){$("#lekStatus").textContent="Na dziś nie ma nic w Harmonogramie — wygeneruj plan tygodnia w zakładce Harmonogram.";return}
   $("#lekStatus").textContent="AI myśli…";$("#lekAsk").disabled=true;
   try{
     const inne=lekTodayActs();
@@ -2160,18 +2171,41 @@ async function lekAskAI(){
       const usedIdx=course?reserveFor(takenIdx,course.id):new Set();
       const okIdx=arr=>course?[...new Set((Array.isArray(arr)?arr:[]).map(Number))]
         .filter(n=>Number.isInteger(n)&&n>=1&&n<=course.lessons.length&&!done.has(n)&&!usedIdx.has(n)):[];
-      const lessons=okIdx(s.lessons).filter(n=>lekKind(course.lessons[n-1])==="lesson");
-      const quiz=okIdx(s.quiz).filter(n=>lekKind(course.lessons[n-1])==="quiz");
-      lessons.concat(quiz).forEach(n=>usedIdx.add(n));
+      const lessonsRaw=okIdx(s.lessons).filter(n=>lekKind(course.lessons[n-1])==="lesson");
+      const quizRaw=okIdx(s.quiz).filter(n=>lekKind(course.lessons[n-1])==="quiz");
+      /* TWARDE pilnowanie budżetu sesji. Model potrafi wcisnąć 111 min materiału w 45-minutową
+         sesję (i sam się w uzasadnieniu gubi), więc nie polegamy na jego arytmetyce — tniemy tutaj.
+         Kolejność zachowujemy (rosnąco po idx), bo lekcje mają iść po kolei. */
+      const budget=ctx.sesjaMin;
+      const keep=[];let usedMin=0;
+      for(const n of [...lessonsRaw,...quizRaw].sort((a,b)=>a-b)){
+        const min=lekMin(course.lessons[n-1]);
+        if(!keep.length&&min>budget){keep.push(n);usedMin=min;break;} // dłuższa niż cała sesja — zajmuje ją w całości
+        if(usedMin+min>budget)break;
+        keep.push(n);usedMin+=min;
+      }
+      const przyciete=keep.length<lessonsRaw.length+quizRaw.length;
+      const keepSet=new Set(keep);
+      const lessons=lessonsRaw.filter(n=>keepSet.has(n));
+      const quiz=quizRaw.filter(n=>keepSet.has(n));
+      // rezerwujemy TYLKO to, co zostało — odrzucone lekcje mają wrócić w kolejnej sesji
+      keep.forEach(n=>usedIdx.add(n));
+      // ile zadań realnie zmieści się w resztce czasu
+      let zadBudget=Math.floor(Math.max(0,budget-usedMin)/(ctx.minNaZadanie||7));
       const tms=lekTaskMats(subj);
       const tasks=(Array.isArray(s.tasks)?s.tasks:[]).map(t=>{
+        if(zadBudget<=0)return null;
         const m=tms.find(x=>x.id===t.materialId)||tms[0];
         if(!m)return null;
-        const cnt=Math.max(1,Math.min(Math.round(+t.count)||1,60));
+        const cnt=Math.max(1,Math.min(Math.round(+t.count)||1,60,zadBudget));
         const r=lekResolveTasks(m,t.section,cnt,reserveFor(takenTasks,m.id));
-        return r.nums.length?r:null;
+        if(!r.nums.length)return null;
+        zadBudget-=r.nums.length;
+        return r;
       }).filter(Boolean);
-      return{hour:blk?blk.hour:(+s.hour||0),subject:subj,courseId:course?course.id:null,lessons,quiz,tasks,note:String(s.note||"").slice(0,400)};
+      let note=String(s.note||"").slice(0,400);
+      if(przyciete)note=(note?note+" ":"")+`⚠️ Skróciłem tę sesję do budżetu ${budget} min — reszta wejdzie na następnej.`;
+      return{hour:blk?blk.hour:(+s.hour||0),subject:subj,courseId:course?course.id:null,lessons,quiz,tasks,note};
     }).filter(s=>s.subject).sort((a,b)=>a.hour-b.hour);
     S.matura.lekcjaPlan={date:today(),topic,sesjaMin:ctx.sesjaMin,sessions};
     save();
