@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-24 (sesja 16, cd. — własne aktywności w Harmonogramie, build 53)_
+_Ostatnia aktualizacja: 2026-08-25 (sesja 16, cd. — pierwsze realne uruchomienie AI ujawniło 2 bugi, build 54)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,38 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-25 (sesja 16, cd. — pierwsze realne wywołanie AI w zakładce Lekcja, build 54):**
+  Użytkownik pierwszy raz użył „Zaproponuj plan" na żywym modelu i zgłosił dwa objawy:
+  (1) sesja 45-minutowa dostała 111 min lekcji, (2) mimo wpisania tematu „Funkcja Kwadratowa"
+  AI zaczęło od początku kursu. **Oba okazały się błędami w kodzie, nie kaprysem modelu.**
+  - **Bug 1 — brak walidacji budżetu czasu.** Klient sprawdzał indeksy lekcji i liczbę zadań,
+    ale NIGDY nie sumował minut. Cała reguła „nie przekraczaj sesjaMin" opierała się wyłącznie
+    na tym, że model policzy dobrze — a model liczył źle i sam się w `note` gubił („razem 58 min...
+    zostaje 15 min" przy budżecie 45). **Fix:** deterministyczne przycinanie w `lekAskAI` —
+    pozycje sortowane po idx, dokładane póki `usedMin+min<=budget`, potem `break`. Wyjątek wg
+    specyfikacji użytkownika: jeśli JUŻ PIERWSZA lekcja jest dłuższa niż budżet, zajmuje całą
+    sesję i nie dostaje zadań. Zadania limitowane przez `floor((budget-usedMin)/minNaZadanie)`.
+    Ważny szczegół: `usedIdx` rezerwuje teraz TYLKO pozycje zachowane — odrzucone wracają
+    w kolejnej sesji (zweryfikowane: lekcja wycięta z 16:00 pojawiła się o 18:00).
+    Gdy coś przycięto, do `note` dopisywane jest ostrzeżenie.
+  - **Bug 2 — temat użytkownika był strukturalnie nieosiągalny.** `lekBuildCtx()` wysyłał
+    szczegóły (z numerami idx) tylko **3 pierwszych nieprzerobionych modułów**, a „Funkcja
+    kwadratowa" to moduł 4 — model fizycznie nie miał numerów jej lekcji, więc NIE MÓGŁ jej
+    zaproponować, nawet gdyby chciał. Do tego reguły 4 („nie otwieraj nowego modułu") i 7
+    („zacznij od tematu użytkownika") nie miały ustalonego pierwszeństwa i model rozstrzygnął
+    je na korzyść 4. **Fix:** `lekBuildCtx(topic)` — moduł pasujący do tematu trafia na początek
+    listy szczegółów i jest w niej ZAWSZE; prompt dostał jawne pierwszeństwo („TEMAT OD
+    UŻYTKOWNIKA MA PIERWSZEŃSTWO PRZED ZASADĄ 4... nie tłumacz, że trzeba najpierw przejść
+    moduł X"). Podpowiedź w kontekście jest per-przedmiot, więc dla Fizyki brzmi „temat nie
+    dotyczy tego przedmiotu, kontynuuj po kolei" zamiast mylącego „nic nie pasuje".
+  - **Wniosek na przyszłość:** przy każdej funkcji opartej na LLM zakładać, że model złamie
+    regułę liczbową, i egzekwować ją deterministycznie w kodzie. Prompt to prośba, nie kontrakt.
+  - **Zweryfikowane** na dokładnie tej odpowiedzi, którą dostał użytkownik: sesja 20:00 spadła
+    ze 141 min (111 lekcji + 3 zadania) do 43/45 min; wszystkie 4 sesje mieszczą się w budżecie;
+    „Wzory Viete'a" (66 min > 45) zajmują całą sesję i dostają 0 zadań; moduł „Funkcja
+    kwadratowa" pojawia się w kontekście z numerami 19-23; regres 14 widoków + 5 pod-zakładek.
+  - **Opublikowano build 54.**
 
 - **2026-08-24 (sesja 16, cd. — własne aktywności w Harmonogramie, build 53):** Użytkownik
   chciał móc wpisywać w plan własne aktywności; przez `AskUserQuestion` doprecyzowane na
