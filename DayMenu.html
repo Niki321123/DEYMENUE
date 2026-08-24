@@ -141,6 +141,11 @@ label.fld{display:block;font-size:var(--fs-1);font-weight:600;color:var(--text-2
 .mat-cell.school{background:var(--primary-soft);border-color:var(--primary)}
 .mat-cell.plan{display:flex;align-items:center;justify-content:center;gap:2px;font-size:10px;font-weight:700;color:var(--good);overflow:hidden;text-align:center;line-height:1.05;padding:1px 3px;white-space:nowrap;text-overflow:ellipsis}
 .mat-cell.plan.done{opacity:.5;text-decoration:line-through}
+/* własne aktywności użytkownika: „zajęte" (blokuje naukę) i „nauka" (liczy się do statystyk) */
+.mat-cell.act{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;overflow:hidden;text-align:center;line-height:1.05;padding:1px 3px;white-space:nowrap;text-overflow:ellipsis}
+.mat-cell.act-busy{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+.mat-cell.act-study{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.mat-cell.act.done{opacity:.5;text-decoration:line-through}
 .mat-grid .hd.clk,.mat-grid .hr.clk{cursor:pointer;user-select:none}
 .mat-grid .hd.clk:hover,.mat-grid .hr.clk:hover{color:var(--primary)}
 /* książki: podpowiedzi + okładki */
@@ -514,8 +519,28 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
         <div class="mastery-pick" id="matBrush">
           <button data-b="avail" class="on"><span class="brush-dot" style="background:var(--good)"></span>Dostępny</button>
           <button data-b="school"><span class="brush-dot" style="background:var(--primary)"></span>W szkole</button>
+          <button data-b="act"><span class="brush-dot" style="background:var(--accent)"></span>Moja aktywność</button>
           <button data-b="unavail"><span class="brush-dot" style="background:var(--text-3)"></span>Niedostępny</button>
         </div>
+        <label class="row" style="width:auto;flex:none;gap:6px;align-items:center">
+          <input type="checkbox" id="matOneWeek" style="width:auto;min-height:0">
+          <span class="muted">tylko w tym tygodniu</span>
+        </label>
+      </div>
+      <div id="matActBar" hidden style="margin-bottom:var(--sp-3)">
+        <div class="row" style="margin-bottom:var(--sp-2)">
+          <select id="matActPick" style="flex:none;width:auto"></select>
+          <button class="btn ghost small" id="matActDel" style="flex:none">Usuń wybraną</button>
+        </div>
+        <div class="row">
+          <input type="text" id="matActName" class="field" placeholder="Nazwa nowej aktywności — np. Trening, Praca, Fiszki">
+          <select id="matActKind" style="flex:none;width:auto">
+            <option value="busy">zajęte — blokuje naukę</option>
+            <option value="study">nauka — liczy się do statystyk</option>
+          </select>
+          <button class="btn" id="matActAdd" style="flex:none">Dodaj</button>
+        </div>
+        <p class="muted" style="margin-top:var(--sp-2)">Wybierz aktywność i maluj nią po siatce. „Zajęte” blokuje godzinę tak jak „Niedostępny”, ale z podpisem — AI wie, czym jest i tam nie zaplanuje nauki. „Nauka” odhaczasz pędzlem „Dostępny” i wlicza się do statystyk.</p>
       </div>
       <div>
         <label class="fld">Preferencje dla AI (opcjonalnie)</label>
@@ -530,6 +555,8 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
       <div class="mat-legend">
         <span><i style="background:var(--good)"></i>Dostępny / zaplanowany przedmiot</span>
         <span><i style="background:var(--primary)"></i>W szkole — nauka dopiero po szkole</span>
+        <span><i style="background:var(--warn)"></i>Moja aktywność — zajęte</span>
+        <span><i style="background:var(--accent)"></i>Moja aktywność — nauka (odhaczasz)</span>
         <span><i style="background:var(--surface-2);border:1px solid var(--border)"></i>Niedostępny</span>
       </div>
     </div>
@@ -863,7 +890,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=52;
+const DM_BUILD=53;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1347,6 +1374,9 @@ function matMigrate(){
   // ovr = nadpisania z czatu AI ważne tylko w bieżącym tygodniu. `grid` jest wyliczane.
   if(!m.base){m.base={...(m.grid||{})};ch=true;}         // istniejąca siatka staje się bazą
   if(!m.ovr){m.ovr={week:weekId(),cells:{}};ch=true;}
+  // własne aktywności użytkownika (definicje) + odhaczenia tych typu "nauka" (reset co tydzień)
+  if(!Array.isArray(m.acts)){m.acts=[];ch=true;}
+  if(!m.actDone){m.actDone={week:weekId(),cells:{}};ch=true;}
   if(ch)save();
 }
 matMigrate();
@@ -1358,25 +1388,125 @@ function matRecompute(){
   if(!m.ovr||m.ovr.week!==weekId())m.ovr={week:weekId(),cells:{}}; // reset nadpisań co tydzień
   const g={...(m.base||{})};
   for(const[k,v]of Object.entries(m.ovr.cells)){
-    if(v==="avail"||v==="school")g[k]=v;else delete g[k]; // "unavail" = brak klucza
+    if(v==="unavail")delete g[k];else g[k]=v; // tylko "unavail" kasuje; reszta (avail/school/"a:id") nadpisuje
   }
   m.grid=g;
 }
 matRecompute();
 
-/* ---- harmonogram tygodnia: 3 stany (dostępny / w szkole / niedostępny), plan wpisany w dostępne okienka ---- */
+/* ---- własne aktywności użytkownika ----
+   Definicje siedzą w S.matura.acts, a w siatce komórka trzyma wartość "a:<id>" — czyli
+   aktywność jest zwykłym stanem komórki obok "avail"/"school". Dzięki temu obie warstwy
+   (base = stały szkielet, ovr = tylko bieżący tydzień) i cała logika składania siatki
+   działają bez zmian, a matFreeSlots() automatycznie omija te godziny (nie są "avail"). */
+const ACT_PREFIX="a:";
+function actList(){if(!Array.isArray(S.matura.acts))S.matura.acts=[];return S.matura.acts}
+function actCell(a){return ACT_PREFIX+a.id}
+function actOf(v){
+  if(typeof v!=="string"||!v.startsWith(ACT_PREFIX))return null;
+  return actList().find(a=>a.id===v.slice(ACT_PREFIX.length))||null;
+}
+function matOvr(){
+  const m=S.matura;
+  if(!m.ovr||m.ovr.week!==weekId())m.ovr={week:weekId(),cells:{}};
+  return m.ovr;
+}
+function matActDone(){
+  const m=S.matura;
+  if(!m.actDone||m.actDone.week!==weekId())m.actDone={week:weekId(),cells:{}};
+  return m.actDone;
+}
+// wszystkie godziny tygodnia zajęte własnymi aktywnościami (do kontekstu dla AI)
+function matActSlots(kind){
+  const out=[];
+  for(let d=0;d<7;d++)for(const h of MAT_HOURS){
+    const a=actOf(S.matura.grid[matKey(d,h)]);
+    if(a&&(!kind||a.kind===kind))out.push({day:d,hour:h,nazwa:a.name,typ:a.kind});
+  }
+  return out;
+}
+// nazwa dla statystyk: sesje własnych aktywności mają topicId w postaci "a:<id>"
+function matEntityName(id){
+  const t=S.matura.topics.find(x=>x.id===id);
+  if(t)return t.name;
+  const a=actOf(id);
+  return a?a.name:null;
+}
+
+/* ---- harmonogram tygodnia: stany (dostępny / w szkole / własna aktywność / niedostępny) ---- */
 let matBrush="avail";
 let matCellTimer=null;
-$$("#matBrush button").forEach(b=>b.onclick=()=>{matBrush=b.dataset.b;$$("#matBrush button").forEach(x=>x.classList.toggle("on",x===b))});
-/* maluje dostępność wg pędzla; malowanie stanu innego niż „avail” usuwa blok planu z tej komórki.
-   Pędzel ręczny edytuje bazę (stały szkielet), nie nadpisania tygodniowe. */
+let matActSel=null;   // która aktywność jest „na pędzlu"
+$$("#matBrush button").forEach(b=>b.onclick=()=>{
+  matBrush=b.dataset.b;
+  $$("#matBrush button").forEach(x=>x.classList.toggle("on",x===b));
+  $("#matActBar").hidden=matBrush!=="act";
+  if(matBrush==="act")matFillActPick();
+});
+function matFillActPick(){
+  const list=actList(),sel=$("#matActPick");
+  sel.innerHTML=list.length
+    ? list.map(a=>`<option value="${esc(a.id)}">${esc(a.name)} — ${a.kind==="study"?"nauka":"zajęte"}</option>`).join("")
+    : `<option value="">— brak aktywności, dodaj poniżej —</option>`;
+  if(list.some(a=>a.id===matActSel))sel.value=matActSel;else matActSel=list.length?list[0].id:null;
+  if(matActSel)sel.value=matActSel;
+  sel.disabled=!list.length;
+  $("#matActDel").disabled=!list.length;
+}
+$("#matActPick").onchange=()=>{matActSel=$("#matActPick").value||null};
+$("#matActAdd").onclick=()=>{
+  const name=$("#matActName").value.trim();
+  if(!name)return toast("Podaj nazwę aktywności");
+  if(actList().some(a=>a.name.toLowerCase()===name.toLowerCase()))return toast("Taka aktywność już jest");
+  const a={id:uid(),name,kind:$("#matActKind").value==="study"?"study":"busy"};
+  actList().push(a);matActSel=a.id;
+  $("#matActName").value="";
+  save();matFillActPick();
+  toast("Dodano „"+name+"” ✓");
+};
+$("#matActName").onkeydown=e=>{if(e.key==="Enter")$("#matActAdd").click()};
+$("#matActDel").onclick=()=>{
+  const a=actList().find(x=>x.id===matActSel);
+  if(!a)return;
+  if(!confirm(`Usunąć aktywność „${a.name}”? Zniknie też ze wszystkich godzin w harmonogramie.`))return;
+  const cell=actCell(a);
+  for(const k of Object.keys(S.matura.base))if(S.matura.base[k]===cell)delete S.matura.base[k];
+  const o=matOvr();
+  for(const k of Object.keys(o.cells))if(o.cells[k]===cell)delete o.cells[k];
+  // sesje z odhaczonych godzin tej aktywności też znikają, żeby statystyki się zgadzały
+  const ad=matActDone();
+  for(const k of Object.keys(ad.cells)){
+    const sid=ad.cells[k];
+    const s=S.matura.sessions.find(x=>x.id===sid);
+    if(s&&s.topicId===cell){S.matura.sessions=S.matura.sessions.filter(x=>x.id!==sid);delete ad.cells[k];}
+  }
+  S.matura.acts=actList().filter(x=>x.id!==a.id);
+  matActSel=null;
+  matRecompute();save();matFillActPick();renderMatSched();
+  toast("Usunięto");
+};
+/* maluje wg pędzla; malowanie czegokolwiek poza „avail” usuwa blok planu z tej komórki.
+   Checkbox „tylko w tym tygodniu" przełącza zapis między warstwą stałą (base) a tygodniową (ovr). */
 function matPaint(d,h){
   const k=matKey(d,h);
-  if(matBrush!=="avail"){
+  let val=matBrush;
+  if(matBrush==="act"){
+    const a=actList().find(x=>x.id===matActSel);
+    if(!a)return;                       // nic nie wybrano — nie malujemy pustką
+    val=actCell(a);
+  }
+  if(val!=="avail"){
     const blk=S.matura.plan.find(b=>b.day===d&&b.hour===h);
     if(blk){matUnmarkDone(blk);S.matura.plan=S.matura.plan.filter(b=>!(b.day===d&&b.hour===h));}
+    const ad=matActDone();              // odhaczenie własnej nauki traci sens, gdy komórka się zmienia
+    if(ad.cells[k]){S.matura.sessions=S.matura.sessions.filter(s=>s.id!==ad.cells[k]);delete ad.cells[k];}
   }
-  if(matBrush==="unavail")delete S.matura.base[k];else S.matura.base[k]=matBrush;
+  if($("#matOneWeek").checked){
+    matOvr().cells[k]=val;              // "unavail" zostaje jawnie — kasuje wartość z bazy tylko w tym tygodniu
+  }else{
+    if(val==="unavail")delete S.matura.base[k];else S.matura.base[k]=val;
+    delete matOvr().cells[k];           // zmiana szkieletu kasuje nadpisanie, inaczej nie byłoby jej widać
+  }
   matRecompute();
 }
 function matCellToggleDone(d,h){
@@ -1384,17 +1514,37 @@ function matCellToggleDone(d,h){
   if(!blk)return;
   if(blk.doneWeek===weekId())matUnmarkDone(blk);else matMarkDone(blk);
 }
+// odhaczanie własnej aktywności typu „nauka" — tworzy/kasuje sesję jak zwykły blok planu
+function matActToggleDone(d,h,a){
+  const ad=matActDone(),k=matKey(d,h);
+  if(ad.cells[k]){
+    S.matura.sessions=S.matura.sessions.filter(s=>s.id!==ad.cells[k]);
+    delete ad.cells[k];
+  }else{
+    const s={id:uid(),topicId:actCell(a),date:today(),minutes:60,completed:true,planned:true};
+    S.matura.sessions.push(s);ad.cells[k]=s.id;
+  }
+}
 function renderMatGrid(){
   const wk=weekId();
+  const actDoneCells=matActDone().cells;
   let html='<div class="hd"></div>'+MAT_DAYS.map((d,i)=>`<div class="hd clk" data-col="${i}" title="Pomaluj cały ${MAT_DAYS_FULL[i]}">${d}</div>`).join("");
   for(const h of MAT_HOURS){
     const hs=String(h).padStart(2,"0")+":00";
     html+=`<div class="hr clk" data-row="${h}" title="Pomaluj ${hs} we wszystkie dni">${hs}</div>`;
     for(let d=0;d<7;d++){
       const st=S.matura.grid[matKey(d,h)];
+      const act=actOf(st);
       let cls=st==="avail"?"avail":st==="school"?"school":"";
       let inner="",lbl=st==="avail"?"Dostępny":st==="school"?"W szkole":"Niedostępny";
-      if(st==="avail"){
+      if(act){
+        const done=act.kind==="study"&&!!actDoneCells[matKey(d,h)];
+        cls="act "+(act.kind==="study"?"act-study":"act-busy")+(done?" done":"");
+        inner=(done?"✓ ":"")+esc(act.name);
+        lbl=act.kind==="study"
+          ? `${act.name} (własna nauka) — ${done?"zrobione (kliknij, aby cofnąć)":"kliknij pędzlem „Dostępny”, aby odhaczyć"}`
+          : `${act.name} — zajęte, nauka niemożliwa`;
+      }else if(st==="avail"){
         const blk=S.matura.plan.find(b=>b.day===d&&b.hour===h);
         const t=blk&&S.matura.topics.find(x=>x.id===blk.topicId);
         if(t){
@@ -1411,7 +1561,13 @@ function renderMatGrid(){
   $$("#matGrid [data-gd]").forEach(c=>{
     const d=+c.dataset.gd,h=+c.dataset.gh;
     c.onclick=()=>{
-      const planned=S.matura.grid[matKey(d,h)]==="avail"&&S.matura.plan.some(b=>b.day===d&&b.hour===h);
+      const st=S.matura.grid[matKey(d,h)];
+      const act=actOf(st);
+      // pędzlem „Dostępny" klik w komórkę własnej nauki = odhaczenie, nie przemalowanie
+      if(matBrush==="avail"&&act&&act.kind==="study"){
+        matActToggleDone(d,h,act);save();renderMatSched();return;
+      }
+      const planned=st==="avail"&&S.matura.plan.some(b=>b.day===d&&b.hour===h);
       if(matBrush==="avail"&&planned){
         clearTimeout(matCellTimer);
         matCellTimer=setTimeout(()=>{matCellToggleDone(d,h);save();renderMatSched()},220);
@@ -1432,7 +1588,7 @@ function renderMatPlanProgress(){
   if(total){$("#matPlanProg").hidden=false;$("#matProgPct").textContent=`${done}/${total}`;$("#matProgBar").style.width=(done/total*100)+"%";}
   else $("#matPlanProg").hidden=true;
 }
-$("#matGridClear").onclick=()=>{if(confirm("Wyczyścić cały harmonogram i plan?")){S.matura.base={};S.matura.ovr={week:weekId(),cells:{}};S.matura.plan=[];matRecompute();save();renderMatSched()}};
+$("#matGridClear").onclick=()=>{if(confirm("Wyczyścić cały harmonogram i plan?")){S.matura.base={};S.matura.ovr={week:weekId(),cells:{}};S.matura.plan=[];S.matura.actDone={week:weekId(),cells:{}};matRecompute();save();renderMatSched()}};
 
 /* ---- przedmioty z priorytetem procentowym ---- */
 function renderMatSubjects(){
@@ -1539,12 +1695,13 @@ function aiJson(text){
   if(a<0||b<=a)throw new Error("Nieprawidłowa odpowiedź AI");
   return JSON.parse(text.slice(a,b+1));
 }
-const MAT_AI_RULES=`Jesteś planerem nauki w aplikacji Day Menu. Dni tygodnia: 0=Pon, 1=Wt, 2=Śr, 3=Czw, 4=Pt, 5=Sob, 6=Nd. Godziny 6-22, każdy blok ("hour") to godzina ZEGAROWA rozpoczęcia — NIE 60 minut realnej nauki. Realna nauka w jednym bloku to sesja pomodoro, jej długość w minutach dostajesz jako "pomoWorkMin" w kontekście (reszta godziny to przerwa/margines). Gdy użytkownik podaje preferencję w godzinach/minutach realnej nauki (np. "chcę się uczyć 4h dziennie"), PRZELICZ to na liczbę bloków wzorem: liczba_blokow = round(pożądane_minuty / pomoWorkMin) — NIE zakładaj, że 1 blok = 1h realnej nauki. Harmonogram powtarza się co tydzień. Zasady planowania: planuj naukę WYŁĄCZNIE w godzinach dostępnych (slots); NIGDY w godzinach szkolnych (school) ani poza dostępnymi — w godzinach szkolnych użytkownik jest w szkole i może uczyć się dopiero po ich zakończeniu; przydzielaj każdemu przedmiotowi czas proporcjonalnie do jego procentu (np. 80% vs 20% = 4× więcej blokow dla pierwszego); rozkładaj każdy przedmiot na różne dni zamiast kumulować; rób przerwy między sesjami tego samego przedmiotu; bezwzględnie szanuj preferencje użytkownika, w tym przeliczenie godzin realnej nauki opisane wyżej. Odpowiadasz WYŁĄCZNIE poprawnym JSON, bez markdown i bez komentarzy.`;
+const MAT_AI_RULES=`Jesteś planerem nauki w aplikacji Day Menu. Dni tygodnia: 0=Pon, 1=Wt, 2=Śr, 3=Czw, 4=Pt, 5=Sob, 6=Nd. Godziny 6-22, każdy blok ("hour") to godzina ZEGAROWA rozpoczęcia — NIE 60 minut realnej nauki. Realna nauka w jednym bloku to sesja pomodoro, jej długość w minutach dostajesz jako "pomoWorkMin" w kontekście (reszta godziny to przerwa/margines). Gdy użytkownik podaje preferencję w godzinach/minutach realnej nauki (np. "chcę się uczyć 4h dziennie"), PRZELICZ to na liczbę bloków wzorem: liczba_blokow = round(pożądane_minuty / pomoWorkMin) — NIE zakładaj, że 1 blok = 1h realnej nauki. Harmonogram powtarza się co tydzień. Zasady planowania: planuj naukę WYŁĄCZNIE w godzinach dostępnych (slots); NIGDY w godzinach szkolnych (school) ani poza dostępnymi — w godzinach szkolnych użytkownik jest w szkole i może uczyć się dopiero po ich zakończeniu; przydzielaj każdemu przedmiotowi czas proporcjonalnie do jego procentu (np. 80% vs 20% = 4× więcej blokow dla pierwszego); rozkładaj każdy przedmiot na różne dni zamiast kumulować; rób przerwy między sesjami tego samego przedmiotu; bezwzględnie szanuj preferencje użytkownika, w tym przeliczenie godzin realnej nauki opisane wyżej. W kontekście dostajesz też "activities" — własne zajęcia użytkownika wpisane w harmonogram (nazwa + typ): "busy" to godziny zajęte czymś innym (trening, praca), a "study" to jego własna forma nauki. Traktuj JEDNE I DRUGIE jako niedostępne — NIGDY nie planuj nauki w tych godzinach i nie usuwaj ich. Możesz się do nich odwoływać po nazwie, gdy tłumaczysz swoje decyzje (np. „w środy masz trening, więc przeniosłem matematykę na czwartek"). Odpowiadasz WYŁĄCZNIE poprawnym JSON, bez markdown i bez komentarzy.`;
 function matAiContext(){
   return {
     subjects:S.matura.topics.filter(t=>(t.percent||0)>0).map(t=>({id:t.id,nazwa:t.name,procent:t.percent})),
     slots:matFreeSlots(),
     school:matSchoolSlots(),
+    activities:matActSlots(),   // własne zajęcia użytkownika — godziny zajęte, ale z nazwą
     pomoWorkMin:S.matura.pomo.work||60
   };
 }
@@ -1562,7 +1719,7 @@ async function aiPlan(prefs){
   const ctx=matAiContext();
   const text=await aiCall(
     MAT_AI_RULES+' Format odpowiedzi: {"blocks":[{"day":0,"hour":18,"topicId":"..."}]}',
-    [{role:"user",content:`Godziny dostępne (day/hour): ${JSON.stringify(ctx.slots)}\nGodziny szkolne (nie planuj tu nauki): ${JSON.stringify(ctx.school)}\nPrzedmioty (id/nazwa/procent): ${JSON.stringify(ctx.subjects)}\nRealny czas nauki w jednym bloku (pomoWorkMin): ${ctx.pomoWorkMin} min\nPreferencje użytkownika: ${prefs||"brak"}\nUłóż plan nauki na tydzień.`}],
+    [{role:"user",content:`Godziny dostępne (day/hour): ${JSON.stringify(ctx.slots)}\nGodziny szkolne (nie planuj tu nauki): ${JSON.stringify(ctx.school)}\nWłasne zajęcia użytkownika (też nie planuj tu nauki): ${JSON.stringify(ctx.activities)}\nPrzedmioty (id/nazwa/procent): ${JSON.stringify(ctx.subjects)}\nRealny czas nauki w jednym bloku (pomoWorkMin): ${ctx.pomoWorkMin} min\nPreferencje użytkownika: ${prefs||"brak"}\nUłóż plan nauki na tydzień.`}],
     2500
   );
   const out=matSanitizeBlocks(aiJson(text).blocks);
@@ -1615,7 +1772,7 @@ $("#matChatSend").onclick=async()=>{
   try{
     const ctx=matAiContext();
     const now=new Date();const todayDay=(now.getDay()+6)%7;
-    const sys=MAT_AI_RULES+` Dziś jest ${MAT_DAYS[todayDay]} (day=${todayDay}), godzina ${now.getHours()}:00. Harmonogram — godziny dostępne: ${JSON.stringify(ctx.slots)}; godziny szkolne: ${JSON.stringify(ctx.school)}. Aktualny plan tygodnia: ${JSON.stringify(S.matura.plan.map(b=>({day:b.day,hour:b.hour,topicId:b.topicId})))}. Przedmioty: ${JSON.stringify(ctx.subjects)}. Realny czas nauki w jednym bloku (pomoWorkMin): ${ctx.pomoWorkMin} min. Użytkownik prosi o zmiany w harmonogramie lub planie albo zadaje pytania. Format odpowiedzi: {"reply":"krótka odpowiedź po polsku","grid":{"3_17":"unavail"}|null,"blocks":[...]|null}. "grid" to WYŁĄCZNIE zmieniane komórki harmonogramu (klucz "dzień_godzina", wartość "avail"/"school"/"unavail") — po zmianie harmonogramu ułóż też nowy "blocks". Zmiany w "grid" obowiązują TYLKO w bieżącym tygodniu i resetują się w następnym (stały szkielet z planu lekcji wraca) — informuj o tym użytkownika przy zmianach dostępności. "blocks" to CAŁY nowy plan tygodnia (wszystkie bloki). Jeśli coś ma zostać bez zmian, ustaw je na null.`;
+    const sys=MAT_AI_RULES+` Dziś jest ${MAT_DAYS[todayDay]} (day=${todayDay}), godzina ${now.getHours()}:00. Harmonogram — godziny dostępne: ${JSON.stringify(ctx.slots)}; godziny szkolne: ${JSON.stringify(ctx.school)}; własne zajęcia użytkownika (nie planuj tam nauki): ${JSON.stringify(ctx.activities)}. Aktualny plan tygodnia: ${JSON.stringify(S.matura.plan.map(b=>({day:b.day,hour:b.hour,topicId:b.topicId})))}. Przedmioty: ${JSON.stringify(ctx.subjects)}. Realny czas nauki w jednym bloku (pomoWorkMin): ${ctx.pomoWorkMin} min. Użytkownik prosi o zmiany w harmonogramie lub planie albo zadaje pytania. Format odpowiedzi: {"reply":"krótka odpowiedź po polsku","grid":{"3_17":"unavail"}|null,"blocks":[...]|null}. "grid" to WYŁĄCZNIE zmieniane komórki harmonogramu (klucz "dzień_godzina", wartość "avail"/"school"/"unavail") — po zmianie harmonogramu ułóż też nowy "blocks". Zmiany w "grid" obowiązują TYLKO w bieżącym tygodniu i resetują się w następnym (stały szkielet z planu lekcji wraca) — informuj o tym użytkownika przy zmianach dostępności. "blocks" to CAŁY nowy plan tygodnia (wszystkie bloki). Jeśli coś ma zostać bez zmian, ustaw je na null.`;
     const hist=matChat.filter(m=>m.text!=="…").slice(-8).map(m=>({role:m.role==="user"?"user":"assistant",content:m.text}));
     while(hist.length&&hist[0].role!=="user")hist.shift();
     const j=aiJson(await aiCall(sys,hist,2500));
@@ -1626,6 +1783,8 @@ $("#matChatSend").onclick=async()=>{
       for(const[k,v]of Object.entries(j.grid)){
         const p=String(k).split("_");const d=+p[0],h=+p[1];
         if(d>=0&&d<7&&MAT_HOURS.includes(h)){
+          // własnych aktywności użytkownika AI nie rusza — wpisał je świadomie, kasuje je tylko ręcznie
+          if(actOf(S.matura.grid[k]))continue;
           // zmiany z czatu AI to nadpisania TYLKO na bieżący tydzień (reset w kolejnym)
           S.matura.ovr.cells[k]=(v==="avail"||v==="school")?v:"unavail";
         }
@@ -1816,8 +1975,8 @@ function renderMatStats(){
   const rows=Object.entries(byTopic).sort((a,b)=>b[1]-a[1]);
   const max=rows[0]?.[1]||1;
   $("#matByTopic").innerHTML=rows.length?rows.map(([id,v])=>{
-    const t=S.matura.topics.find(x=>x.id===id);
-    return`<div class="bar-row"><div class="lbl">${t?esc(t.name):"(usunięty)"}</div>
+    const nazwa=matEntityName(id);
+    return`<div class="bar-row"><div class="lbl">${nazwa?esc(nazwa):"(usunięty)"}</div>
       <div class="bar" style="width:${Math.max(2,v/max*70)}%;background:${matTopicColor(id)}"></div>
       <div class="val">${fmtMin(v)}</div></div>`;
   }).join(""):`<div class="empty">Odhacz pierwszą godzinę w planie albo ukończ sesję pomodoro, aby zobaczyć statystyki.</div>`;
@@ -1872,6 +2031,15 @@ function lekTodayBlocks(){
     const t=(S.matura.topics||[]).find(x=>x.id===b.topicId);
     return{hour:b.hour,topicId:b.topicId,subject:t?t.name:"(usunięty przedmiot)"};
   });
+}
+// własne aktywności użytkownika zaplanowane na dziś (zajęte godziny + własne formy nauki)
+function lekTodayActs(){
+  const day=(new Date().getDay()+6)%7,out=[];
+  for(const h of MAT_HOURS){
+    const a=actOf(S.matura.grid[matKey(day,h)]);
+    if(a)out.push({hour:h,name:a.name,kind:a.kind});
+  }
+  return out;
 }
 // kurs pogrupowany w moduły, z pominięciem pozycji "skip"
 function lekModules(course){
@@ -1973,7 +2141,9 @@ async function lekAskAI(){
   const topic=$("#lekTopic").value.trim();
   $("#lekStatus").textContent="AI myśli…";$("#lekAsk").disabled=true;
   try{
+    const inne=lekTodayActs();
     const msg=`Dzisiejsze sesje (godzina | przedmiot): ${ctx.blocks.map(b=>`${b.hour}:00 | ${b.subject}`).join(" ; ")}\n`
+      +(inne.length?`Inne zajęcia użytkownika dziś (NIE rozpisuj ich, tylko uwzględnij, że dzień jest zajęty): ${inne.map(a=>`${a.hour}:00 ${a.name}${a.kind==="study"?" (własna nauka)":""}`).join(" ; ")}\n`:"")
       +`sesjaMin: ${ctx.sesjaMin}\nminNaZadanie: ${ctx.minNaZadanie}\n`
       +`Temat na dziś: ${topic||"brak — kontynuuj od pierwszego nieprzerobionego modułu"}\n\n`
       +ctx.text+"\n\nRozpisz każdą dzisiejszą sesję.";
@@ -2023,10 +2193,11 @@ $("#lekMinTask").onchange=()=>{
 // podgląd dzisiejszego harmonogramu — widoczny też zanim AI cokolwiek zaproponuje
 function lekRenderToday(){
   $("#lekMinTask").value=S.matura.minPerTask||7;
-  const blocks=lekTodayBlocks(),mins=S.matura.pomo.work||60;
+  const blocks=lekTodayBlocks(),mins=S.matura.pomo.work||60,inne=lekTodayActs();
+  const dopisek=inne.length?` Poza tym masz dziś: ${esc(inne.map(a=>a.hour+":00 "+a.name).join(", "))}.`:"";
   $("#lekToday").innerHTML=blocks.length
-    ? `<p class="muted" style="margin-bottom:var(--sp-3)">Dziś w Harmonogramie: <strong>${blocks.length} ${matsPlural(blocks.length,"sesja","sesje","sesji")}</strong> po ${mins} min — ${esc(blocks.map(b=>b.hour+":00 "+b.subject).join(", "))}.</p>`
-    : `<div class="empty">Na dziś nie ma nic w Harmonogramie — ustaw dostępne godziny i wygeneruj plan w zakładce Harmonogram.</div>`;
+    ? `<p class="muted" style="margin-bottom:var(--sp-3)">Dziś w Harmonogramie: <strong>${blocks.length} ${matsPlural(blocks.length,"sesja","sesje","sesji")}</strong> po ${mins} min — ${esc(blocks.map(b=>b.hour+":00 "+b.subject).join(", "))}.${dopisek}</p>`
+    : `<div class="empty">Na dziś nie ma nic w Harmonogramie${inne.length?` (poza: ${esc(inne.map(a=>a.hour+":00 "+a.name).join(", "))})`:""} — ustaw dostępne godziny i wygeneruj plan w zakładce Harmonogram.</div>`;
 }
 
 function lekRenderPlan(plan){
