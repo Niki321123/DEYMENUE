@@ -448,14 +448,18 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   <div id="matLekcjaView" hidden>
     <div class="card">
       <h2 style="margin-bottom:2px">🤖 Plan na dziś</h2>
-      <p class="muted" style="margin-bottom:var(--sp-3)">AI zaproponuje, które lekcje kursu video obejrzeć i ile zadań zrobić z materiałów — dopasowanych tematycznie. Domyślnie kontynuuje kurs od miejsca, w którym skończyłeś.</p>
+      <p class="muted" style="margin-bottom:var(--sp-3)">AI rozpisze <strong>każdą dzisiejszą sesję z Harmonogramu osobno</strong> — co obejrzeć z kursu i które zadania zrobić, mieszcząc się w czasie sesji pomodoro. Domyślnie kontynuuje kurs od miejsca, w którym skończyłeś, i nie przechodzi dalej, dopóki bieżący dział nie jest przerobiony.</p>
       <div class="row" style="margin-bottom:var(--sp-2)">
-        <select id="lekSubj" style="flex:none;width:auto"></select>
         <input type="text" id="lekTopic" class="field" placeholder="Temat na dziś (opcjonalnie) — np. Funkcja kwadratowa">
+        <div class="row" style="flex:none;flex-wrap:nowrap;gap:6px;width:auto">
+          <input type="number" id="lekMinTask" min="1" max="60" step="1" style="width:74px" title="Ile minut zajmuje Ci średnio jedno zadanie">
+          <span class="muted">min/zad.</span>
+        </div>
         <button class="btn accent" id="lekAsk">✨ Zaproponuj plan</button>
       </div>
       <p class="muted" id="lekStatus"></p>
     </div>
+    <div id="lekToday"></div>
     <div id="lekPlan"></div>
   </div>
 
@@ -859,7 +863,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=51;
+const DM_BUILD=52;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1335,6 +1339,7 @@ function matMigrate(){
     if("mastery"in t){delete t.mastery;ch=true;}
   }
   if(!m.pomo){m.pomo={work:25,break:5};ch=true;}
+  if(!Number.isFinite(m.minPerTask)){m.minPerTask=7;ch=true;} // ile minut zajmuje jedno zadanie (do budżetu sesji)
   if(!Array.isArray(m.attendanceLessons)){m.attendanceLessons=[];ch=true;}
   if(!m.attendanceFreq||typeof m.attendanceFreq!=="object"){m.attendanceFreq={};ch=true;}
   if(!Array.isArray(m.lessonSubjects)){m.lessonSubjects=[];ch=true;}
@@ -1832,118 +1837,268 @@ $$("#matTabs button").forEach(b=>b.onclick=()=>matShowTab(b.dataset.mt));
 function renderMatura(){
   $("#matPrefs").value=S.matura.prefs||"";
   renderMatGrid();renderMatPlanProgress();renderMatSubjects();renderMatStats();matChatRender();renderForest();matFillPomoLen();
-  lekFillSubj();lekRenderPlan(S.matura.lekcjaPlan||null);
+  lekRenderToday();lekRenderPlan(S.matura.lekcjaPlan||null);
 }
 
-/* ---- zakładka "Lekcja": AI proponuje plan na dziś (lekcje z kursu video + zadania z materiałów) ---- */
-const LEK_AI_RULES=`Jesteś nauczycielem-planerem w aplikacji Day Menu. Dostajesz dla jednego przedmiotu: ponumerowaną (idx) listę lekcji kursu video w kolejności (moduł|nazwa|czy już obejrzana) oraz listę materiałów zadaniowych (id|nazwa|liczba zadań|ile już zrobione). Ułóż realistyczny plan nauki na DZISIAJ: 1) wybierz 1-4 KOLEJNE, jeszcze nieobejrzane lekcje z JEDNEGO modułu/tematu (nie przeskakuj losowo po całym kursie) — jeśli podano wybrany temat, znajdź moduł, którego nazwa najlepiej mu odpowiada (dopasowanie częściowe, ignoruj wielkość liter), i zacznij od pierwszej nieobejrzanej lekcji w tym module; jeśli nie podano tematu, kontynuuj od pierwszej nieobejrzanej lekcji w całym kursie (po kolei); 2) wybierz jeden materiał zadaniowy i liczbę zadań do zrobienia — dopasuj materiał tematycznie do wybranych lekcji, jeśli jego nazwa na to wskazuje (np. moduł "Funkcja kwadratowa" → materiał o zadaniach z funkcji kwadratowej), a jeśli żaden materiał nie pasuje tematycznie, wybierz najbardziej ogólny/dostępny i napisz to wprost w uzasadnieniu; nie proponuj więcej zadań niż zostało niezrobionych. Krótkie uzasadnienie po polsku w "note" (1-2 zdania), wspominające ewentualny brak tematycznego dopasowania zadań. Odpowiadasz WYŁĄCZNIE poprawnym JSON, bez markdown, bez komentarzy. Format: {"lessons":[idx,...],"tasks":[{"materialId":"...","count":N}],"note":"..."}`;
-function lekFillSubj(){
-  const subs=[...new Set(matsList().filter(m=>Array.isArray(m.lessons)&&m.lessons.length).map(m=>m.subject))].sort((a,b)=>a.localeCompare(b,"pl"));
-  const sel=$("#lekSubj"),prev=sel.value;
-  sel.innerHTML=subs.length?subs.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join(""):`<option value="">— brak kursów video w Materiałach —</option>`;
-  if(subs.includes(prev))sel.value=prev;
-  sel.disabled=!subs.length;
-  $("#lekAsk").disabled=!subs.length;
+/* ---- zakładka "Lekcja": AI rozpisuje KAŻDĄ dzisiejszą sesję z Harmonogramu osobno ----
+   Materiał kursu (m.lessons) miesza trzy rodzaje pozycji, które traktujemy inaczej:
+     - "Wprowadzenie do modułu"/"Poznajmy się"/"Powodzenia" (kilkanaście sekund) → pomijamy zupełnie,
+     - "QUIZ" i "Quiz - omówienie" → to praktyka, więc idą do części ZADANIOWEJ sesji, nie do lekcji,
+     - reszta → właściwe lekcje wideo.
+   Czasu na sesję jest tyle, ile minut pracy ma pomodoro (zakładka Las), a lekcja zjada swój realny
+   czas trwania — reszta budżetu zostaje na zadania. */
+const LEK_SKIP_RE=/^(wprowadzenie do modu|poznajmy si|powodzenia na maturze)/i;
+function lekKind(l){
+  const n=(l&&l.name||"").trim();
+  if(/^quiz/i.test(n))return "quiz";                 // "QUIZ" (bez czasu) i "Quiz - omówienie"
+  if(LEK_SKIP_RE.test(n))return "skip";
+  const sec=matsParseDur(l&&l.dur);
+  if(sec>0&&sec<120)return "skip";                   // krótkie wstawki — najkrótsza realna lekcja ma ~5 min
+  return "lesson";
 }
-function lekCourseFor(subj){return matsList().find(m=>m.subject===subj&&Array.isArray(m.lessons)&&m.lessons.length)}
+function lekMin(l){return Math.round(matsParseDur(l&&l.dur)/60)}
+function lekCourseFor(subj){
+  const s=String(subj||"").toLowerCase();
+  return matsList().find(m=>String(m.subject||"").toLowerCase()===s&&Array.isArray(m.lessons)&&m.lessons.length);
+}
+function lekTaskMats(subj){
+  const s=String(subj||"").toLowerCase();
+  return matsList().filter(m=>String(m.subject||"").toLowerCase()===s&&!(Array.isArray(m.lessons)&&m.lessons.length)&&(m.tasks||0)>0);
+}
+// dzisiejsze bloki z Harmonogramu (S.matura.plan trzyma day 0=Pon, JS getDay ma 0=Nd)
+function lekTodayBlocks(){
+  const day=(new Date().getDay()+6)%7;
+  return (S.matura.plan||[]).filter(b=>b.day===day).sort((a,b)=>a.hour-b.hour).map(b=>{
+    const t=(S.matura.topics||[]).find(x=>x.id===b.topicId);
+    return{hour:b.hour,topicId:b.topicId,subject:t?t.name:"(usunięty przedmiot)"};
+  });
+}
+// kurs pogrupowany w moduły, z pominięciem pozycji "skip"
+function lekModules(course){
+  const done=new Set(matsDone(course));
+  const mods=[];
+  course.lessons.forEach((l,i)=>{
+    const kind=lekKind(l);
+    if(kind==="skip")return;
+    const name=l.section||"(bez modułu)";
+    let m=mods.find(x=>x.name===name);
+    if(!m){m={name,items:[]};mods.push(m);}
+    m.items.push({idx:i+1,kind,name:l.name,min:lekMin(l),done:done.has(i+1)});
+  });
+  return mods;
+}
+function lekModDone(mod){return mod.items.every(it=>it.done)}
+// stan zadań w rozbiciu na działy (albo cały materiał, gdy działów nie ma)
+function lekTaskState(m){
+  const done=new Set(matsDone(m));
+  const rs=matsSecRanges(m);
+  if(!rs)return[{name:m.name,count:m.tasks||0,doneCount:done.size,from:1,to:m.tasks||0}];
+  return rs.map(r=>{let d=0;for(let n=r.from;n<=r.to;n++)if(done.has(n))d++;return Object.assign({},r,{doneCount:d})});
+}
+// AI podaje dział + ile zadań; konkretne numery dobiera klient (pierwsze niezrobione w dziale),
+// dzięki czemu nigdy nie zaproponuje czegoś, co jest już odhaczone.
+// `reserved` zbiera numery przydzielone wcześniejszym sesjom TEGO SAMEGO planu — bez tego każda
+// sesja dnia dostawałaby w kółko te same "pierwsze niezrobione" zadania.
+function lekResolveTasks(m,sectionName,count,reserved){
+  const done=new Set(matsDone(m));
+  const taken=reserved||new Set();
+  const rs=matsSecRanges(m);
+  let from=1,to=m.tasks||0,secName=null,secNo=null;
+  if(rs){
+    const q=String(sectionName||"").toLowerCase().trim();
+    let i=rs.findIndex(r=>r.name.toLowerCase()===q);
+    if(i<0&&q)i=rs.findIndex(r=>r.name.toLowerCase().includes(q)||q.includes(r.name.toLowerCase()));
+    if(i<0)i=rs.findIndex(r=>{let d=0;for(let n=r.from;n<=r.to;n++)if(done.has(n)||taken.has(n))d++;return d<r.count});
+    if(i>=0){from=rs[i].from;to=rs[i].to;secName=rs[i].name;secNo=i+1;}
+  }
+  const nums=[];
+  for(let n=from;n<=to&&nums.length<count;n++)if(!done.has(n)&&!taken.has(n)){nums.push(n);taken.add(n);}
+  return{materialId:m.id,section:secName,sectionNo:secNo,nums};
+}
+
+const LEK_AI_RULES=`Jesteś nauczycielem-planerem w aplikacji Day Menu. Rozpisujesz naukę na DZISIAJ, sesja po sesji, na podstawie harmonogramu użytkownika.
+ZASADY:
+1) Dostajesz listę dzisiejszych SESJI (godzina + przedmiot). Rozpisz KAŻDĄ osobno. Nie dokładaj ani nie pomijaj sesji.
+2) Budżet czasu jednej sesji to "sesjaMin" minut. Lekcja z kursu zjada swój realny czas ("min"), a to, co zostaje, idzie na zadania. Jedno zadanie zajmuje "minNaZadanie" minut. Nie przekraczaj budżetu.
+   - Jeśli lekcja trwa np. 35 min przy sesji 45 min, zostaje ~10 min, czyli maks 1-2 zadania.
+   - Jeśli lekcja jest DŁUŻSZA niż budżet sesji, ta lekcja zajmuje całą sesję i NIE dokładaj do niej zadań.
+   - Sesja NIE MUSI mieć lekcji. Sesje z samymi zadaniami są równie wartościowe.
+3) Zadania są równie ważne jak lekcje. Po obejrzeniu lekcji zaplanuj utrwalenie: kolejna sesja tego przedmiotu powinna iść w całości albo w dużej części na zadania z TEGO SAMEGO tematu. Nie odkładaj zadań "na koniec, jak zostanie czas".
+4) Idziemy po kolei i NIE otwieramy nowego modułu, dopóki bieżący nie jest przerobiony, czyli dopóki nie są obejrzane wszystkie jego lekcje ORAZ zrobione zadania z odpowiadającego mu działu zbioru zadań. Kolejność lekcji w module zachowuj.
+5) Pozycje typu QUIZ i "Quiz - omówienie" to praktyka - traktuj je jako zadania (pole "quiz"), nie jako lekcje. One też zajmują swój czas.
+6) Dopasuj dział zbioru zadań tematycznie do modułu kursu (np. moduł "Funkcja kwadratowa" do działu "Funkcja kwadratowa"). Jeśli nic nie pasuje tematycznie, wybierz najbliższy sensowny i napisz to wprost w "note".
+7) Jeśli użytkownik podał temat na dziś, zacznij od modułu, którego nazwa najlepiej mu odpowiada (dopasowanie częściowe, ignoruj wielkość liter). Bez podanego tematu kontynuuj od pierwszego nieprzerobionego modułu.
+Odpowiadasz WYŁĄCZNIE poprawnym JSON, bez markdown i bez komentarzy.
+Format: {"sessions":[{"hour":17,"subject":"Matematyka","lessons":[12,13],"quiz":[],"tasks":[{"materialId":"abc","section":"Funkcja kwadratowa","count":2}],"note":"krótkie uzasadnienie po polsku"}]}
+W "lessons" i "quiz" podajesz idx pozycji z listy kursu. W "tasks" nie podajesz numerów zadań, tylko dział i ile ich zrobić.`;
+
+function lekBuildCtx(){
+  const blocks=lekTodayBlocks();
+  const sesjaMin=S.matura.pomo.work||60;
+  const minNaZadanie=S.matura.minPerTask||7;
+  const subjects=[...new Set(blocks.map(b=>b.subject))];
+  const parts=[];
+  for(const subj of subjects){
+    const course=lekCourseFor(subj);
+    parts.push(`### Przedmiot: ${subj}`);
+    if(!course)parts.push("(brak kursu video w Materiałach — planuj same zadania)");
+    else{
+      const mods=lekModules(course);
+      parts.push(`Moduły kursu "${course.name}" (nr | nazwa | lekcje zrobione/wszystkie | quizy zrobione/wszystkie):`);
+      mods.forEach((mo,i)=>{
+        const les=mo.items.filter(x=>x.kind==="lesson"),qz=mo.items.filter(x=>x.kind==="quiz");
+        parts.push(`${i+1} | ${mo.name} | ${les.filter(x=>x.done).length}/${les.length} | ${qz.filter(x=>x.done).length}/${qz.length}`);
+      });
+      // szczegóły tylko dla pierwszych nieprzerobionych modułów — dalsze i tak blokuje reguła 4
+      const open=mods.filter(mo=>!lekModDone(mo)).slice(0,3);
+      parts.push("Pozycje z najbliższych nieprzerobionych modułów (idx | typ | moduł | nazwa | min | obejrzane):");
+      open.forEach(mo=>mo.items.forEach(it=>{
+        parts.push(`${it.idx} | ${it.kind} | ${mo.name} | ${it.name} | ${it.min} | ${it.done?"tak":"nie"}`);
+      }));
+    }
+    const tms=lekTaskMats(subj);
+    if(!tms.length)parts.push("Materiały zadaniowe: (brak)");
+    else tms.forEach(m=>{
+      parts.push(`Materiał zadaniowy: materialId=${m.id} | ${m.name}`);
+      parts.push("Działy (nazwa | zrobione/wszystkie):");
+      lekTaskState(m).forEach(s=>parts.push(`${s.name} | ${s.doneCount}/${s.count}`));
+    });
+  }
+  return{blocks,sesjaMin,minNaZadanie,text:parts.join("\n")};
+}
+
 async function lekAskAI(){
-  const subj=$("#lekSubj").value;
-  if(!subj)return;
-  const course=lekCourseFor(subj);
-  if(!course){$("#lekStatus").textContent="Brak kursu video dla tego przedmiotu w Materiałach.";return}
+  const ctx=lekBuildCtx();
+  if(!ctx.blocks.length){$("#lekStatus").textContent="Na dziś nie ma nic w Harmonogramie — wygeneruj plan tygodnia w zakładce Harmonogram.";return}
   const topic=$("#lekTopic").value.trim();
-  const taskMats=matsList().filter(m=>m.subject===subj&&!(Array.isArray(m.lessons)&&m.lessons.length)&&(m.tasks||0)>0);
   $("#lekStatus").textContent="AI myśli…";$("#lekAsk").disabled=true;
   try{
-    const doneSet=new Set(matsDone(course));
-    const lessonsCtx=course.lessons.map((l,i)=>`${i+1}|${l.section||""}|${l.name}|${doneSet.has(i+1)?"tak":"nie"}`).join("\n");
-    const matsCtx=taskMats.length?taskMats.map(m=>`${m.id}|${m.name}|${m.tasks||0}|${matsDone(m).length}`).join("\n"):"(brak materiałów zadaniowych dla tego przedmiotu)";
-    const text=await aiCall(
-      LEK_AI_RULES,
-      [{role:"user",content:`Przedmiot: ${subj}\nWybrany temat na dziś: ${topic||"brak — kontynuuj kurs od pierwszej nieobejrzanej lekcji"}\nLekcje kursu (idx|moduł|nazwa|obejrzana):\n${lessonsCtx}\nMateriały zadaniowe (id|nazwa|liczba_zadań|zrobione):\n${matsCtx}\nZaproponuj plan na dziś.`}],
-      1200
-    );
+    const msg=`Dzisiejsze sesje (godzina | przedmiot): ${ctx.blocks.map(b=>`${b.hour}:00 | ${b.subject}`).join(" ; ")}\n`
+      +`sesjaMin: ${ctx.sesjaMin}\nminNaZadanie: ${ctx.minNaZadanie}\n`
+      +`Temat na dziś: ${topic||"brak — kontynuuj od pierwszego nieprzerobionego modułu"}\n\n`
+      +ctx.text+"\n\nRozpisz każdą dzisiejszą sesję.";
+    const text=await aiCall(LEK_AI_RULES,[{role:"user",content:msg}],2000);
     const raw=aiJson(text);
-    const lessons=[...new Set((Array.isArray(raw.lessons)?raw.lessons:[]).map(Number))]
-      .filter(n=>Number.isInteger(n)&&n>=1&&n<=course.lessons.length&&!doneSet.has(n));
-    const tasks=(Array.isArray(raw.tasks)?raw.tasks:[]).map(t=>{
-      const m=taskMats.find(x=>x.id===t.materialId);if(!m)return null;
-      const left=(m.tasks||0)-matsDone(m).length;if(left<=0)return null;
-      return{materialId:m.id,count:Math.max(1,Math.min(Math.round(+t.count)||1,left))};
-    }).filter(Boolean);
-    S.matura.lekcjaPlan={date:today(),subject:subj,topic,courseId:course.id,lessons,tasks,note:String(raw.note||"").slice(0,500)};
+    // rezerwacje w obrębie jednego dnia: ta sama lekcja/zadanie nie może trafić do dwóch sesji
+    const takenTasks=new Map(),takenIdx=new Map();
+    const reserveFor=(map,key)=>{if(!map.has(key))map.set(key,new Set());return map.get(key)};
+    const sessions=(Array.isArray(raw.sessions)?raw.sessions:[]).sort((a,b)=>(+a.hour||0)-(+b.hour||0)).map(s=>{
+      const blk=ctx.blocks.find(b=>b.hour===+s.hour)||null;
+      const subj=blk?blk.subject:String(s.subject||"");
+      const course=lekCourseFor(subj);
+      const done=course?new Set(matsDone(course)):new Set();
+      const usedIdx=course?reserveFor(takenIdx,course.id):new Set();
+      const okIdx=arr=>course?[...new Set((Array.isArray(arr)?arr:[]).map(Number))]
+        .filter(n=>Number.isInteger(n)&&n>=1&&n<=course.lessons.length&&!done.has(n)&&!usedIdx.has(n)):[];
+      const lessons=okIdx(s.lessons).filter(n=>lekKind(course.lessons[n-1])==="lesson");
+      const quiz=okIdx(s.quiz).filter(n=>lekKind(course.lessons[n-1])==="quiz");
+      lessons.concat(quiz).forEach(n=>usedIdx.add(n));
+      const tms=lekTaskMats(subj);
+      const tasks=(Array.isArray(s.tasks)?s.tasks:[]).map(t=>{
+        const m=tms.find(x=>x.id===t.materialId)||tms[0];
+        if(!m)return null;
+        const cnt=Math.max(1,Math.min(Math.round(+t.count)||1,60));
+        const r=lekResolveTasks(m,t.section,cnt,reserveFor(takenTasks,m.id));
+        return r.nums.length?r:null;
+      }).filter(Boolean);
+      return{hour:blk?blk.hour:(+s.hour||0),subject:subj,courseId:course?course.id:null,lessons,quiz,tasks,note:String(s.note||"").slice(0,400)};
+    }).filter(s=>s.subject).sort((a,b)=>a.hour-b.hour);
+    S.matura.lekcjaPlan={date:today(),topic,sesjaMin:ctx.sesjaMin,sessions};
     save();
     lekRenderPlan(S.matura.lekcjaPlan);
     $("#lekStatus").textContent="";
   }catch(e){
-    $("#lekStatus").textContent="Błąd AI: "+(e.message||"nieznany");
+    $("#lekStatus").textContent="Błąd AI: "+((e&&e.message)||"nieznany");
   }
-  $("#lekAsk").disabled=!$("#lekSubj").value;
+  $("#lekAsk").disabled=false;
 }
 $("#lekAsk").onclick=lekAskAI;
+
+$("#lekMinTask").onchange=()=>{
+  const v=Math.round(+$("#lekMinTask").value);
+  if(!Number.isFinite(v)||v<1||v>60){$("#lekMinTask").value=S.matura.minPerTask||7;return toast("Podaj 1-60 minut")}
+  S.matura.minPerTask=v;save();
+};
+
+// podgląd dzisiejszego harmonogramu — widoczny też zanim AI cokolwiek zaproponuje
+function lekRenderToday(){
+  $("#lekMinTask").value=S.matura.minPerTask||7;
+  const blocks=lekTodayBlocks(),mins=S.matura.pomo.work||60;
+  $("#lekToday").innerHTML=blocks.length
+    ? `<p class="muted" style="margin-bottom:var(--sp-3)">Dziś w Harmonogramie: <strong>${blocks.length} ${matsPlural(blocks.length,"sesja","sesje","sesji")}</strong> po ${mins} min — ${esc(blocks.map(b=>b.hour+":00 "+b.subject).join(", "))}.</p>`
+    : `<div class="empty">Na dziś nie ma nic w Harmonogramie — ustaw dostępne godziny i wygeneruj plan w zakładce Harmonogram.</div>`;
+}
+
 function lekRenderPlan(plan){
-  if(!plan||plan.subject!==$("#lekSubj").value){
-    $("#lekPlan").innerHTML=`<p class="empty">Kliknij „Zaproponuj plan” — AI ułoży dzisiejsze lekcje i zadania.</p>`;
+  const host=$("#lekPlan");
+  if(!plan||!Array.isArray(plan.sessions)||!plan.sessions.length||plan.date!==today()){
+    host.innerHTML=(plan&&plan.date&&plan.date!==today())
+      ? `<div class="empty">Plan jest z ${esc(plan.date)} — kliknij „Zaproponuj plan”, żeby rozpisać dzisiejszy dzień.</div>`
+      : `<div class="empty">Kliknij „Zaproponuj plan” — AI rozpisze każdą dzisiejszą sesję.</div>`;
     return;
   }
-  const course=matsList().find(m=>m.id===plan.courseId);
-  const lessonRows=course?(plan.lessons||[]).map(idx=>{
-    const l=course.lessons[idx-1];if(!l)return"";
-    const done=matsDone(course).includes(idx);
-    return`<div class="mats-lesson-row">
-      <input type="checkbox" data-lekmt="${course.id}" data-lekn="${idx}"${done?" checked":""}>
-      <a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.name)}</a>
-      <span class="muted">${l.dur?esc(l.dur):"—"}</span>
-    </div>`;
-  }).join(""):"";
-  const taskRows=(plan.tasks||[]).map(t=>{
-    const m=matsList().find(x=>x.id===t.materialId);if(!m)return"";
-    const left=Math.max(0,(m.tasks||0)-matsDone(m).length);
-    const cnt=Math.min(t.count,left);
-    if(cnt<=0)return`<div class="row" style="justify-content:space-between"><span class="muted">${esc(m.name)} — już zrobione ✓</span></div>`;
-    return`<div class="row" style="justify-content:space-between;align-items:center">
-      <span>${esc(m.name)} — ${cnt} ${matsPlural(cnt,"zadanie","zadania","zadań")}</span>
-      <button class="btn ghost small" data-lekdo="${m.id}" data-lekcnt="${cnt}">Odhacz ${cnt}</button>
+  host.innerHTML=plan.sessions.map((s,si)=>{
+    const course=matsList().find(m=>m.id===s.courseId);
+    const done=course?new Set(matsDone(course)):new Set();
+    const row=idx=>{
+      const l=course&&course.lessons[idx-1];if(!l)return"";
+      return `<div class="mats-lesson-row">
+        <input type="checkbox" data-lekmt="${course.id}" data-lekn="${idx}"${done.has(idx)?" checked":""}>
+        <a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.name)}</a>
+        <span class="muted">${l.dur?esc(l.dur):"—"}</span>
+      </div>`;
+    };
+    const lesMin=(s.lessons||[]).concat(s.quiz||[]).reduce((a,i)=>a+(course?lekMin(course.lessons[i-1]):0),0);
+    const zadCnt=(s.tasks||[]).reduce((a,t)=>a+t.nums.length,0);
+    const zadMin=zadCnt*(S.matura.minPerTask||7);
+    const taskRows=(s.tasks||[]).map((t,ti)=>{
+      const m=matsList().find(x=>x.id===t.materialId);if(!m)return"";
+      const left=t.nums.filter(n=>!matsDone(m).includes(n));
+      const lbl=t.section?`dział ${t.sectionNo}. ${t.section}`:m.name;
+      if(!left.length)return `<div class="row"><span class="muted">${esc(m.name)} · ${esc(lbl)} — zrobione ✓</span></div>`;
+      return `<div class="row" style="justify-content:space-between;align-items:center;gap:var(--sp-2)">
+        <span><strong>${esc(m.name)}</strong><br><span class="muted">${esc(lbl)} · zad. ${esc(matsFmtNums(left.map(n=>matsLocalNo(m,n))))}</span></span>
+        <button class="btn ghost small" data-lekdo="${si}" data-lekti="${ti}">Odhacz ${left.length}</button>
+      </div>`;
+    }).join("");
+    const lesRows=(s.lessons||[]).map(row).join("");
+    const quizRows=(s.quiz||[]).map(row).join("");
+    return `<div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:var(--sp-2)">
+        <h3 style="margin:0">${s.hour}:00 · ${esc(s.subject)}</h3>
+        <span class="muted">${plan.sesjaMin||S.matura.pomo.work||60} min${(lesMin||zadMin)?` · ${lesMin} min lekcje + ~${zadMin} min zadania`:""}</span>
+      </div>
+      ${lesRows?`<div class="mats-lessons">${lesRows}</div>`:""}
+      ${quizRows?`<div class="mats-lesson-sec">Quiz — liczy się jako praktyka</div><div class="mats-lessons">${quizRows}</div>`:""}
+      ${taskRows||(lesRows?"":`<p class="muted">Brak zadań do zaproponowania dla tego przedmiotu.</p>`)}
+      ${s.note?`<p class="muted" style="margin-top:var(--sp-2)">💬 ${esc(s.note)}</p>`:""}
     </div>`;
   }).join("");
-  $("#lekPlan").innerHTML=`
-    <div class="card">
-      <h3 style="margin:0 0 var(--sp-2)">📚 Lekcje na dziś</h3>
-      <div class="mats-lessons">${lessonRows||'<p class="muted">Brak — cały kurs obejrzany! 🎉</p>'}</div>
-    </div>
-    <div class="card">
-      <h3 style="margin:0 0 var(--sp-2)">✏️ Zadania na dziś</h3>
-      ${taskRows||'<p class="muted">Brak materiałów zadaniowych dla tego przedmiotu.</p>'}
-    </div>
-    ${plan.note?`<p class="muted" style="margin-top:var(--sp-2)">💬 ${esc(plan.note)}</p>`:""}
-  `;
 }
+
 $("#matLekcjaView").addEventListener("click",e=>{
   const cb=e.target.closest("[data-lekmt]");
   if(cb){
     const m=matsList().find(x=>x.id===cb.dataset.lekmt);if(!m)return;
     const n=+cb.dataset.lekn,done=matsDone(m),i=done.indexOf(n);
     if(i>=0)done.splice(i,1);else done.push(n);
-    done.sort((a,b)=>a-b);
-    save();
+    done.sort((a,b)=>a-b);save();
     return;
   }
   const btn=e.target.closest("[data-lekdo]");
   if(btn){
-    const m=matsList().find(x=>x.id===btn.dataset.lekdo);if(!m)return;
-    const cnt=+btn.dataset.lekcnt,done=matsDone(m);
+    const plan=S.matura.lekcjaPlan;if(!plan)return;
+    const s=plan.sessions[+btn.dataset.lekdo],t=s&&s.tasks[+btn.dataset.lekti];
+    if(!t)return;
+    const m=matsList().find(x=>x.id===t.materialId);if(!m)return;
+    const done=matsDone(m);
     let added=0;
-    for(let n=1;n<=(m.tasks||0)&&added<cnt;n++)if(!done.includes(n)){done.push(n);added++;}
-    done.sort((a,b)=>a-b);
-    // po odhaczeniu zdejmujemy pozycję z planu — inaczej przy niezmienionym "left" render
-    // znów zaproponowałby te samo "N zadań" (licznik liczy się na bieżąco z materiału)
-    if(S.matura.lekcjaPlan)S.matura.lekcjaPlan.tasks=(S.matura.lekcjaPlan.tasks||[]).filter(t=>t.materialId!==m.id);
-    save();
+    t.nums.forEach(n=>{if(!done.includes(n)){done.push(n);added++;}});
+    done.sort((a,b)=>a-b);save();
     toast(`Odhaczono ${added} ${matsPlural(added,"zadanie","zadania","zadań")} ✓`);
-    lekRenderPlan(S.matura.lekcjaPlan);
+    lekRenderPlan(plan);
   }
 });
-$("#lekSubj").onchange=()=>lekRenderPlan(S.matura.lekcjaPlan||null);
 
 /* ================= SPRAWDZIANY (zapowiedzi z terminarza Librusa + poprawy) ================= */
 /* S.exams.librus jest tylko do odczytu — nadpisuje je każda synchronizacja z serwerem.
@@ -2911,6 +3066,54 @@ function matsSeedWP(){
 // jednorazowo — jeśli usunięty ręcznie, nie wraca (flaga trwała w S.matura, nie w S.materialy)
 if(!S.matura.wpMatsSeeded){matsSeedWP();S.matura.wpMatsSeeded=true;save();}
 
+/* Zbiór zadań z działami. Numeracja w książce startuje od nowa w każdym dziale, ale wewnętrznie
+   (m.done) trzymamy numery globalne 1..605 — inaczej ten sam numer w dwóch działach byłby nie do
+   rozróżnienia. Przeliczenie global↔lokalny robi matsSecRanges()/matsLocalNo(). */
+const MATS_ZBIOR_SECTIONS=[
+  ["Funkcja kwadratowa",42],["Wielomiany",30],["Funkcje wymierne, wykładnicze, logarytmiczne",24],
+  ["Trygonometria",52],["Wartość bezwzględna",27],["Ciągi",35],
+  ["Granica ciągu, suma szeregu nieskończonego",29],["Planimetria",46],["Stereometria",46],
+  ["Geometria analityczna",56],["Kombinatoryka",19],["Rachunek prawdopodobieństwa",43],
+  ["Dowody algebra",41],["Dowody geometria",42],["Granice. Pochodna",29],["Optymalizacja",44],
+  // dział 17 „Inne" świadomie pominięty — użytkownik nie podał liczby zadań
+].map(([name,count])=>({name,count}));
+function matsSeedZbior(){
+  const list=matsList();
+  let m=list.find(x=>x.source==="zbior-mat");
+  if(!m){m={id:uid()};list.push(m);}
+  m.subject="Matematyka";m.name="Zbiór Zadań Maturalnych";m.source="zbior-mat";
+  m.sections=MATS_ZBIOR_SECTIONS;
+  m.tasks=MATS_ZBIOR_SECTIONS.reduce((a,s)=>a+s.count,0);
+  if(!Array.isArray(m.done))m.done=[];
+}
+if(!S.matura.zbiorSeeded){matsSeedZbior();S.matura.zbiorSeeded=true;save();}
+
+// działy materiału z zakresami numerów globalnych; null gdy materiał nie ma działów
+function matsSecRanges(m){
+  if(!Array.isArray(m.sections)||!m.sections.length)return null;
+  let off=0;
+  return m.sections.map(s=>{const r={name:s.name,count:s.count,from:off+1,to:off+s.count};off+=s.count;return r});
+}
+function matsSecOf(m,globalNo){
+  const rs=matsSecRanges(m);if(!rs)return null;
+  return rs.find(r=>globalNo>=r.from&&globalNo<=r.to)||null;
+}
+// numer, jaki użytkownik widzi w książce (w dziale numeracja leci od 1)
+function matsLocalNo(m,globalNo){
+  const r=matsSecOf(m,globalNo);
+  return r?globalNo-r.from+1:globalNo;
+}
+// „5, 6, 7, 9" → „5-7, 9" (numery lokalne, do pokazania użytkownikowi)
+function matsFmtNums(nums){
+  const out=[];let i=0;
+  while(i<nums.length){
+    let j=i;while(j+1<nums.length&&nums[j+1]===nums[j]+1)j++;
+    out.push(j>i+1?`${nums[i]}-${nums[j]}`:nums.slice(i,j+1).join(", "));
+    i=j+1;
+  }
+  return out.join(", ");
+}
+
 const MATS_BASE_SUBJ=["Matematyka","Geografia","Fizyka"]; // punkt startu, gdy nie ma jeszcze żadnych przedmiotów
 const MATS_OTHER="__inny__";
 let matsFilter="all";
@@ -3030,6 +3233,7 @@ function renderMats(){
 }
 function matsItemHtml(m){
   const hasLessons=Array.isArray(m.lessons)&&m.lessons.length>0;
+  const secs=hasLessons?null:matsSecRanges(m);
   const t=hasLessons?m.lessons.length:(m.tasks||0),zr=matsDone(m).length;
   const[one,few,many]=matsUnit(m);
   const dur=hasLessons?matsTotalDur(m.lessons):0;
@@ -3038,7 +3242,11 @@ function matsItemHtml(m){
       <input type="text" data-mnm="${m.id}" class="field" style="flex:1;min-width:0" value="${esc(m.name)}">
       ${hasLessons?`
       <span class="muted" style="flex:none">${t} ${matsPlural(t,one,few,many)}${dur?` · ${esc(matsFmtDur(dur))}`:""}</span>
-      ${m.link?`<a href="${esc(m.link)}" target="_blank" rel="noopener" class="btn ghost small" style="flex:none">Otwórz kurs ↗</a>`:""}`:`
+      ${m.link?`<a href="${esc(m.link)}" target="_blank" rel="noopener" class="btn ghost small" style="flex:none">Otwórz kurs ↗</a>`:""}`
+      /* materiał z działami ma liczbę zadań wyliczoną z sumy działów — ręczna edycja rozjechałaby
+         zakresy numerów, więc zamiast pola pokazujemy samą liczbę */
+      :secs?`
+      <span class="muted" style="flex:none">${t} ${matsPlural(t,one,few,many)} · ${secs.length} ${matsPlural(secs.length,"dział","działy","działów")}</span>`:`
       <div class="row" style="flex:none;flex-wrap:nowrap;gap:6px;width:auto">
         <input type="number" data-mtk="${m.id}" min="0" max="999" step="1" placeholder="—" style="width:80px" value="${m.tasks==null?"":m.tasks}">
         <span class="muted">zad.</span>
@@ -3081,8 +3289,19 @@ function matsFillGrid(m){
     return;
   }
   if(!m.tasks)return;
+  const btn=n=>`<button type="button" data-mtask="${m.id}" data-n="${n}"${done.has(n)?' class="on"':""} aria-pressed="${done.has(n)}">${matsLocalNo(m,n)}</button>`;
+  const rs=matsSecRanges(m);
   let h="";
-  for(let n=1;n<=m.tasks;n++)h+=`<button type="button" data-mtask="${m.id}" data-n="${n}"${done.has(n)?' class="on"':""} aria-pressed="${done.has(n)}">${n}</button>`;
+  if(rs){
+    // działy jako nagłówki; w każdym numeracja od 1 (tak jak w książce), a data-n zostaje globalne
+    rs.forEach((r,i)=>{
+      let zr=0;for(let n=r.from;n<=r.to;n++)if(done.has(n))zr++;
+      h+=`<div class="mats-lesson-sec" style="width:100%">${i+1}. ${esc(r.name)} — ${zr}/${r.count}</div>`;
+      h+=`<div class="mats-tasks" style="width:100%;padding:0 0 var(--sp-2)">`;
+      for(let n=r.from;n<=r.to;n++)h+=btn(n);
+      h+=`</div>`;
+    });
+  }else for(let n=1;n<=m.tasks;n++)h+=btn(n);
   g.innerHTML=h;
 }
 // po odhaczeniu odświeżamy tylko liczniki, nie całą listę
@@ -3707,6 +3926,11 @@ async function cloudAutoPull(){
 let aiAccess=false;
 function applyAiGating(){
   document.querySelectorAll("[data-ai-only]").forEach(el=>{el.hidden=!aiAccess});
+  // Zakładka „Lekcja" istnieje tylko dzięki AI. Sam widok NIE może mieć data-ai-only (gating
+  // pokazałby go wtedy również wtedy, gdy aktywna jest inna pod-zakładka), więc po utracie
+  // dostępu — np. przy wylogowaniu — cofamy się ręcznie na Harmonogram.
+  const lek=$("#matLekcjaView");
+  if(!aiAccess&&lek&&!lek.hidden)matShowTab("sched");
 }
 async function checkAiAccess(){
   aiAccess=false;
