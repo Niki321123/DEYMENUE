@@ -446,6 +446,75 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
     „sprawdź hasło", co w wakacyjnym przypadku jest myląca — ewentualna kosmetyka
     na przyszłość: osobny komunikat dla `status=session` poza rokiem szkolnym).
 
+- **2026-08-24 (sesja 15, cd. — frekwencja + przedmioty z lekcji):** Na prośbę
+  użytkownika: „strona ma też pobierać frekwencję oraz przedmioty z godzin
+  lekcyjnych", z doprecyzowaniem, że „zaliczona godzina" ma być **automatyczna**
+  (gdy Librus wykryje obecność, sam odznacza) — nie ręczny klik. Budowa właściwej
+  **zakładki Frekwencja** (wizualizacja per-przedmiot) świadomie odłożona przez
+  użytkownika na kolejne sesje; ta sesja to fundament danych.
+  - **Research:** biblioteka referencyjna `librusapi` (już cytowana w kodzie) NIE ma
+    modułu frekwencji. Znaleziono właściwy, realny endpoint przez inną,
+    ugruntowaną bibliotekę open-source `RustySnek/librus-apix`
+    ([github.com/RustySnek/librus-apix](https://github.com/RustySnek/librus-apix)):
+    `POST /zrealizowane_lekcje` („zrealizowane lekcje") — per-lekcja przedmiot/
+    nauczyciel/temat + symbol obecności (puste = obecny, kod nb/u/sp/zw... =
+    wyjątek), stronicowane po 15. To jest lepsze źródło niż osobna strona
+    `/przegladaj_nb/uczen` (tylko wyjątki, bez pełnej listy lekcji) — pozwala
+    dopasować **konkretną godzinę lekcyjną** do jej statusu obecności.
+  - **Migracja `librus_attendance_columns`:** nowe kolumny w `librus_snapshot` —
+    `attendance_lessons` (lekcje bieżącego tygodnia, do przyszłego dopasowania do
+    gridu), `attendance_freq` (kumulatywne liczniki present/absent/total per
+    przedmiot, budowane od dziś — Librus nie daje historii sprzed podłączenia),
+    `attendance_seen_keys` (klucze `date|lessonNumber|subject` już wliczone, żeby
+    godzinny cron nie liczył tych samych lekcji dwa razy), `attendance_fetched_at`,
+    `attendance_error`.
+  - **Funkcja `librus-timetable` v12:** nowy moduł parsera (`fetchCompletedLessons`/
+    `parseCompletedLessonsPage`, generyczny wzorzec th/td jak w terminarzu — odporny
+    na zmiany klas CSS), `accumulateAttendance()` (diff względem `seenKeys`, nie
+    względem poprzedniego snapshotu — bo w trakcie tygodnia lista tylko rośnie),
+    `safeAttendance()` (jak `safeExams` — własny try/catch, błąd frekwencji nie
+    może przewrócić synchronizacji planu/terminarza). Wpięte w `processAccount`
+    (cron) i w ścieżkę `connect` (pierwsze pobranie). Drobny refaktor `weekRange`
+    → wydzielony `weekMonSun()` (DRY, bez duplikacji arytmetyki dat).
+  - **„Przedmioty z godzin lekcyjnych":** okazało się, że `Unit.name` (nazwa
+    przedmiotu) już od dawna leci do klienta w `row.units`, tylko nigdzie nie był
+    używany. Zero zmian po stronie serwera — dodano tylko po stronie klienta
+    wyciąganie unikalnej, posortowanej listy (`S.matura.lessonSubjects`) w
+    `librusSyncSchedule()`, gotowej na przyszłe wykorzystanie (np. podpowiedzi przy
+    dodawaniu przedmiotu do nauki).
+  - **Klient (`DayMenu.html`):** `librusApplyAttendance(row)` (wzorowane na
+    `librusApplyExams` — zapisuje `S.matura.attendanceLessons`/`attendanceFreq`
+    tylko przy realnej zmianie, własny `save()`), rozszerzone zapytanie o snapshot
+    (`select=...,attendance_lessons,attendance_freq`), nowe pola dopisane do
+    `matMigrate()` (pułapka płytkiego `Object.assign` — nowe klucze w zagnieżdżonym
+    `S.matura` nie docierają do istniejących userów samym dodaniem do `defaults`,
+    trzeba backfillować w migracji, tak jak `pomo`/`base`/`ovr` — zob.
+    [[save-at-load-tdz]] dla podobnej klasy pułapek w tym pliku).
+  - **⚠️ Nie zweryfikowane na żywych danych Librusa.** Test end-to-end (`net.http_post`
+    z `force=1` na prawdziwe konto 11036707) nie doszedł do kodu frekwencji — cały
+    `processAccount` wywala się wcześniej na `fetchTimetable` z tym samym błędem
+    `session: Brak dostępu` co poprzednio (wakacje, plan lekcji jeszcze niedostępny).
+    Parser frekwencji jest napisany wg realnego, zweryfikowanego adresu i struktury
+    z `librus-apix`, w tym samym stylu co już działający (przetestowany) parser
+    terminarza — ale **HTML samej strony `/zrealizowane_lekcje` nie został jeszcze
+    zobaczony na oczy**. Ryzyko: Librus mógł nieco inaczej ułożyć tabelę niż
+    referencyjna biblioteka zakłada. Klientowe funkcje (`librusApplyAttendance`,
+    ekstrakcja `lessonSubjects`) przetestowane w przeglądarce na spreparowanym
+    (fałszywym) snapshocie — te działają poprawnie.
+  - **Opublikowano build 43** (`npm run publish`, APK od razu bez dogrywki).
+  - **DO ZROBIENIA (samoistnie, brak akcji użytkownika):** gdy Librus opublikuje
+    plan na wrzesień, najbliższy godzinny cron pierwszy raz faktycznie doleci do
+    kodu frekwencji. **Trzeba to sprawdzić** (zapytać `librus_snapshot.attendance_error`
+    tego konta) — jeśli parser się nie zgadza z realnym HTML-em, `attendance_error`
+    będzie to pokazywał, a `attendance_lessons`/`attendance_freq` zostaną puste
+    (błąd jest izolowany, nie zepsuje planu/terminarza). To pierwsza rzecz do
+    zweryfikowania na starcie następnej sesji dotykającej Librusa.
+  - **DO ZROBIENIA (przyszła sesja, jak zapowiedział użytkownik):** zakładka
+    Frekwencja — wizualizacja `S.matura.attendanceFreq` per przedmiot, i decyzja
+    projektowa jak dopasować `attendance_lessons` do konkretnych bloków „w szkole"
+    w Harmonogramie (obecnie grid zna tylko zbiorczy status „school" dla całego
+    zakresu godzin, bez per-lekcja granularności — do przemyślenia przy budowie tabu).
+
 - **2026-08-23 (sesja 15, hotfix backendu):** Zdiagnozowano i naprawiono **„Błąd
   sieci"** przy próbie „Połącz z Librusem" (karta w zakładce Konto). Przyczyna:
   Edge Function `librus-timetable` (w przeciwieństwie do `daymenu-ai`) nie miała

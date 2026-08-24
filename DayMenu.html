@@ -817,7 +817,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=43;
+const DM_BUILD=44;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1626,6 +1626,11 @@ function matPomoToggle(){
         const blk=matPomo.day!=null?S.matura.plan.find(b=>b.day===matPomo.day&&b.hour===matPomo.hour):null;
         if(blk){if(blk.doneWeek!==weekId())matMarkDone(blk);}
         else S.matura.sessions.push({id:uid(),topicId:matPomo.topicId,date:today(),minutes:min,completed:true});
+        // Godzina z planu jest odhaczana tylko dla PIERWSZEJ rundy sesji — każda kolejna
+        // (jeśli praca+przerwa akurat trafia w pełną godzinę, np. 45+15=60 min) nie ma już
+        // przypisanego bloku w gridzie, więc licz się dalej jako zwykła sesja (S.matura.sessions),
+        // inaczej czas kolejnych rund ginąłby: trafiałby wciąż w ten sam, już odhaczony blok.
+        matPomo.day=null;matPomo.hour=null;
         if(t)S.timelog.push({id:uid(),name:"Nauka: "+t.name,category:"Nauka",estimate:null,actual:min,date:today()});
         if(matPomo.treeId){forestFinish(matPomo.treeId,"alive");matPomo.treeId=null;}
         save();toast("Sesja ukończona! Drzewo wyrosło 🌳");notify("Pomodoro ukończone",t?`${t.name} — dobra robota.`:"Dobra robota — czas na przerwę.");
