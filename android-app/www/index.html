@@ -332,6 +332,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     <button class="nav-btn" data-view="exams">Sprawdziany</button>
     <button class="nav-btn" data-view="wymagania">Wymagania</button>
     <button class="nav-btn" data-view="mats">Materiały</button>
+    <button class="nav-btn" data-view="frekwencja">Frekwencja</button>
   </div>
   <div class="nav-group"><h3>Produktywność</h3>
     <button class="nav-btn" data-view="time">Analiza czasu</button>
@@ -681,6 +682,24 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   <div id="matsList"></div>
 </section>
 
+<!-- ============ FREKWENCJA ============ -->
+<section class="view" id="view-frekwencja">
+  <h1>Frekwencja</h1>
+  <p class="sub">Obecności i nieobecności z Librusa — liczone automatycznie od dnia podłączenia konta, bez klikania. Historia sprzed podłączenia nie jest dostępna.</p>
+
+  <div class="grid3" id="frekStatCards"></div>
+
+  <div class="card">
+    <h2>Frekwencja wg przedmiotu</h2>
+    <div id="frekBySubject"></div>
+  </div>
+
+  <div class="card">
+    <h2>Ten tydzień</h2>
+    <div id="frekWeekList"></div>
+  </div>
+</section>
+
 <!-- ============ TIME ANALYSIS ============ -->
 <section class="view" id="view-time">
   <h1>Analiza czasu</h1><p class="sub">Wszystkie wskaźniki na jednym wykresie giełdowym — zaznacz, które linie chcesz widzieć, osobno lub nałożone na siebie.</p>
@@ -817,7 +836,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=44;
+const DM_BUILD=45;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -995,7 +1014,7 @@ $("#themeBtn").onclick=()=>{
 applyTheme();loadBg();
 
 /* ================= NAV ================= */
-const renderers={dash:renderDash,mood:renderMood,goals:renderGoals,books:renderBooks,time:renderTime,sleep:renderSleep,look:renderLook,habits:renderHabits,account:renderAccount,matura:renderMatura,exams:renderExams,wymagania:renderWymagania,mats:renderMats};
+const renderers={dash:renderDash,mood:renderMood,goals:renderGoals,books:renderBooks,time:renderTime,sleep:renderSleep,look:renderLook,habits:renderHabits,account:renderAccount,matura:renderMatura,exams:renderExams,wymagania:renderWymagania,mats:renderMats,frekwencja:renderFrekwencja};
 $$(".nav-btn").forEach(b=>b.onclick=()=>show(b.dataset.view));
 function show(v){
   $$(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
@@ -3289,7 +3308,48 @@ function librusApplyAttendance(row){
   S.matura.attendanceFreq=freq;
   if(JSON.stringify([S.matura.attendanceLessons,S.matura.attendanceFreq])===before)return false;
   save();
+  if($("#view-frekwencja").classList.contains("active"))renderFrekwencja();
   return true;
+}
+
+/* ---- widok Frekwencja: obecności/nieobecności z Librusa (S.matura.attendanceFreq/Lessons) ---- */
+function frekPct(b){return b&&b.total>0?Math.round(b.present/b.total*100):null}
+function frekColor(pct){return pct==null?"var(--text-3)":pct>=90?"var(--good)":pct>=75?"var(--warn)":"var(--bad)"}
+function renderFrekwencja(){
+  const freq=S.matura.attendanceFreq||{};
+  const subjects=Object.keys(freq);
+  const totals=subjects.reduce((a,s)=>({present:a.present+(freq[s].present||0),absent:a.absent+(freq[s].absent||0),total:a.total+(freq[s].total||0)}),{present:0,absent:0,total:0});
+  const overallPct=frekPct(totals);
+  $("#frekStatCards").innerHTML=`
+    <div class="stat"><div class="v" style="color:${frekColor(overallPct)}">${overallPct==null?"—":overallPct+"%"}</div><div class="l">Frekwencja ogółem</div></div>
+    <div class="stat"><div class="v">${totals.present}</div><div class="l">Obecności</div></div>
+    <div class="stat"><div class="v">${totals.absent}</div><div class="l">Nieobecności</div></div>`;
+
+  const rows=subjects.map(s=>({s,pct:frekPct(freq[s])??0})).sort((a,b)=>a.pct-b.pct);
+  $("#frekBySubject").innerHTML=rows.length?rows.map(r=>{
+    const f=freq[r.s];
+    return `<div class="bar-row" title="${f.present} obecności, ${f.absent} nieobecności, ${f.total} lekcji łącznie">
+      <div class="lbl">${esc(r.s)}</div>
+      <div class="bar" style="width:${Math.max(2,r.pct)}%;background:${frekColor(r.pct)}"></div>
+      <div class="val">${r.pct}%</div>
+    </div>`;
+  }).join(""):`<div class="empty">Brak danych — frekwencja zbiera się automatycznie po pierwszej udanej synchronizacji z Librusem (co godzinę).</div>`;
+
+  const lessons=Array.isArray(S.matura.attendanceLessons)?S.matura.attendanceLessons:[];
+  const sorted=[...lessons].sort((a,b)=>a.date.localeCompare(b.date)||a.lessonNumber-b.lessonNumber);
+  $("#frekWeekList").innerHTML=sorted.length?sorted.map(l=>{
+    const present=!l.attendance;
+    const badge=present?`<span class="badge b-good">Obecny</span>`:`<span class="badge b-bad">${esc(l.attendance)}</span>`;
+    const d=l.date?new Date(l.date+"T00:00:00"):null;
+    const dl=d?d.toLocaleDateString("pl-PL",{weekday:"short",day:"numeric",month:"numeric"}):(l.weekday||"");
+    return `<div class="list-item">
+      <div style="flex:1">
+        <strong>${esc(l.subject||"—")}</strong>
+        <p class="muted" style="margin:2px 0 0">${esc(dl)} • lekcja ${l.lessonNumber||"?"}${l.topic?" — "+esc(l.topic):""}</p>
+      </div>
+      ${badge}
+    </div>`;
+  }).join(""):`<div class="empty">Brak zrealizowanych lekcji w tym tygodniu (albo dane jeszcze nie doszły).</div>`;
 }
 async function librusSyncSchedule(force){
   if(!sbSession)return null;

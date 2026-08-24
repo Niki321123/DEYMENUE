@@ -515,6 +515,35 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
     w Harmonogramie (obecnie grid zna tylko zbiorczy status „school" dla całego
     zakresu godzin, bez per-lekcja granularności — do przemyślenia przy budowie tabu).
 
+- **2026-08-24 (sesja 15, cd. — bugfix wieloramowych sesji pomodoro):** Użytkownik
+  zauważył: lekcja szkolna trwa 45 min, jego pomodoro też (45 min pracy + 15 min
+  przerwy = **równo 60 min** na cykl). Doprecyzowanie („grid Harmonogramu jest
+  godzinowy") naprowadziło na realny bug w `matPomoToggle()`: sesja odpalona
+  z konkretnego bloku planu (`matStartPomo(blk)`) trzyma `matPomo.day/hour`
+  **na cały czas trwania sesji**, nie tylko na pierwszą rundę. Skoro cykl = 60 min,
+  każda kolejna runda pracy ląduje idealnie na następnej pełnej godzinie, ale kod
+  wciąż szuka bloku pod PIERWOTNĄ godziną — ten jest już odhaczony (`doneWeek`
+  ustawiony), więc `if(blk){...}` nic nie robi i **czas kolejnych rund ginął bez
+  zapisu** (ani odhaczenie, ani wpis w `S.matura.sessions`). Przy typowym 25+5=30 min
+  błąd byłby dużo mniej zauważalny (rundy nie trafiałyby akurat w pełne godziny) —
+  u tego użytkownika 45+15=60 sprawia, że wystąpi to za każdym razem.
+  - **Fix:** po obsłużeniu pierwszej rundy (`matMarkDone(blk)` albo push do
+    `S.matura.sessions`) w `DayMenu.html` dopisano `matPomo.day=null;matPomo.hour=null;`
+    — każda kolejna runda w tej samej sesji trafia już w gałąź `else` (zwykła sesja
+    z `topicId`, bez próby ponownego odhaczenia tego samego bloku).
+  - **Odkrycie przy okazji:** timer pomodoro **nie kontynuuje automatycznie** między
+    fazami — `matPomoStop()` (który robi `clearInterval`) jest wołany na końcu KAŻDEJ
+    fazy, więc użytkownik musi kliknąć „Start" ponownie dla przerwy i dla każdej
+    kolejnej rundy pracy. To już istniejące zachowanie (nie zmieniane), tylko
+    nieoczywiste — ważne dla przyszłego debugowania timera.
+  - **Przetestowane w przeglądarce** (przyspieszone pomodoro: praca 2s/przerwa 1s,
+    z ręcznym „kliknięciem Start" między fazami jak robi to prawdziwy user): runda 1
+    poprawnie odhacza blok planu (`planned:true`, 60 min), po niej `day/hour` faktycznie
+    `null`, runda 2 poprawnie trafia do `S.matura.sessions` jako osobny wpis
+    (`planned:false`) — przed fixem ten wpis by nie powstał. Zero regresji w innych
+    widokach, zero błędów konsoli. Dane testowe wyczyszczone.
+  - **Opublikowano build 44** (`npm run publish`, APK od razu bez dogrywki).
+
 - **2026-08-23 (sesja 15, hotfix backendu):** Zdiagnozowano i naprawiono **„Błąd
   sieci"** przy próbie „Połącz z Librusem" (karta w zakładce Konto). Przyczyna:
   Edge Function `librus-timetable` (w przeciwieństwie do `daymenu-ai`) nie miała
