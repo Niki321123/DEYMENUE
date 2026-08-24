@@ -338,7 +338,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     <button class="nav-btn" data-view="habits">Nawyki</button>
     <button class="nav-btn" data-view="sleep">Licznik snu</button>
     <button class="nav-btn" data-view="goals">Cele</button>
-    <button class="nav-btn" data-view="books">Lista książek</button>
+    <button class="nav-btn" data-view="books" style="display:none">Lista książek</button>
   </div>
   <div class="nav-group"><h3>Edukacja</h3>
     <button class="nav-btn" data-view="matura">Nauka</button>
@@ -890,7 +890,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=54;
+const DM_BUILD=55;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1092,14 +1092,14 @@ function renderDash(){
   $("#dashDate").textContent=new Date().toLocaleDateString("pl-PL",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
   const m=S.moods.find(x=>x.date===today());
   const studyToday=S.matura.sessions.filter(s=>s.date===today()).reduce((a,s)=>a+s.minutes,0);
-  const reading=S.books.filter(b=>b.status==="reading").length;
   const sl=S.sleep.find(x=>x.date===today());
   $("#dashStats").innerHTML=`
     <div class="stat"><div class="v" style="font-size:var(--fs-4);${m?`color:${MOOD_COLORS[m.mood]}`:""}">${m?MOODS[m.mood]:"—"}</div><div class="l">Dzisiejszy nastrój</div></div>
     <div class="stat"><div class="v">${sl?fmtMin(sleepMin(sl)):"—"}</div><div class="l">Sen ostatniej nocy</div></div>
     <div class="stat"><div class="v">${fmtMin(studyToday)}</div><div class="l">Nauka dzisiaj</div></div>
-    <div class="stat"><div class="v">${S.habits.length?S.habits.filter(h=>h.days[today()]).length+"/"+S.habits.length:"—"}</div><div class="l">Nawyki dzisiaj</div></div>
-    <div class="stat"><div class="v">${reading}</div><div class="l">Książki w trakcie</div></div>`;
+    <div class="stat"><div class="v">${S.habits.length?S.habits.filter(h=>h.days[today()]).length+"/"+S.habits.length:"—"}</div><div class="l">Nawyki dzisiaj</div></div>`;
+    /* kafelek „Książki w trakcie" zdjęty razem z ukryciem zakładki Lista książek —
+       prowadziłby do widoku, którego nie ma w nawigacji. Dane w S.books zostają nietknięte. */
   const gs=S.goals.filter(g=>g.steps.some(s=>!s.done)||!g.steps.length).slice(0,4);
   $("#dashGoals").innerHTML=gs.length?gs.map(g=>{
     const done=g.steps.filter(s=>s.done).length,p=g.steps.length?Math.round(done/g.steps.length*100):0;
