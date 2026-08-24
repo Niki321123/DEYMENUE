@@ -346,6 +346,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     <button class="nav-btn" data-view="wymagania" style="display:none">Wymagania</button>
     <button class="nav-btn" data-view="mats">Materiały</button>
     <button class="nav-btn" data-view="frekwencja">Frekwencja</button>
+    <button class="nav-btn" data-view="rywal">Rywalizacja</button>
   </div>
   <div class="nav-group"><h3>Produktywność</h3>
     <button class="nav-btn" data-view="time">Analiza czasu</button>
@@ -754,6 +755,57 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   </div>
 </section>
 
+<!-- ============ RYWALIZACJA ============ -->
+<section class="view" id="view-rywal">
+  <h1>Rywalizacja</h1>
+  <p class="sub">Porównuj godziny nauki i sesje pomodoro ze znajomymi. Znajomi widzą wyłącznie te dwie liczby — nastrój, sen, cele, Librus i reszta zostają prywatne.</p>
+
+  <div id="rywalLogin" class="empty" hidden>Zaloguj się do konta w chmurze (zakładka Konto), żeby porównywać się ze znajomymi.</div>
+
+  <div id="rywalMain" hidden>
+    <div class="card">
+      <h2 style="margin-bottom:2px">Twój kod zaproszenia</h2>
+      <p class="muted" style="margin-bottom:var(--sp-3)">Wyślij go znajomemu — po wpisaniu zobaczycie nawzajem swoje wyniki.</p>
+      <div class="row" style="margin-bottom:var(--sp-3)">
+        <code id="rywalCode" class="field" style="flex:none;width:auto;font-size:var(--fs-3);font-weight:700;letter-spacing:.08em">————</code>
+        <button class="btn ghost small" id="rywalCopy" style="flex:none">Kopiuj</button>
+        <input type="text" id="rywalName" class="field" placeholder="Twoja nazwa widoczna dla znajomych" maxlength="40">
+      </div>
+      <div class="row">
+        <input type="text" id="rywalAddCode" class="field" placeholder="Wpisz kod znajomego, np. A1B2-C3D4" maxlength="20">
+        <button class="btn" id="rywalAdd" style="flex:none">Dodaj znajomego</button>
+      </div>
+      <p class="muted" id="rywalMsg" style="margin-top:var(--sp-2)"></p>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:var(--sp-3)">
+        <h2 style="margin:0">Pojedynek tygodnia</h2>
+        <button class="btn ghost small" id="rywalRefresh" style="flex:none">Odśwież</button>
+      </div>
+      <div id="rywalDuel"></div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:var(--sp-2)">
+        <h2 style="margin:0">Wykres</h2>
+        <div class="row" style="width:auto;gap:var(--sp-2)">
+          <div class="tabs" id="rywalMetric" style="margin:0">
+            <button data-rm="study" class="on">Nauka</button>
+            <button data-rm="pomo">Pomodoro</button>
+          </div>
+          <div class="tabs" id="rywalRange" style="margin:0">
+            <button data-rr="7">7 dni</button>
+            <button data-rr="30" class="on">30 dni</button>
+          </div>
+        </div>
+      </div>
+      <div class="chart-legend" id="rywalLegend" style="margin-bottom:var(--sp-2)"></div>
+      <div id="rywalChart"></div>
+    </div>
+  </div>
+</section>
+
 <!-- ============ TIME ANALYSIS ============ -->
 <section class="view" id="view-time">
   <h1>Analiza czasu</h1><p class="sub">Wszystkie wskaźniki na jednym wykresie giełdowym — zaznacz, które linie chcesz widzieć, osobno lub nałożone na siebie.</p>
@@ -890,7 +942,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=55;
+const DM_BUILD=56;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1068,7 +1120,7 @@ $("#themeBtn").onclick=()=>{
 applyTheme();loadBg();
 
 /* ================= NAV ================= */
-const renderers={dash:renderDash,mood:renderMood,goals:renderGoals,books:renderBooks,time:renderTime,sleep:renderSleep,look:renderLook,habits:renderHabits,account:renderAccount,matura:renderMatura,exams:renderExams,wymagania:renderWymagania,mats:renderMats,frekwencja:renderFrekwencja};
+const renderers={dash:renderDash,mood:renderMood,goals:renderGoals,books:renderBooks,time:renderTime,sleep:renderSleep,look:renderLook,habits:renderHabits,account:renderAccount,matura:renderMatura,exams:renderExams,wymagania:renderWymagania,mats:renderMats,frekwencja:renderFrekwencja,rywal:renderRywal};
 $$(".nav-btn").forEach(b=>b.onclick=()=>show(b.dataset.view));
 function show(v){
   $$(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
@@ -4123,6 +4175,7 @@ async function cloudAutoPull(){
       toast("Dane zaktualizowane z chmury");
     }
   }catch(e){}
+  statsMaybePush(); // dzienne liczby dla znajomych — wysyłka tylko przy realnej zmianie
 }
 /* ---- dostęp do AI (allowlista maili w tabeli ai_access, egzekwowana też w funkcji
    serwerowej daymenu-ai) — wersja bez dostępu nie widzi funkcji AI i nie może ich wołać.
@@ -4151,16 +4204,275 @@ async function checkAiAccess(){
   }
   applyAiGating();
 }
+/* ================= RYWALIZACJA ZE ZNAJOMYMI =================
+   Prywatny blob (daymenu_data) nigdy nie opuszcza właściciela. Znajomym udostępniamy
+   wyłącznie tabelę stats_daily: jeden wiersz na dzień z dwiema liczbami (minuty nauki,
+   ukończone sesje pomodoro). Kto co widzi, pilnuje RLS po stronie Postgresa — klient
+   nie ma tu żadnej władzy i nie musi jej mieć. */
+const RYWAL_ME_COLOR="#2d6cdf", RYWAL_COLORS=["#e0872e","#9b6dd6","#3aa0b8","#d24f7f","#2e9e5b"];
+let rywalProfile=null;            // {user_id,name,code}
+let rywalFriends=[];              // [{user_id,name,stats:{data:{study_min,pomo_count}},updated_at}]
+let rywalMetric="study", rywalRange=30;
+let rywalLoading=false;
+let statsLastHash=null, statsBackfilled=false;
+
+// jeden dzień = minuty z sesji nauki + drzewa, które przetrwały (czyli ukończone pomodoro)
+function statsForDate(ds){
+  const study=(S.matura.sessions||[]).filter(s=>s.date===ds).reduce((a,s)=>a+(s.minutes||0),0);
+  const pomo=(S.forest||[]).filter(t=>t.date===ds&&t.status==="alive").length;
+  return{study_min:study,pomo_count:pomo};
+}
+function rywalDates(n){
+  const out=[],d=new Date();
+  d.setDate(d.getDate()-n+1);
+  for(let i=0;i<n;i++){out.push(d.toISOString().slice(0,10));d.setDate(d.getDate()+1);}
+  return out;
+}
+async function statsUpsert(rows){
+  if(!rows.length)return false;
+  const tok=await sbToken();if(!tok)return false;
+  const r=await fetch(`${SB_URL}/rest/v1/stats_daily?on_conflict=user_id,date`,{
+    method:"POST",
+    headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json",
+             Prefer:"resolution=merge-duplicates,return=minimal"},
+    body:JSON.stringify(rows)
+  });
+  return r.ok;
+}
+/* Wysyłamy tylko wtedy, gdy dzisiejsze liczby faktycznie się zmieniły — inaczej
+   przy pollingu co 15 s waliliśmy w bazę bez powodu. */
+async function statsMaybePush(){
+  if(!sbSession||!rywalProfile)return;
+  const ds=today(),st=statsForDate(ds);
+  const h=`${ds}|${st.study_min}|${st.pomo_count}`;
+  if(h===statsLastHash)return;
+  const ok=await statsUpsert([{user_id:rywalProfile.user_id,date:ds,...st,updated_at:new Date().toISOString()}]);
+  if(ok)statsLastHash=h;
+}
+// jednorazowo po zalogowaniu: dosyłamy historię, żeby wykres nie zaczynał się od dzisiaj
+async function statsBackfill(){
+  if(statsBackfilled||!rywalProfile)return;
+  const rows=rywalDates(60).map(ds=>({user_id:rywalProfile.user_id,date:ds,...statsForDate(ds)}))
+    .filter(r=>r.study_min>0||r.pomo_count>0);
+  if(rows.length)await statsUpsert(rows);
+  statsBackfilled=true;
+}
+
+async function rywalEnsureProfile(){
+  const tok=await sbToken();if(!tok)return null;
+  const r=await fetch(`${SB_URL}/rest/v1/rpc/profile_ensure`,{
+    method:"POST",
+    headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json"},
+    body:JSON.stringify({p_name:null})
+  });
+  if(!r.ok)return null;
+  const rows=await r.json();
+  const p=Array.isArray(rows)?rows[0]:rows;
+  return p?{user_id:p.out_user_id,name:p.out_name,code:p.out_code}:null;
+}
+async function rywalLoad(){
+  if(rywalLoading)return;
+  rywalLoading=true;
+  try{
+    rywalProfile=await rywalEnsureProfile();
+    if(!rywalProfile)return;
+    await statsBackfill();
+    await statsMaybePush();
+    const tok=await sbToken();if(!tok)return;
+    const H={apikey:SB_KEY,Authorization:"Bearer "+tok};
+    // znajomi: profile wszystkich poza mną (RLS i tak zwróci tylko znajomych)
+    const pr=await fetch(`${SB_URL}/rest/v1/profiles?select=user_id,name`,{headers:H});
+    const profs=pr.ok?await pr.json():[];
+    // statystyki: RLS zwraca moje + znajomych
+    const from=rywalDates(60)[0];
+    const sr=await fetch(`${SB_URL}/rest/v1/stats_daily?select=user_id,date,study_min,pomo_count,updated_at&date=gte.${from}`,{headers:H});
+    const stats=sr.ok?await sr.json():[];
+    const byUser={};
+    stats.forEach(s=>{(byUser[s.user_id]||(byUser[s.user_id]={}))[s.date]=s});
+    rywalFriends=profs.filter(p=>p.user_id!==rywalProfile.user_id)
+      .map(p=>({user_id:p.user_id,name:p.name,days:byUser[p.user_id]||{}}));
+    rywalFriends.myDays=byUser[rywalProfile.user_id]||{};
+  }catch(e){console.error("rywalLoad:",e)}
+  finally{rywalLoading=false}
+}
+async function rywalAddFriend(){
+  const code=$("#rywalAddCode").value.trim();
+  if(!code)return;
+  const msg=$("#rywalMsg");msg.textContent="Dodaję…";
+  try{
+    const tok=await sbToken();if(!tok)throw new Error("NOLOGIN");
+    const r=await fetch(`${SB_URL}/rest/v1/rpc/friend_add_by_code`,{
+      method:"POST",
+      headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json"},
+      body:JSON.stringify({p_code:code})
+    });
+    const body=await r.json().catch(()=>({}));
+    if(!r.ok){
+      const e=String(body.message||body.hint||"");
+      msg.textContent=/not_found/.test(e)?"Nie ma takiego kodu — sprawdź, czy przepisany jest dokładnie."
+        :/self_code/.test(e)?"To Twój własny kod 🙂"
+        :/bad_code/.test(e)?"Kod wygląda na niepełny."
+        :"Nie udało się dodać: "+(body.message||r.status);
+      return;
+    }
+    const p=Array.isArray(body)?body[0]:body;
+    $("#rywalAddCode").value="";
+    msg.textContent=`Dodano: ${p&&p.out_name?p.out_name:"znajomy"} ✓`;
+    await rywalLoad();renderRywal();
+  }catch(e){msg.textContent="Błąd: "+((e&&e.message)||"nieznany")}
+}
+async function rywalRemoveFriend(id,name){
+  if(!confirm(`Usunąć ${name} ze znajomych? Przestaniecie widzieć nawzajem swoje wyniki.`))return;
+  const tok=await sbToken();if(!tok)return;
+  // znajomość jest symetryczna (dwa wiersze) — kasujemy oba naraz
+  await fetch(`${SB_URL}/rest/v1/friendships?or=(and(user_id.eq.${rywalProfile.user_id},friend_id.eq.${id}),and(user_id.eq.${id},friend_id.eq.${rywalProfile.user_id}))`,
+    {method:"DELETE",headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,Prefer:"return=minimal"}});
+  await rywalLoad();renderRywal();
+}
+
+// suma metryki z bieżącego tygodnia (pon–nd, jak reszta aplikacji)
+function rywalWeekDates(){
+  const d=new Date(),wd=(d.getDay()+6)%7;
+  d.setDate(d.getDate()-wd);
+  const out=[];
+  for(let i=0;i<7;i++){out.push(d.toISOString().slice(0,10));d.setDate(d.getDate()+1);}
+  return out;
+}
+function rywalSum(days,dates,key){return dates.reduce((a,ds)=>a+((days[ds]&&days[ds][key])||0),0)}
+function rywalAgo(days){
+  let last=null;
+  Object.values(days).forEach(s=>{if(s.updated_at&&(!last||s.updated_at>last))last=s.updated_at});
+  if(!last)return "brak danych";
+  const min=Math.round((Date.now()-new Date(last).getTime())/60000);
+  return min<2?"przed chwilą":min<60?`${min} min temu`:min<1440?`${Math.round(min/60)} godz. temu`:`${Math.round(min/1440)} dni temu`;
+}
+
+function renderRywal(){
+  const zalogowany=!!sbSession;
+  $("#rywalLogin").hidden=zalogowany;
+  $("#rywalMain").hidden=!zalogowany;
+  if(!zalogowany)return;
+  if(rywalProfile){
+    $("#rywalCode").textContent=rywalProfile.code||"————";
+    if(document.activeElement!==$("#rywalName"))$("#rywalName").value=rywalProfile.name||"";
+  }
+  const wk=rywalWeekDates();
+  const me={name:(rywalProfile&&rywalProfile.name)||"Ty",days:rywalFriends.myDays||{},me:true};
+  const wszyscy=[me,...rywalFriends];
+
+  // ── pojedynek tygodnia ──
+  if(!rywalFriends.length){
+    $("#rywalDuel").innerHTML=`<div class="empty">Nie masz jeszcze znajomych — wyślij komuś swój kod albo wpisz jego kod powyżej.</div>`;
+  }else{
+    const wiersz=(label,key,fmt)=>{
+      const wart=wszyscy.map(u=>rywalSum(u.days,wk,key));
+      const max=Math.max(...wart);
+      return `<tr><td class="muted">${label}</td>`+wszyscy.map((u,i)=>{
+        const lider=wart[i]===max&&max>0;
+        return `<td style="text-align:right;font-variant-numeric:tabular-nums;${lider?"font-weight:800;color:var(--good)":""}">${fmt(wart[i])}${lider?" 👑":""}</td>`;
+      }).join("")+`</tr>`;
+    };
+    $("#rywalDuel").innerHTML=`
+      <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr><th></th>${wszyscy.map((u,i)=>
+          `<th style="text-align:right;padding-bottom:6px">
+             <span style="display:inline-flex;align-items:center;gap:6px">
+               <span style="width:10px;height:10px;border-radius:3px;background:${u.me?RYWAL_ME_COLOR:RYWAL_COLORS[(i-1)%RYWAL_COLORS.length]}"></span>
+               ${esc(u.name)}
+             </span>
+           </th>`).join("")}</tr></thead>
+        <tbody>
+          ${wiersz("Godziny nauki","study_min",v=>fmtMin(v))}
+          ${wiersz("Sesje pomodoro","pomo_count",v=>String(v))}
+        </tbody>
+      </table></div>
+      <p class="muted" style="margin-top:var(--sp-3)">${wszyscy.filter(u=>!u.me).map(u=>`${esc(u.name)}: dane ${rywalAgo(u.days)}`).join(" · ")}</p>
+      <div class="row" style="gap:var(--sp-2);margin-top:var(--sp-2)">
+        ${rywalFriends.map(f=>`<button class="btn ghost small" data-rywdel="${esc(f.user_id)}" data-rywnm="${esc(f.name)}">Usuń ${esc(f.name)}</button>`).join("")}
+      </div>`;
+    $$("#rywalDuel [data-rywdel]").forEach(b=>b.onclick=()=>rywalRemoveFriend(b.dataset.rywdel,b.dataset.rywnm));
+  }
+
+  // ── wykres nałożony ──
+  const dates=rywalDates(rywalRange);
+  const key=rywalMetric==="study"?"study_min":"pomo_count";
+  const serie=wszyscy.map((u,i)=>({
+    name:u.name,
+    color:u.me?RYWAL_ME_COLOR:RYWAL_COLORS[(i-1)%RYWAL_COLORS.length],
+    vals:dates.map(ds=>(u.days[ds]&&u.days[ds][key])||0),
+    suma:rywalSum(u.days,dates,key)
+  }));
+  $("#rywalLegend").innerHTML=serie.map(s=>
+    `<label><span class="swatch" style="background:${s.color}"></span>${esc(s.name)}
+      <span class="cval" style="color:${s.color}">${rywalMetric==="study"?fmtMin(s.suma):s.suma}</span></label>`).join("");
+
+  const maxV=Math.max(1,...serie.flatMap(s=>s.vals));
+  const maxY=rywalMetric==="study"?Math.ceil(maxV/30)*30:Math.max(2,Math.ceil(maxV));
+  const W=720,H=220,PL=34,PR=10,PT=10,PB=10,n=dates.length;
+  const x=i=>PL+(n>1?i/(n-1):0.5)*(W-PL-PR);
+  const y=v=>PT+(1-v/maxY)*(H-PT-PB);
+  const kroki=4;
+  let grid="";
+  for(let s=0;s<=kroki;s++){
+    const v=Math.round(maxY/kroki*s);
+    grid+=`<line x1="${PL}" x2="${W-PR}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border)" stroke-dasharray="3 5" stroke-width="1"/>`
+       +`<text x="${PL-4}" y="${y(v)+3}" text-anchor="end" font-size="10" fill="var(--text-3)">${v}</text>`;
+  }
+  let linie="";
+  serie.forEach(s=>{
+    let path="";
+    s.vals.forEach((v,i)=>{path+=`${i?"L":"M"}${x(i).toFixed(1)},${y(v).toFixed(1)} `});
+    linie+=`<path d="${path}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const li=s.vals.length-1;
+    linie+=`<circle cx="${x(li)}" cy="${y(s.vals[li])}" r="3.5" fill="${s.color}"/>`;
+  });
+  $("#rywalChart").innerHTML=`
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Porównanie ze znajomymi">${grid}${linie}</svg>
+    <div class="row" style="justify-content:space-between"><span class="muted">${fmtDate(dates[0])}</span><span class="muted">${fmtDate(dates[dates.length-1])}</span></div>`;
+}
+
+$("#rywalAdd").onclick=rywalAddFriend;
+$("#rywalAddCode").onkeydown=e=>{if(e.key==="Enter")rywalAddFriend()};
+$("#rywalCopy").onclick=async()=>{
+  const kod=(rywalProfile&&rywalProfile.code)||"";
+  if(!kod)return;
+  try{await navigator.clipboard.writeText(kod);toast("Kod skopiowany ✓")}
+  catch(e){toast("Skopiuj ręcznie: "+kod)}
+};
+$("#rywalName").onchange=async()=>{
+  const nazwa=$("#rywalName").value.trim();
+  if(!nazwa)return;
+  const tok=await sbToken();if(!tok)return;
+  await fetch(`${SB_URL}/rest/v1/rpc/profile_ensure`,{
+    method:"POST",
+    headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json"},
+    body:JSON.stringify({p_name:nazwa})
+  });
+  if(rywalProfile)rywalProfile.name=nazwa;
+  toast("Nazwa zapisana ✓");renderRywal();
+};
+$("#rywalRefresh").onclick=async()=>{await rywalLoad();renderRywal()};
+$$("#rywalMetric button").forEach(b=>b.onclick=()=>{
+  rywalMetric=b.dataset.rm;$$("#rywalMetric button").forEach(x=>x.classList.toggle("on",x===b));renderRywal();
+});
+$$("#rywalRange button").forEach(b=>b.onclick=()=>{
+  rywalRange=+b.dataset.rr;$$("#rywalRange button").forEach(x=>x.classList.toggle("on",x===b));renderRywal();
+});
+
 function startCloudPolling(){
   if(cloudPollTimer)return;
   cloudPollTimer=setInterval(cloudAutoPull,15000);
   startLibrusPolling();librusPollEvents();
   checkAiAccess();
+  rywalLoad().then(()=>{if($("#view-rywal").classList.contains("active"))renderRywal()});
 }
 function stopCloudPolling(){
   clearInterval(cloudPollTimer);cloudPollTimer=null;
   stopLibrusPolling();
   aiAccess=false;applyAiGating();
+  // po wylogowaniu nie zostawiamy w pamięci ani profilu, ani cudzych statystyk
+  rywalProfile=null;rywalFriends=[];statsLastHash=null;statsBackfilled=false;
 }
 setTimeout(cloudAutoPull,2500);
 applyAiGating();               // domyślnie (przed potwierdzeniem dostępu) AI ukryte
