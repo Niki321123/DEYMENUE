@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-24 (sesja 16, cd. — ukryto zakładkę „Wymagania" z nawigacji, build 50)_
+_Ostatnia aktualizacja: 2026-08-24 (sesja 16, cd. — zakładka „Lekcja" z planem dnia od AI, build 51)_
 
 ## Czym jest projekt
 
@@ -441,6 +441,48 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-24 (sesja 16, cd. — nowa pod-zakładka „Lekcja" w Nauce, build 51):** Na
+  prośbę użytkownika: pod-zakładka w grupie tabów Nauki (`#matTabs`, obok Harmonogram/
+  Przedmioty/Las/Statystyki) z przyciskiem AI, który proponuje **plan na dziś** —
+  ile i które lekcje kursu video obejrzeć oraz ile zadań z jakiego materiału zrobić,
+  dopasowanych tematycznie (np. moduł „Funkcja kwadratowa" → zadania też z tego tematu).
+  Opcjonalne pole tekstowe „temat na dziś" (domyślnie: kontynuacja kursu od pierwszej
+  nieobejrzanej lekcji, po kolei).
+  - **Widok:** `#matLekcjaView` + przycisk taba `data-mt="lekcja"`, oba oznaczone
+    `data-ai-only` (auto-ukryte bez dostępu do AI, jak `bookAiCard`/`matChatCard`/
+    `wymAiCard`). Wybór przedmiotu (`#lekSubj`, tylko przedmioty z kursem video w
+    Materiałach), pole tematu, przycisk „Zaproponuj plan".
+  - **Kontekst do AI:** dla wybranego przedmiotu — cała lista lekcji jednego kursu
+    (idx|moduł|nazwa|obejrzana, z `m.lessons`/`matsDone`) + lista materiałów
+    zadaniowych (bez `lessons`) z liczbą zadań i ile już zrobione. Nowy prompt
+    (`LEK_AI_RULES`): 1-4 kolejne nieobejrzane lekcje z JEDNEGO modułu (dopasowanego
+    do wpisanego tematu albo pierwszego nieobejrzanego), plus jeden materiał + liczba
+    zadań dopasowana tematycznie do nazwy modułu, jeśli to możliwe — **ograniczenie
+    uczciwie zakomunikowane w prompt do AI**: materiały zadaniowe w tej apce nie mają
+    przypisanych numerów zadań do tematu (`S.materialy` to płaska lista `{tasks,done}`
+    bez metadanych tematycznych), więc dopasowanie działa na poziomie „który materiał
+    pasuje nazwą", nie „które konkretne numery zadań" — AI ma to wprost napisać w
+    uzasadnieniu (`note`), gdy dopasowania nie ma.
+  - **Wynik jako `S.matura.lekcjaPlan`** (`{date,subject,topic,courseId,lessons:[idx],
+    tasks:[{materialId,count}],note}`), zwalidowany po stronie klienta (indeksy w
+    zakresie i nieobejrzane, `count` przycięty do ile faktycznie zostało). Renderuje
+    się jako dwie karty: lekcje (checkbox+link+czas, współdzielą `done` z zakładką
+    Materiały — odhaczenie widać w obu miejscach) i zadania (nazwa materiału + licznik
+    + przycisk „Odhacz N", który zaznacza N pierwszych niezrobionych numerów i **zdejmuje
+    tę pozycję z planu** (inaczej po kliknięciu render pokazałby to samo „N zadań" w
+    kółko, bo licznik liczy się na bieżąco z materiału, nie z historii planu).
+  - Zmiana przedmiotu w dropdownie czyści widok planu (plan jest przypisany do
+    konkretnego przedmiotu — `plan.subject`), pokazując zachętę do kliknięcia „Zaproponuj".
+  - **Zweryfikowane w przeglądarce** (symulowany plan AI, bez realnego wywołania —
+    brak dostępu AI na koncie testowym): pokazywanie/chowanie taba pod `aiAccess`,
+    wypełnianie listy przedmiotów, renderowanie lekcji pogrupowanych/zadań, odhaczanie
+    checkboxa lekcji (współdzielone z Materiałami), przycisk „Odhacz N" (zaznacza N
+    zadań i usuwa pozycję z planu), przełączenie przedmiotu czyści widok. **Nie
+    zweryfikowano żywego wywołania AI** (`aiCall`/`LEK_AI_RULES`) — do sprawdzenia przy
+    pierwszym realnym użyciu, czy Haiku trzyma się formatu JSON i sensownie dopasowuje
+    moduł/materiał.
+  - **Opublikowano build 51.**
 
 - **2026-08-24 (sesja 16, cd. — ukryto „Wymagania" z nawigacji, build 50):** Na prośbę
   użytkownika ("usuń zakładkę wymagania, tylko żeby jej nie było wizualnie") przycisk
