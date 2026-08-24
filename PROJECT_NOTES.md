@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-24 (sesja 16 — import kursów video „Wielka Powtórka" do zakładki Materiały, build 48)_
+_Ostatnia aktualizacja: 2026-08-24 (sesja 16 — import kursów video „Wielka Powtórka" do zakładki Materiały, build 49)_
 
 ## Czym jest projekt
 
@@ -403,7 +403,7 @@ sprzed tej sesji, już nieużywany przez apkę, można zignorować/skasować.
       poziomie **generowania planu** — `MAT_AI_RULES`/`matAiContext`/`aiPlan`/czat AI
       dostają `pomoWorkMin` i przeliczają realny czas nauki, planer lokalny liczy i
       pokazuje realne minuty (`fmtMin`) zamiast zakładać 60 min/blok.
-- [x] **Sesja 16 (2026-08-24, build 48):** zaimportowano do zakładki **Materiały** pełną
+- [x] **Sesja 16 (2026-08-24, build 49):** zaimportowano do zakładki **Materiały** pełną
       treść dwóch kupionych kursów video z serwisu wielkapowtorka.pl (Matematyka
       rozszerzenie — 85 lekcji, Fizyka — 169 lekcji) — nazwa, link do każdej lekcji i
       czas trwania. Model materiału rozszerzony o `link`/`lessons[{name,url,dur,section}]`;
@@ -416,7 +416,7 @@ sprzed tej sesji, już nieużywany przez apkę, można zignorować/skasować.
       samych kursów w Materiałach, mogą być teraz zduplikowane — do skasowania ręcznie.
       Zweryfikowane w przeglądarce (plik lokalny, bez chmury): obie listy renderują się
       z poprawnymi modułami/czasami, checkbox + pasek postępu działają, link otwiera się
-      w nowej karcie. **Opublikowano build 48** (`npm run publish`).
+      w nowej karcie. **Opublikowano build 49** (`npm run publish`).
 
 ### Proces publikacji (zweryfikowany i naprawiony w tej sesji)
 
@@ -442,7 +442,7 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 
 ## Historia sesji (skrót)
 
-- **2026-08-24 (sesja 16 — import kursów „Wielka Powtórka" do Materiałów, build 48):**
+- **2026-08-24 (sesja 16 — import kursów „Wielka Powtórka" do Materiałów, build 49):**
   Użytkownik kupił kurs video na wielkapowtorka.pl (matematyka rozszerzona + fizyka) i
   poprosił o wyciągnięcie nazw wszystkich lekcji wraz z linkami i czasem trwania, i
   wgranie tego do zakładki Materiały. Serwis to platforma Circle.so — lekcje nie mają
@@ -467,7 +467,7 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
   - Zweryfikowane w przeglądarce (lokalny plik, poza chmurą — `localStorage` niedostępny
     w tym trybie testowym, ale to ograniczenie sandboksa testowego, nie apki): obie listy
     renderują moduły/lekcje/czasy poprawnie, checkbox + pasek postępu + licznik działają.
-  - **Opublikowano build 48** (`npm run publish`).
+  - **Opublikowano build 49** (`npm run publish`).
 
 - **2026-08-24 (sesja 15, dokończenie — drobne poprawki pomodoro/frekwencji/AI, buildy 44-47):**
   Rekonstrukcja z podsumowania poprzedniej sesji (notatki nie zostały dopisane na czas
