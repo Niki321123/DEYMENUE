@@ -950,7 +950,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=58;
+const DM_BUILD=59;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -3327,8 +3327,8 @@ function matsSeedWP(){
   upsert("wp-matematyka","Matematyka","Wielka Powtórka — Matematyka (rozszerzenie)","https://www.wielkapowtorka.pl/c/m-matematyka-pr",MATSWP_MATEMATYKA);
   upsert("wp-fizyka","Fizyka","Wielka Powtórka — Fizyka","https://www.wielkapowtorka.pl/c/m-fizyka",MATSWP_FIZYKA);
 }
-// jednorazowo — jeśli usunięty ręcznie, nie wraca (flaga trwała w S.matura, nie w S.materialy)
-if(!S.matura.wpMatsSeeded){matsSeedWP();S.matura.wpMatsSeeded=true;save();}
+/* Wgranie kursów NIE dzieje się już przy starcie — patrz matsSeedForOwner() niżej.
+   Wcześniej każdy nowy użytkownik dostawał cudze kursy przy pierwszym uruchomieniu. */
 
 /* Zbiór zadań z działami. Numeracja w książce startuje od nowa w każdym dziale, ale wewnętrznie
    (m.done) trzymamy numery globalne 1..605 — inaczej ten sam numer w dwóch działach byłby nie do
@@ -3350,7 +3350,20 @@ function matsSeedZbior(){
   m.tasks=MATS_ZBIOR_SECTIONS.reduce((a,s)=>a+s.count,0);
   if(!Array.isArray(m.done))m.done=[];
 }
-if(!S.matura.zbiorSeeded){matsSeedZbior();S.matura.zbiorSeeded=true;save();}
+/* Kursy z Wielkiej Powtórki i „Zbiór Zadań Maturalnych" to prywatne materiały jednego
+   użytkownika (kupione przez niego), więc wgrywają się WYŁĄCZNIE na jego koncie i dopiero
+   wtedy, gdy wiadomo, kto jest zalogowany. Nowy użytkownik widzi pustą zakładkę Materiały.
+   Wywoływane po zalogowaniu i po każdym pobraniu danych z chmury — flagi w S.matura
+   sprawiają, że ręczne usunięcie materiału jest trwałe. */
+const MATS_OWNER_EMAIL="mikolaj.sledziewski@gmail.com";
+function sbEmail(){return((sbSession&&sbSession.user&&sbSession.user.email)||"").toLowerCase()}
+function matsSeedForOwner(){
+  if(sbEmail()!==MATS_OWNER_EMAIL)return;
+  let ch=false;
+  if(!S.matura.wpMatsSeeded){matsSeedWP();S.matura.wpMatsSeeded=true;ch=true;}
+  if(!S.matura.zbiorSeeded){matsSeedZbior();S.matura.zbiorSeeded=true;ch=true;}
+  if(ch){save();if($("#view-mats").classList.contains("active"))renderMats();}
+}
 
 // działy materiału z zakresami numerów globalnych; null gdy materiał nie ma działów
 function matsSecRanges(m){
@@ -4169,7 +4182,8 @@ async function cloudAutoPull(){
       toast("Dane zaktualizowane z chmury");
     }
   }catch(e){}
-  statsMaybePush(); // dzienne liczby dla znajomych — wysyłka tylko przy realnej zmianie
+  matsSeedForOwner();  // po pobraniu z chmury: właściciel dostaje swoje kursy, inni nie
+  statsMaybePush();    // dzienne liczby dla znajomych — wysyłka tylko przy realnej zmianie
 }
 /* ---- dostęp do AI (allowlista maili w tabeli ai_access, egzekwowana też w funkcji
    serwerowej daymenu-ai) — wersja bez dostępu nie widzi funkcji AI i nie może ich wołać.
@@ -4518,6 +4532,7 @@ function startCloudPolling(){
   cloudPollTimer=setInterval(cloudAutoPull,15000);
   startLibrusPolling();librusPollEvents();
   checkAiAccess();
+  matsSeedForOwner();
   rywalLoad().then(()=>{if($("#view-rywal").classList.contains("active"))renderRywal()});
 }
 function stopCloudPolling(){
