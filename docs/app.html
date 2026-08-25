@@ -805,6 +805,28 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     </div>
 
     <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:2px">
+        <h2 style="margin:0">🛒 Sklep za punkty</h2>
+        <span class="muted" id="shopSaldo"></span>
+      </div>
+      <p class="muted" style="margin-bottom:var(--sp-3)">Wspólna lista nagród — obaj ją widzicie, obaj możecie kupować. Punkty schodzą od razu.</p>
+      <div class="row" style="margin-bottom:var(--sp-2)">
+        <input type="text" id="shopNazwa" class="field" maxlength="120" placeholder="Nagroda, np. wieczór na grze bez wyrzutów sumienia">
+        <div class="row" style="flex:none;flex-wrap:nowrap;gap:6px;width:auto">
+          <input type="number" id="shopCena" min="1" max="1000" step="1" value="20" style="width:80px">
+          <span class="muted">pkt</span>
+        </div>
+        <button class="btn" id="shopDodaj" style="flex:none">Dodaj nagrodę</button>
+      </div>
+      <p class="muted" id="shopMsg" style="margin-bottom:var(--sp-2)"></p>
+      <div id="shopLista"></div>
+      <div class="row" style="justify-content:space-between;margin:var(--sp-4) 0 var(--sp-2)">
+        <strong>Historia zakupów</strong>
+      </div>
+      <div id="shopHistoria"></div>
+    </div>
+
+    <div class="card">
       <div class="row" style="justify-content:space-between;margin-bottom:var(--sp-3)">
         <h2 style="margin:0">Pojedynek</h2>
         <div class="row" style="width:auto;gap:var(--sp-2)">
@@ -977,7 +999,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=61;
+const DM_BUILD=62;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -4397,6 +4419,7 @@ async function rywalLoad(){
       .map(p=>({user_id:p.user_id,name:p.name,days:byUser[p.user_id]||{},since:odKiedy[p.user_id]||null}));
     rywalFriends.myDays=byUser[rywalProfile.user_id]||{};
     await betsLoad();
+    await shopLoad();
   }catch(e){console.error("rywalLoad:",e)}
   finally{rywalLoading=false}
 }
@@ -4463,7 +4486,7 @@ function renderRywal(){
   $("#rywalLogin").hidden=zalogowany;
   $("#rywalMain").hidden=!zalogowany;
   if(!zalogowany)return;
-  renderPunkty();renderZaklady();
+  renderPunkty();renderZaklady();renderSklep();
   if(rywalProfile){
     $("#rywalCode").textContent=rywalProfile.code||"————";
     if(document.activeElement!==$("#rywalName"))$("#rywalName").value=rywalProfile.name||"";
@@ -4575,7 +4598,7 @@ function renderRywal(){
    Bonusy liczymy tylko za okresy ZAKOŃCZONE — inaczej punkty skakałyby w trakcie tygodnia
    przy każdej sesji nauki. Bieżący okres pokazujemy osobno jako „w toku". */
 const PKT_ZA_OKRES=10;
-let rywalBets=[];
+let rywalBets=[],shopItems=[],shopPurchases=[];
 // lokalna data (bez pułapki toISOString, które przy północy potrafi cofnąć o dzień)
 function dsLok(d){const p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())}
 function pktDni(od,do_){const out=[];for(const d=new Date(od);d<=do_;d.setDate(d.getDate()+1))out.push(dsLok(d));return out}
@@ -4613,32 +4636,42 @@ function pktUczestnicy(){
             days:rywalFriends.myDays||{},me:true};
   return [me,...rywalFriends.map(f=>({id:f.user_id,name:f.name,days:f.days}))];
 }
-/* Bonus dostaje tylko osoba ŚCIŚLE lepsza — przy remisie nikt, bo inaczej „obaj po 0 godzin"
-   dawałoby punkty za nicnierobienie. */
-function pktLider(wartosci){
+/* Ściśły lider bierze bonus sam. Przy remisie punkty dostają wszyscy remisujący, ale tylko
+   jeśli KAŻDY z nich przekroczył w tym okresie próg nauki — inaczej „obaj po 0 godzin"
+   nagradzałoby nicnierobienie. */
+const PKT_PROG_TYG_MIN=10*60;     // 10 h nauki w tygodniu
+const PKT_PROG_MIES_MIN=40*60;    // proporcjonalny odpowiednik miesięczny
+function pktLiderzy(wartosci,minuty,prog){
   const max=Math.max(...wartosci);
-  if(!(max>0))return -1;
-  return wartosci.filter(v=>v===max).length===1?wartosci.indexOf(max):-1;
+  if(!(max>0))return [];
+  const idx=wartosci.map((v,i)=>v===max?i:-1).filter(i=>i>=0);
+  if(idx.length===1)return idx;
+  return idx.every(i=>minuty[i]>prog)?idx:[];
 }
 function pktOblicz(){
   const od=rywalStart||rywalFirstDataDate()||today();
-  const osoby=pktUczestnicy().map(u=>({...u,nauka:0,tyg:0,mies:0,zaklady:0,razem:0}));
+  const osoby=pktUczestnicy().map(u=>({...u,nauka:0,tyg:0,mies:0,zaklady:0,razem:0,wydane:0,saldo:0}));
   const wszystkieDni=rywalDatesFrom(od);
   osoby.forEach(u=>{u.nauka=Math.round(rywalSum(u.days,wszystkieDni,"study_min")/60*10)/10});
-  const przyznaj=(okresy,pole)=>okresy.forEach(o=>{
-    const i1=pktLider(osoby.map(u=>rywalSum(u.days,o.dni,"study_min")));
-    if(i1>=0)osoby[i1][pole]+=PKT_ZA_OKRES;
-    const i2=pktLider(osoby.map(u=>rywalAvg(u.days,o.dni,"prod_pct")));
-    if(i2>=0)osoby[i2][pole]+=PKT_ZA_OKRES;
+  const przyznaj=(okresy,pole,prog)=>okresy.forEach(o=>{
+    const minuty=osoby.map(u=>rywalSum(u.days,o.dni,"study_min"));
+    pktLiderzy(minuty,minuty,prog).forEach(i=>osoby[i][pole]+=PKT_ZA_OKRES);
+    const prod=osoby.map(u=>rywalAvg(u.days,o.dni,"prod_pct"));
+    pktLiderzy(prod,minuty,prog).forEach(i=>osoby[i][pole]+=PKT_ZA_OKRES);
   });
   const tygodnie=pktPelneTygodnie(od),miesiace=pktPelneMiesiace(od);
-  przyznaj(tygodnie,"tyg");
-  przyznaj(miesiace,"mies");
+  // bonusy mają sens tylko wtedy, gdy jest z kim rywalizować — solo nie ma „lepszego"
+  if(osoby.length>1){przyznaj(tygodnie,"tyg",PKT_PROG_TYG_MIN);przyznaj(miesiace,"mies",PKT_PROG_MIES_MIN);}
   rywalBets.filter(b=>b.status==="settled"&&b.winner_id).forEach(b=>{
     const u=osoby.find(x=>x.id===b.winner_id);
     if(u)u.zaklady+=b.stawka||0;
   });
-  osoby.forEach(u=>{u.razem=Math.round((u.nauka+u.tyg+u.mies+u.zaklady)*10)/10});
+  shopPurchases.forEach(p=>{const u=osoby.find(x=>x.id===p.buyer_id);if(u)u.wydane+=p.cena||0});
+  // razem = zdobyte (to decyduje o koronie), saldo = to, co zostało do wydania w sklepie
+  osoby.forEach(u=>{
+    u.razem=Math.round((u.nauka+u.tyg+u.mies+u.zaklady)*10)/10;
+    u.saldo=Math.round((u.razem-u.wydane)*10)/10;
+  });
   return{od,osoby,tygodni:tygodnie.length,miesiecy:miesiace.length};
 }
 function renderPunkty(){
@@ -4663,15 +4696,19 @@ function renderPunkty(){
           <div class="muted" style="margin-top:var(--sp-2);font-size:var(--fs-1);line-height:1.9">
             Nauka: <strong>${u.nauka}</strong> pkt<br>
             Tygodnie: <strong>${u.tyg}</strong> pkt · Miesiące: <strong>${u.mies}</strong> pkt<br>
-            Zakłady: <strong>${u.zaklady}</strong> pkt
+            Zakłady: <strong>${u.zaklady}</strong> pkt<br>
+            Wydane w sklepie: <strong>${u.wydane}</strong> pkt · zostało: <strong>${u.saldo}</strong> pkt
           </div>
         </div>`;
       }).join("")}
     </div>`;
   $("#pktInfo").innerHTML=`1 godzina nauki = 1 pkt. Za każdy <strong>zakończony</strong> tydzień i miesiąc po
-    ${PKT_ZA_OKRES} pkt za więcej godzin i ${PKT_ZA_OKRES} pkt za wyższą średnią produktywność —
-    przy remisie nikt nie dostaje. Rozliczono: ${w.tygodni} ${matsPlural(w.tygodni,"tydzień","tygodnie","tygodni")}
-    i ${w.miesiecy} ${matsPlural(w.miesiecy,"miesiąc","miesiące","miesięcy")}; bieżący okres doliczy się po zakończeniu.`;
+    ${PKT_ZA_OKRES} pkt za więcej godzin i ${PKT_ZA_OKRES} pkt za wyższą średnią produktywność.
+    <strong>Przy remisie</strong> punkty dostają obaj, jeśli każdy przekroczył próg nauki
+    (${PKT_PROG_TYG_MIN/60} h w tygodniu, ${PKT_PROG_MIES_MIN/60} h w miesiącu) — poniżej progu remis nie punktuje.
+    Rozliczono: ${w.tygodni} ${matsPlural(w.tygodni,"tydzień","tygodnie","tygodni")}
+    i ${w.miesiecy} ${matsPlural(w.miesiecy,"miesiąc","miesiące","miesięcy")}; bieżący okres doliczy się po zakończeniu.
+    Korona idzie za punkty <em>zdobyte</em> — zakupy w sklepie jej nie zabierają.`;
 }
 
 /* ---- zakłady ---- */
@@ -4788,6 +4825,120 @@ $("#betLista").onclick=async e=>{
 $("#betDodaj").onclick=betDodaj;
 $("#betOpis").onkeydown=e=>{if(e.key==="Enter")betDodaj()};
 
+/* ---- sklep ----
+   Katalog jest wspólny: RLS pokazuje nagrody moje i znajomych, więc obaj widzicie tę samą
+   listę. Saldo = punkty zdobyte minus wydane; korony w tabeli punktów zakupy nie ruszają. */
+async function shopLoad(){
+  const tok=await sbToken();if(!tok)return;
+  const H={apikey:SB_KEY,Authorization:"Bearer "+tok};
+  const [ri,rp]=await Promise.all([
+    fetch(`${SB_URL}/rest/v1/shop_items?select=*&order=cena.asc`,{headers:H}),
+    fetch(`${SB_URL}/rest/v1/shop_purchases?select=*&order=created_at.desc`,{headers:H})
+  ]);
+  shopItems=ri.ok?await ri.json():[];
+  shopPurchases=rp.ok?await rp.json():[];
+}
+async function shopOdswiez(){await shopLoad();renderSklep();renderPunkty()}
+function shopMojeSaldo(){
+  const ja=pktOblicz().osoby.find(u=>u.me);
+  return ja?ja.saldo:0;
+}
+async function shopDodaj(){
+  const nazwa=$("#shopNazwa").value.trim(),cena=Math.round(+$("#shopCena").value),msg=$("#shopMsg");
+  if(!nazwa)return msg.textContent="Wpisz nazwę nagrody.";
+  if(!Number.isFinite(cena)||cena<1||cena>1000)return msg.textContent="Cena musi być od 1 do 1000 punktów.";
+  msg.textContent="Dodaję…";
+  try{
+    const tok=await sbToken();if(!tok)throw new Error("NOLOGIN");
+    const r=await fetch(`${SB_URL}/rest/v1/shop_items`,{
+      method:"POST",
+      headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json",Prefer:"return=minimal"},
+      body:JSON.stringify([{owner_id:rywalProfile.user_id,nazwa,cena}])
+    });
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    $("#shopNazwa").value="";msg.textContent="Dodane ✓";
+    await shopOdswiez();
+  }catch(e){msg.textContent="Nie udało się dodać: "+((e&&e.message)||"błąd")}
+}
+function renderSklep(){
+  const ja=rywalProfile?rywalProfile.user_id:null;
+  const saldo=shopMojeSaldo();
+  $("#shopSaldo").textContent=`${saldo} pkt do wydania`;
+  $("#shopDodaj").disabled=!ja;
+
+  $("#shopLista").innerHTML=shopItems.length
+    ? shopItems.map(it=>{
+        const moja=it.owner_id===ja,stac=saldo>=it.cena;
+        return `<div class="mats-item">
+          <div class="row" style="justify-content:space-between;align-items:flex-start;gap:var(--sp-2)">
+            <div style="flex:1;min-width:0">
+              <strong>${esc(it.nazwa)}</strong><br>
+              <span class="muted">${it.cena} pkt · ${moja?"Twoja nagroda":"od "+esc(betNazwa(it.owner_id))}</span>
+            </div>
+            <div class="row" style="width:auto;flex:none;gap:6px">
+              <button class="btn small" data-shop="kup" data-id="${it.id}"${stac?"":" disabled"}>${stac?"Kup":"Za mało pkt"}</button>
+              ${moja?`<button class="btn ghost small" data-shop="usun" data-id="${it.id}">Usuń</button>`:""}
+            </div>
+          </div>
+        </div>`;
+      }).join("")
+    : `<div class="empty">Pusto. Dodaj pierwszą nagrodę — np. „wieczór na grze" za 20 pkt.</div>`;
+
+  $("#shopHistoria").innerHTML=shopPurchases.length
+    ? shopPurchases.slice(0,15).map(p=>{
+        const moj=p.buyer_id===ja;
+        return `<div class="mats-item">
+          <div class="row" style="justify-content:space-between;align-items:center;gap:var(--sp-2)">
+            <div style="flex:1;min-width:0">
+              <strong>${esc(betNazwa(p.buyer_id))}</strong> · ${esc(p.nazwa)}<br>
+              <span class="muted">−${p.cena} pkt · ${fmtDate(String(p.created_at||"").slice(0,10))}</span>
+            </div>
+            ${moj?`<button class="btn ghost small" data-shop="cofnij" data-id="${p.id}" style="flex:none">Cofnij</button>`:""}
+          </div>
+        </div>`;
+      }).join("")
+    : `<div class="empty">Jeszcze nic nie kupione.</div>`;
+}
+$("#shopLista").onclick=async e=>{
+  const b=e.target.closest("[data-shop]");if(!b)return;
+  const id=b.dataset.id,akcja=b.dataset.shop;
+  const it=shopItems.find(x=>x.id===id);if(!it)return;
+  const tok=await sbToken();if(!tok)return;
+  b.disabled=true;
+  try{
+    if(akcja==="kup"){
+      if(shopMojeSaldo()<it.cena){toast("Za mało punktów");return}
+      if(!confirm(`Kupić „${it.nazwa}" za ${it.cena} pkt?`)){b.disabled=false;return}
+      const r=await fetch(`${SB_URL}/rest/v1/shop_purchases`,{
+        method:"POST",
+        headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json",Prefer:"return=minimal"},
+        body:JSON.stringify([{buyer_id:rywalProfile.user_id,item_id:it.id,nazwa:it.nazwa,cena:it.cena}])
+      });
+      if(!r.ok)throw new Error("HTTP "+r.status);
+      toast("Kupione ✓");
+    }else if(akcja==="usun"){
+      if(!confirm(`Usunąć „${it.nazwa}" ze sklepu? Historia zakupów zostaje.`)){b.disabled=false;return}
+      await fetch(`${SB_URL}/rest/v1/shop_items?id=eq.${id}`,{method:"DELETE",
+        headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,Prefer:"return=minimal"}});
+    }
+    await shopOdswiez();
+  }catch(err){toast("Błąd: "+((err&&err.message)||"nieznany"))}
+};
+$("#shopHistoria").onclick=async e=>{
+  const b=e.target.closest("[data-shop='cofnij']");if(!b)return;
+  const p=shopPurchases.find(x=>x.id===b.dataset.id);if(!p)return;
+  if(!confirm(`Cofnąć zakup „${p.nazwa}"? Wróci ${p.cena} pkt.`))return;
+  b.disabled=true;
+  try{
+    const tok=await sbToken();if(!tok)return;
+    await fetch(`${SB_URL}/rest/v1/shop_purchases?id=eq.${p.id}`,{method:"DELETE",
+      headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,Prefer:"return=minimal"}});
+    await shopOdswiez();
+  }catch(err){toast("Błąd: "+((err&&err.message)||"nieznany"))}
+};
+$("#shopDodaj").onclick=shopDodaj;
+$("#shopNazwa").onkeydown=e=>{if(e.key==="Enter")shopDodaj()};
+
 $("#rywalAdd").onclick=rywalAddFriend;
 $("#rywalAddCode").onkeydown=e=>{if(e.key==="Enter")rywalAddFriend()};
 $("#rywalCopy").onclick=async()=>{
@@ -4832,7 +4983,7 @@ function stopCloudPolling(){
   stopLibrusPolling();
   aiAccess=false;applyAiGating();
   // po wylogowaniu nie zostawiamy w pamięci ani profilu, ani cudzych statystyk
-  rywalProfile=null;rywalFriends=[];rywalBets=[];statsLastHash=null;statsBackfilled=false;
+  rywalProfile=null;rywalFriends=[];rywalBets=[];shopItems=[];shopPurchases=[];statsLastHash=null;statsBackfilled=false;
 }
 setTimeout(cloudAutoPull,2500);
 applyAiGating();               // domyślnie (przed potwierdzeniem dostępu) AI ukryte
