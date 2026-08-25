@@ -950,7 +950,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=59;
+const DM_BUILD=60;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1417,7 +1417,15 @@ function weekId(){
 }
 /* migracja starych danych (siatka bool→"avail", tematy priorytet/mastery→procent) */
 function matMigrate(){
-  const m=S.matura;let ch=false;
+  const m=S.matura||(S.matura={});let ch=false;
+  /* Odporność na niepełny obiekt matura. load() i applyCloud() robią PŁYTKI Object.assign,
+     więc wiersz z chmury bez np. `topics` całkowicie zastępuje domyślny obiekt i migracja
+     wywalała się na `for(const t of m.topics)`, zostawiając S.matura.grid niezdefiniowane
+     (a wtedy renderMatGrid rzuca wyjątkiem). */
+  if(!m.grid||typeof m.grid!=="object"){m.grid={};ch=true;}
+  if(!Array.isArray(m.topics)){m.topics=[];ch=true;}
+  if(!Array.isArray(m.plan)){m.plan=[];ch=true;}
+  if(!Array.isArray(m.sessions)){m.sessions=[];ch=true;}
   for(const k in m.grid){if(m.grid[k]===true){m.grid[k]="avail";ch=true;}}
   for(const t of m.topics){
     if(t.percent==null){t.percent=({1:60,2:40,3:20}[t.priority])||40;ch=true;}
@@ -4027,6 +4035,12 @@ function cloudQueuePush(){
 }
 async function cloudPush(showMsg){
   if(!sbSession||cloudBusy)return;
+  // ostatnia linia obrony: nigdy nie wysyłamy danych należących do innego konta
+  const wl=dataOwner();
+  if(wl&&sbUserId()&&wl!==sbUserId()){
+    console.warn("cloudPush pominięty — dane na urządzeniu należą do innego konta");
+    return;
+  }
   cloudBusy=true;
   try{
     const now=new Date().toISOString();
@@ -4047,8 +4061,27 @@ function applyCloud(row,goAccount){
   S=Object.assign({},defaults,row.data||{});
   S.lastCloudSync=row.updated_at;
   localStorage.setItem(KEY,JSON.stringify(S));
+  setDataOwner(sbUserId());
+  matMigrate();matRecompute();
   applyTheme();renderDash();
   if(goAccount)show("account");
+}
+/* ── Czyje są dane na tym urządzeniu ──────────────────────────────────────────
+   localStorage jest wspólny dla wszystkich kont na jednym urządzeniu. Bez tego
+   znacznika przelogowanie się na inne konto wypychało dane poprzedniego użytkownika
+   na nowe konto (firstSync porównywał lastCloudSync NALEŻĄCY DO INNEJ OSOBY i przy
+   „starszej" chmurze robił cloudPush) — realny bug: usunięcie materiałów na jednym
+   koncie skasowało je też na drugim. */
+const SB_OWNER_KEY="daymenu_data_owner";
+function sbUserId(){return(sbSession&&sbSession.user&&sbSession.user.id)||null}
+function dataOwner(){try{return localStorage.getItem(SB_OWNER_KEY)}catch(e){return null}}
+function setDataOwner(id){try{id?localStorage.setItem(SB_OWNER_KEY,id):localStorage.removeItem(SB_OWNER_KEY)}catch(e){}}
+function resetLocalData(){
+  S=JSON.parse(JSON.stringify(defaults));
+  S.materialy=[];                    // defaults.materialy to współdzielona referencja
+  matMigrate();matRecompute();
+  localStorage.setItem(KEY,JSON.stringify(S));
+  applyTheme();renderDash();
 }
 function cloudCard(){
   if(recoveryToken)return `<div class="card"><h2>Ustaw nowe hasło</h2>
@@ -4157,13 +4190,23 @@ async function sbDoAuth(signup){
   }
 }
 async function firstSync(){
+  const uid=sbUserId(),wlasciciel=dataOwner();
+  // dane na urządzeniu należą do INNEGO konta → nigdy ich nie wypychamy na to konto
+  const obceDane=!!(uid&&wlasciciel&&wlasciciel!==uid);
   try{
     const row=await cloudPull();
+    if(obceDane){
+      if(row)applyCloud(row,true);
+      else{resetLocalData();setDataOwner(uid);await cloudPush(false);show("account");}
+      setDataOwner(uid);
+      return;
+    }
     if(row&&row.updated_at&&(!S.lastCloudSync||new Date(row.updated_at)>new Date(S.lastCloudSync))){
       if(confirm("W chmurze są już dane (np. z innego urządzenia). Pobrać je na to urządzenie?\n\nOK = pobierz z chmury · Anuluj = wyślij dane z tego urządzenia do chmury"))
         return applyCloud(row,true);
     }
     await cloudPush(false);
+    setDataOwner(uid);
   }catch(e){}
 }
 /* auto-pull: co jakiś czas w tle sprawdź, czy w chmurze jest nowsza wersja (np. z drugiego
@@ -4544,6 +4587,10 @@ function stopCloudPolling(){
 }
 setTimeout(cloudAutoPull,2500);
 applyAiGating();               // domyślnie (przed potwierdzeniem dostępu) AI ukryte
+// Użytkownicy sprzed tej wersji nie mają jeszcze znacznika właściciela danych. Skoro są
+// zalogowani, dane na urządzeniu są ich — ustawiamy znacznik, żeby ochrona działała od razu,
+// bez czekania na kolejne logowanie.
+if(sbSession&&!dataOwner())setDataOwner(sbUserId());
 if(sbSession)startCloudPolling();
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)cloudAutoPull()});
 
