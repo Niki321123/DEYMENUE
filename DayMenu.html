@@ -796,7 +796,8 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
         <h2 style="margin:0">Wykres</h2>
         <div class="row" style="width:auto;gap:var(--sp-2)">
           <div class="tabs" id="rywalMetric" style="margin:0">
-            <button data-rm="study" class="on">Nauka</button>
+            <button data-rm="prod" class="on">Produktywność</button>
+            <button data-rm="study">Nauka</button>
             <button data-rm="pomo">Pomodoro</button>
           </div>
           <div class="tabs" id="rywalRange" style="margin:0">
@@ -841,7 +842,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   <div class="grid3" id="timeStats"></div>
   <div class="card" style="margin-top:var(--sp-4)"><h2>Według kategorii</h2><div id="timeByCat"></div></div>
   <div class="card"><h2>Według dni (ostatnie 7)</h2><div id="timeByDay"></div></div>
-  <div class="card"><h2>Sen a produktywność</h2>
+  <div class="card"><h2>Sen a nauka</h2>
     <div id="corrInsights" style="margin-bottom:var(--sp-3)"></div>
     <div id="corrChart"></div>
   </div>
@@ -949,7 +950,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=57;
+const DM_BUILD=58;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -3694,7 +3695,7 @@ function renderMainChart(){
   const active=CHART_SERIES.filter(s=>chartOn[s.id]);
   const anyData=active.some(s=>pts.some(p=>p.v[s.id]!=null));
   if(!active.length||!anyData){
-    $("#mainChart").innerHTML=`<div class="empty">${!active.length?"Zaznacz przynajmniej jedną linię powyżej.":"Brak danych w tym zakresie — zapisuj sen, naukę i nastrój."}</div>`;
+    $("#mainChart").innerHTML=`<div class="empty">${!active.length?"Zaznacz przynajmniej jedną linię powyżej.":"Brak danych w tym zakresie — zapisuj sen i naukę."}</div>`;
     return;
   }
   let maxV=100;
@@ -3790,22 +3791,23 @@ function renderCorr(){
   for(let i=29;i>=0;i--){
     const d=new Date();d.setDate(d.getDate()-i);const ds=d.toISOString().slice(0,10);
     const s=S.sleep.find(x=>x.date===ds);
-    const prod=S.timelog.filter(t=>t.date===ds&&(t.actual||0)>0).reduce((a,t)=>a+t.actual,0);
-    days.push({ds,d,sleep:s?sleepMin(s):null,prod});
+    // porównujemy sen z NAUKĄ (sesje z zakładki Nauka), nie ze zmierzoną pracą z Analizy czasu
+    const nauka=(S.matura.sessions||[]).filter(x=>x.date===ds).reduce((a,x)=>a+(x.minutes||0),0);
+    days.push({ds,d,sleep:s?sleepMin(s):null,nauka});
   }
   const ins=[];
-  const bp=days.filter(x=>x.sleep!=null&&x.prod>0);
+  const bp=days.filter(x=>x.sleep!=null&&x.nauka>0);
   const shortP=bp.filter(x=>x.sleep<420),longP=bp.filter(x=>x.sleep>=420);
   if(shortP.length>=3&&longP.length>=3)
-    ins.push(`Zmierzona praca po krótkim śnie to średnio <strong>${fmtMin(avg(shortP.map(x=>x.prod)))}</strong> dziennie, a po 7+ godzinach snu — <strong>${fmtMin(avg(longP.map(x=>x.prod)))}</strong>.`);
+    ins.push(`Nauka po nocach krótszych niż 7 h to średnio <strong>${fmtMin(avg(shortP.map(x=>x.nauka)))}</strong> dziennie, a po 7+ godzinach snu — <strong>${fmtMin(avg(longP.map(x=>x.nauka)))}</strong>.`);
   $("#corrInsights").innerHTML=ins.length?ins.map(t=>`<p style="margin-bottom:var(--sp-2)">${t}</p>`).join("")
-    :`<p class="muted">Zapisuj sen i czas pracy przez co najmniej kilka dni, a tutaj pojawią się wnioski o zależnościach między nimi.</p>`;
+    :`<p class="muted">Zapisuj sen i ucz się przez co najmniej kilka dni, a tutaj pojawią się wnioski o zależności między nimi.</p>`;
   let rows="";
   for(const x of days.slice(-14)){
     const col=x.sleep==null?"var(--surface-2)":x.sleep<360?"var(--bad)":x.sleep<420?"var(--warn)":"var(--good)";
     rows+=`<div class="bar-row"><div class="lbl">${x.d.toLocaleDateString("pl-PL",{weekday:"short",day:"numeric",month:"short"})}</div>
       <div class="bar" style="width:${Math.max(2,Math.min((x.sleep||0)/600,1)*46)}%;background:${col}" title="Sen"></div>
-      <div class="val">${x.sleep!=null?fmtMin(x.sleep):"—"} · ${x.prod?fmtMin(x.prod)+" pracy":"—"}</div></div>`;
+      <div class="val">${x.sleep!=null?fmtMin(x.sleep):"—"} · ${x.nauka?fmtMin(x.nauka)+" nauki":"—"}</div></div>`;
   }
   $("#corrChart").innerHTML=rows;
 }
@@ -4204,15 +4206,18 @@ async function checkAiAccess(){
 const RYWAL_ME_COLOR="#2d6cdf", RYWAL_COLORS=["#e0872e","#9b6dd6","#3aa0b8","#d24f7f","#2e9e5b"];
 let rywalProfile=null;            // {user_id,name,code}
 let rywalFriends=[];              // [{user_id,name,stats:{data:{study_min,pomo_count}},updated_at}]
-let rywalMetric="study", rywalRange=30, rywalScope="week";
+let rywalMetric="prod", rywalRange=30, rywalScope="week";
 let rywalLoading=false, rywalStart=null;   // rywalStart = data najstarszej znajomości = „start rywalizacji"
 let statsLastHash=null, statsBackfilled=false;
 
-// jeden dzień = minuty z sesji nauki + drzewa, które przetrwały (czyli ukończone pomodoro)
+/* Jeden dzień = minuty z sesji nauki + drzewa, które przetrwały (czyli ukończone pomodoro),
+   plus produktywność. Produktywność liczymy TĄ SAMĄ funkcją co w Analizie czasu (pctProd:
+   sen 50% + nauka 50%), ale wysyłamy wyłącznie gotowy procent — dane o śnie zostają u nas. */
 function statsForDate(ds){
   const study=(S.matura.sessions||[]).filter(s=>s.date===ds).reduce((a,s)=>a+(s.minutes||0),0);
   const pomo=(S.forest||[]).filter(t=>t.date===ds&&t.status==="alive").length;
-  return{study_min:study,pomo_count:pomo};
+  const p=pctProd(ds);
+  return{study_min:study,pomo_count:pomo,prod_pct:p==null?null:Math.round(p)};
 }
 function rywalDates(n){
   const out=[],d=new Date();
@@ -4249,7 +4254,7 @@ async function statsUpsert(rows){
 async function statsMaybePush(){
   if(!sbSession||!rywalProfile)return;
   const ds=today(),st=statsForDate(ds);
-  const h=`${ds}|${st.study_min}|${st.pomo_count}`;
+  const h=`${ds}|${st.study_min}|${st.pomo_count}|${st.prod_pct}`;
   if(h===statsLastHash)return;
   const ok=await statsUpsert([{user_id:rywalProfile.user_id,date:ds,...st,updated_at:new Date().toISOString()}]);
   if(ok)statsLastHash=h;
@@ -4261,8 +4266,9 @@ async function statsBackfill(){
   const dni=new Set();
   (S.matura.sessions||[]).forEach(s=>{if(s.date)dni.add(s.date)});
   (S.forest||[]).forEach(t=>{if(t.date&&t.status==="alive")dni.add(t.date)});
+  (S.sleep||[]).forEach(s=>{if(s.date)dni.add(s.date)});   // sam sen też daje produktywność
   const rows=[...dni].sort().map(ds=>({user_id:rywalProfile.user_id,date:ds,...statsForDate(ds)}))
-    .filter(r=>r.study_min>0||r.pomo_count>0);
+    .filter(r=>r.study_min>0||r.pomo_count>0||r.prod_pct!=null);
   // upsert partiami, żeby nie wysyłać jednego wielkiego żądania przy długiej historii
   for(let i=0;i<rows.length;i+=200)await statsUpsert(rows.slice(i,i+200));
   statsBackfilled=true;
@@ -4299,7 +4305,7 @@ async function rywalLoad(){
     const odKiedy={};rels.forEach(r=>{odKiedy[r.friend_id]=String(r.created_at||"").slice(0,10)});
     rywalStart=rels.length?rels.map(r=>String(r.created_at||"").slice(0,10)).sort()[0]:null;
     // statystyki: RLS zwraca moje + znajomych (bez limitu dat — zakres „Wszystko" ma być pełny)
-    const sr=await fetch(`${SB_URL}/rest/v1/stats_daily?select=user_id,date,study_min,pomo_count,updated_at&order=date.asc`,{headers:H});
+    const sr=await fetch(`${SB_URL}/rest/v1/stats_daily?select=user_id,date,study_min,pomo_count,prod_pct,updated_at&order=date.asc`,{headers:H});
     const stats=sr.ok?await sr.json():[];
     const byUser={};
     stats.forEach(s=>{(byUser[s.user_id]||(byUser[s.user_id]={}))[s.date]=s});
@@ -4353,6 +4359,12 @@ function rywalWeekDates(){
   return out;
 }
 function rywalSum(days,dates,key){return dates.reduce((a,ds)=>a+((days[ds]&&days[ds][key])||0),0)}
+// produktywność to procent — sumowanie nie ma sensu, liczymy średnią z dni, które mają dane
+function rywalAvg(days,dates,key){
+  const v=dates.map(ds=>days[ds]&&days[ds][key]).filter(x=>x!=null&&x!=="");
+  return v.length?Math.round(v.reduce((a,x)=>a+x,0)/v.length):0;
+}
+function rywalAgg(days,dates,key){return key==="prod_pct"?rywalAvg(days,dates,key):rywalSum(days,dates,key)}
 function rywalAgo(days){
   let last=null;
   Object.values(days).forEach(s=>{if(s.updated_at&&(!last||s.updated_at>last))last=s.updated_at});
@@ -4386,7 +4398,7 @@ function renderRywal(){
     const wiersz=(label,key,fmt,liczDni)=>{
       const wart=wszyscy.map(u=>liczDni
         ? wk.filter(ds=>u.days[ds]&&u.days[ds][key]>0).length
-        : rywalSum(u.days,wk,key));
+        : rywalAgg(u.days,wk,key));
       if(liczDni)fmt=v=>String(v);
       const max=Math.max(...wart);
       return `<tr><td class="muted">${label}</td>`+wszyscy.map((u,i)=>{
@@ -4406,6 +4418,7 @@ function renderRywal(){
              </span>
            </th>`).join("")}</tr></thead>
         <tbody>
+          ${wiersz("Średnia produktywność","prod_pct",v=>v+"%")}
           ${wiersz("Godziny nauki","study_min",v=>fmtMin(v))}
           ${wiersz("Sesje pomodoro","pomo_count",v=>String(v))}
           ${wiersz("Dni z nauką","study_min",()=>"",true)}
@@ -4420,25 +4433,28 @@ function renderRywal(){
 
   // ── wykres nałożony ──
   const dates=rywalRange?rywalDates(rywalRange):rywalDatesFrom(rywalFirstDataDate()||today());
-  const key=rywalMetric==="study"?"study_min":"pomo_count";
+  const key=rywalMetric==="study"?"study_min":rywalMetric==="pomo"?"pomo_count":"prod_pct";
   /* Przy roku czy „wszystkim" 365+ punktów zlewa się w jedną kreskę, więc powyżej 90 dni
      sumujemy tygodniami. Sumujemy (a nie uśredniamy), bo to liczniki, nie procenty. */
   const tygodniowo=dates.length>90;
   const kubelki=[];
-  if(tygodniowo)for(let i=0;i<dates.length;i+=7)kubelki.push(dates.slice(i,i+7));
+  if(tygodniowo)for(let i=0;i<dates.length;i+=7)kubelki.push(dates.slice(i,i+7)); // prod: średnia, reszta: suma (rywalAgg)
   else dates.forEach(ds=>kubelki.push([ds]));
   const serie=wszyscy.map((u,i)=>({
     name:u.name,
     color:u.me?RYWAL_ME_COLOR:RYWAL_COLORS[(i-1)%RYWAL_COLORS.length],
-    vals:kubelki.map(k=>rywalSum(u.days,k,key)),
-    suma:rywalSum(u.days,dates,key)
+    vals:kubelki.map(k=>rywalAgg(u.days,k,key)),
+    suma:rywalAgg(u.days,dates,key)
   }));
+  const fmtWart=v=>rywalMetric==="study"?fmtMin(v):rywalMetric==="prod"?v+"%":String(v);
   $("#rywalLegend").innerHTML=serie.map(s=>
     `<label><span class="swatch" style="background:${s.color}"></span>${esc(s.name)}
-      <span class="cval" style="color:${s.color}">${rywalMetric==="study"?fmtMin(s.suma):s.suma}</span></label>`).join("");
+      <span class="cval" style="color:${s.color}">${fmtWart(s.suma)}</span></label>`).join("");
 
   const maxV=Math.max(1,...serie.flatMap(s=>s.vals));
-  const maxY=rywalMetric==="study"?Math.ceil(maxV/30)*30:Math.max(2,Math.ceil(maxV));
+  const maxY=rywalMetric==="study"?Math.ceil(maxV/30)*30
+            :rywalMetric==="prod"?Math.max(100,Math.ceil(maxV/25)*25)
+            :Math.max(2,Math.ceil(maxV));
   const W=720,H=220,PL=34,PR=10,PT=10,PB=10,n=kubelki.length;
   const x=i=>PL+(n>1?i/(n-1):0.5)*(W-PL-PR);
   const y=v=>PT+(1-v/maxY)*(H-PT-PB);
@@ -4461,7 +4477,7 @@ function renderRywal(){
     <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Porównanie ze znajomymi">${grid}${linie}</svg>
     <div class="row" style="justify-content:space-between">
       <span class="muted">${fmtDate(dates[0])}</span>
-      ${tygodniowo?`<span class="muted">sumy tygodniowe</span>`:""}
+      ${tygodniowo?`<span class="muted">${rywalMetric==="prod"?"średnie tygodniowe":"sumy tygodniowe"}</span>`:""}
       <span class="muted">${fmtDate(dates[dates.length-1])}</span>
     </div>`;
 }
