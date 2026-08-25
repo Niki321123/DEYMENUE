@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-25 (sesja 16, cd. — produktywność w Rywalizacji, „Sen a nauka", build 58)_
+_Ostatnia aktualizacja: 2026-08-25 (sesja 16, cd. — materiały tylko dla konta właściciela, build 59)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,32 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-25 (sesja 16, cd. — materiały tylko dla konta właściciela, build 59):**
+  Kursy z Wielkiej Powtórki i „Zbiór Zadań Maturalnych" to prywatne materiały jednej osoby
+  (kupione przez nią), a wgrywały się **każdemu** przy pierwszym uruchomieniu — `matsSeedWP()`
+  i `matsSeedZbior()` szły bezwarunkowo przy ewaluacji skryptu, czyli zanim w ogóle wiadomo,
+  kto jest zalogowany. Flagi `wpMatsSeeded`/`zbiorSeeded` chroniły tylko przed powtórnym
+  zasianiem u tej samej osoby, nie przed zasianiem u obcej.
+  - **Fix:** zasiew przeniesiony do `matsSeedForOwner()`, bramkowanego mailem
+    (`MATS_OWNER_EMAIL`, porównanie bez względu na wielkość liter przez `sbEmail()`).
+    Wywoływany dopiero wtedy, gdy tożsamość jest znana: w `startCloudPolling()` (start
+    z sesją i logowanie) oraz na końcu `cloudAutoPull()` — to drugie jest istotne, bo pobranie
+    z chmury nadpisuje `S` i mogłoby cofnąć zasiew wykonany wcześniej. Funkcja jest
+    idempotentna (flagi + `source`), więc wielokrotne wywołanie nic nie psuje.
+  - **Sprzątanie danych:** konto `miciwici.yt@gmail.com` **zdążyło już dostać** wszystkie trzy
+    materiały (zalogowane 2026-08-25 11:39). Po potwierdzeniu przez użytkownika, że właścicielem
+    ma być wyłącznie `mikolaj.sledziewski@gmail.com`, usunięto z tamtego konta materiały
+    **mające pole `source`** (czyli tylko zasiane automatycznie — ewentualne własne wpisy
+    zostałyby nietknięte) oraz obie flagi, żeby zakładka była realnie pusta. Kopia zapasowa
+    w `daymenu_data_backup` (id 2) przed operacją. Pozostałe konta nigdy nie dostały zasiewu
+    (ostatnie logowania sprzed builda 49).
+  - **Zweryfikowane:** przed zalogowaniem 0 materiałów, nowy użytkownik 0 materiałów i flagi
+    nieustawione, właściciel dostaje 3 materiały (85/169/605 pozycji) także przy innej wielkości
+    liter w mailu, ręcznie usunięty materiał **nie wraca** po kolejnych cyklach, regres widoków
+    bez błędów; w bazie: konto główne zachowało materiały, drugie ma zero, a cele/książki/sesje
+    obu kont nietknięte.
+  - **Opublikowano build 59.**
 
 - **2026-08-25 (sesja 16, cd. — produktywność w Rywalizacji + „Sen a nauka", build 58):**
   - **Produktywność w Rywalizacji.** Problem prywatności: produktywność to `pctProd` = sen 50%
