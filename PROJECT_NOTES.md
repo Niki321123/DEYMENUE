@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-25 (sesja 16, cd. — KRYTYCZNE: dane wyciekały między kontami, build 60)_
+_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — system punktowy i zakłady, build 61)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,37 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-26 (sesja 16, cd. — system punktowy i zakłady w Rywalizacji, build 61):**
+  Zasady wg użytkownika: 1 h nauki = 1 pkt; w tygodniu (pon-nd) 10 pkt za więcej godzin
+  i 10 pkt za wyższą średnią produktywność; tak samo miesięcznie; plus zakłady o 1-7 pkt.
+  - **Decyzja projektowa: bonusy tylko za ZAKOŃCZONE okresy.** Gdyby liczyć bieżący tydzień,
+    punkty skakałyby po każdej sesji nauki (raz u jednego, raz u drugiego). Bieżący okres jest
+    komunikowany jako „doliczy się po zakończeniu". Tygodnie liczone od pierwszego pełnego
+    poniedziałku po starcie rywalizacji, miesiące — od pierwszego pełnego miesiąca.
+  - **Remis nie daje punktów** (`pktLider` wymaga wyniku ściśle najwyższego i > 0), inaczej
+    „obaj po zero godzin" nagradzałoby nicnierobienie.
+  - **Własny `dsLok()` zamiast `toISOString().slice(0,10)`** — przy budowaniu dat z lokalnej
+    północy ISO potrafi cofnąć o dzień (PL to UTC+1/+2), co rozjeżdżałoby granice tygodni.
+  - **Zakłady — nowa tabela `bets`** (`a_id`,`b_id`,`opis`,`stawka` 1-7 wymuszone CHECKiem
+    w bazie, `status`, `claimed_by`, `winner_id`). Przepływ: *pending* → przeciwnik przyjmuje
+    (*active*) → ktoś zgłasza wynik (*claimed*) → **druga strona potwierdza** (*settled*) albo
+    kwestionuje (wraca do *active*). **Zgłaszający nie widzi u siebie żadnego przycisku
+    potwierdzenia** — bez tego każdy przyznawałby sobie punkty. Punkty liczą się wyłącznie
+    ze statusu *settled*.
+  - **RLS:** odczyt/edycja tylko dla stron zakładu; INSERT wymaga `a_id = auth.uid()`
+    **oraz** `is_friend(b_id)`; DELETE tylko własnego, jeszcze nieprzyjętego.
+  - **Zweryfikowane:** arytmetyka na 120 dniach danych (16 zakończonych tygodni × 20 pkt = 320,
+    3 miesiące × 20 = 60, zakłady tylko rozstrzygnięte — łącznie 623 vs 126, zgodne z ręcznym
+    przeliczeniem); granice okresów (ostatni pełny tydzień kończy się przed dziś, bieżący
+    pominięty; brak zakończonych miesięcy przy starcie w połowie lipca); pełny cykl zakładu
+    z obu stron wraz z zakwestionowaniem; RLS — obcy nie widzi zakładów, nie założy się
+    z nie-znajomym i nie podszyje pod innego użytkownika (oba INSERT-y odrzucone);
+    regres 12 widoków + 5 pod-zakładek + stany puste.
+  - **Uwaga o testowaniu:** podgląd `data:` re-renderuje stronę między wywołaniami narzędzia,
+    więc zrzut ekranu pokazywał stan wylogowany mimo poprawnego renderu — weryfikacja treści
+    musi się odbywać w tym samym wywołaniu, w którym ustawia się stan.
+  - **Opublikowano build 61.**
 
 - **2026-08-25 (sesja 16, cd. — ⚠️ KRYTYCZNE: dane wyciekały między kontami, build 60):**
   Użytkownik zgłosił, że po ręcznym usunięciu materiałów na koncie `miciwici.yt@gmail.com`
