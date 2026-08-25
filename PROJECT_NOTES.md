@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — system punktowy i zakłady, build 61)_
+_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — sklep za punkty i próg remisu, build 62)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,40 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-26 (sesja 16, cd. — sklep za punkty i nowa zasada remisu, build 62):**
+  - **Remis punktuje po przekroczeniu progu nauki.** Poprzednia zasada („remis = nikt") była
+    za surowa: dwa równe, mocne tygodnie nie dawały nic. Teraz przy remisie punkty dostają
+    wszyscy remisujący, ale tylko jeśli **każdy** przekroczył próg — `PKT_PROG_TYG_MIN` = 10 h
+    w tygodniu (wg użytkownika) i `PKT_PROG_MIES_MIN` = 40 h w miesiącu (proporcjonalny
+    odpowiednik, decyzja przy braku wskazania). Próg jest **ostry** (> 10 h), więc równe
+    dokładnie 10 h nie punktuje. `pktLider` → `pktLiderzy(wartosci,minuty,prog)` zwraca listę
+    indeksów. Ten sam próg gatuje remis produktywności — inaczej dwa leniwe tygodnie z równym
+    procentem dawałyby po 10 pkt.
+  - **Bonusy tylko przy ≥ 2 osobach** (`if(osoby.length>1)`) — solo nie ma „lepszego", a bez
+    tego pojedynczy użytkownik zbierałby 20 pkt tygodniowo sam ze sobą (ujawniło się dopiero
+    przy sklepie, bo tabela punktów przy braku znajomych i tak pokazuje pusty stan).
+  - **Sklep za punkty — tabele `shop_items` i `shop_purchases`** (migracja
+    `shop_items_and_purchases`). Katalog **wspólny**: RLS pokazuje nagrody własne i znajomych
+    (`owner_id = auth.uid() or is_friend(owner_id)`), zakupy analogicznie po `buyer_id`.
+    Cena 1-1000 pkt wymuszona CHECKiem. Zakup **bez potwierdzenia** drugiej strony (decyzja
+    użytkownika) — punkty schodzą od razu; własny zakup można cofnąć (DELETE tylko dla
+    kupującego), cudzej nagrody nie da się skasować.
+  - **`razem` vs `saldo`:** korona w tabeli punktów idzie za punkty **zdobyte**, żeby wydawanie
+    w sklepie nie kosztowało pozycji w rywalizacji. `saldo = razem − wydane` służy tylko do
+    kupowania.
+  - **Znane ograniczenie:** saldo liczy klient, baza go nie zna (punkty to agregat ze
+    `stats_daily`, nie kolumna). Ktoś, kto ręcznie uderzy w REST API, kupi „na minusie".
+    Przy dwóch znajomych to kwestia zaufania; gdyby miało to kiedyś rosnąć, trzeba przenieść
+    wyliczanie punktów do funkcji `SECURITY DEFINER` i sprawdzać saldo w triggerze na INSERT.
+  - Testy: arytmetyka na 3 pełnych tygodniach (remis 10 h → 0 pkt, remis 11 h → po 20 pkt
+    obaj, 12 h vs 5 h → 20 pkt dla lepszego; nauka 33 vs 26, razem 73 vs 46, saldo po zakupie
+    20 pkt = 53) ✓; UI: przycisk „Za mało pkt" wyłączony przy cenie ponad saldo, „Usuń" tylko
+    przy własnej nagrodzie, „Cofnij" tylko przy własnym zakupie ✓; RLS w transakcji z
+    rollbackiem: obcy widzi 0 nagród i 0 zakupów, podszycie pod cudze `owner_id`/`buyer_id`
+    odrzucone, znajomy nie skasował cudzej nagrody, cena 5000 odrzucona ✓; przejście po
+    wszystkich 15 widokach bez błędów w konsoli ✓.
+
 
 - **2026-08-26 (sesja 16, cd. — system punktowy i zakłady w Rywalizacji, build 61):**
   Zasady wg użytkownika: 1 h nauki = 1 pkt; w tygodniu (pon-nd) 10 pkt za więcej godzin
