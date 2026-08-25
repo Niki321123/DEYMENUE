@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — stawki bonusów 5/15 pkt, build 63)_
+_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — incydent: skasowana znajomość, odtworzona)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,29 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-26 (sesja 16, cd. — INCYDENT: skasowana prawdziwa znajomość):**
+  Użytkownik zgłosił, że utworzona kilka godzin wcześniej rywalizacja z kolegą zniknęła.
+  **Przyczyna: mój bezwarunkowy `delete` przy sprzątaniu po testach zakładów**
+  (25.08 22:21 UTC, build 61): `delete from public.bets; delete from public.friendships;
+  delete from public.profile_codes; delete from public.profiles;` — bez `where`, więc poszły
+  też wiersze produkcyjne. O 23:35 aplikacja odtworzyła sam profil użytkownika (nowy kod
+  `0159-EE40`), ale powiązanie już nie wróciło.
+  - **Co ocalało:** `stats_daily` (tej tabeli nie ruszyłem), więc cała historia nauki obu kont
+    jest nietknięta. **Co zginęło:** wiersze `friendships`, `profiles`, `profile_codes`,
+    `bets` (zakłady były wtedy tylko testowe).
+  - **Naprawa:** odtworzone dwa symetryczne wiersze `friendships` między
+    `mikolaj.sledziewski@gmail.com` a `julian9te@gmail.com` (potwierdzone przez użytkownika)
+    z `created_at = 2026-08-25 12:00 UTC`, żeby `rywalStart` i granice rozliczanych tygodni
+    się nie przesunęły. Profil kolegi wstawiony z nazwą tymczasową — `profile_ensure` nadpisze
+    ją przy jego następnym uruchomieniu i dogeneruje brakujący kod (funkcja backfilluje
+    `profile_codes`, gdy profil już istnieje). Zweryfikowane przez RLS w obie strony: każdy
+    widzi profil i statystyki drugiego, kody nadal tylko własne.
+  - **Zasada na przyszłość:** DayMenu nie ma bazy testowej — testy idą na produkcję. Testy
+    zmieniające dane pisać jako jeden `do $$ ... $$` zakończony `raise exception` z wynikiem
+    w treści wyjątku (rollback sprząta sam, a MCP nie zwraca `raise notice`). Tak zrobiony
+    jest test sklepu z buildu 62. Nigdy `delete`/`update` bez `where` na `profiles`
+    ani `friendships`.
 
 - **2026-08-26 (sesja 16, cd. — stawki bonusów okresowych, build 63):**
   `PKT_ZA_OKRES=10` rozbite na `PKT_ZA_TYDZIEN=5` i `PKT_ZA_MIESIAC=15` (decyzja użytkownika).
