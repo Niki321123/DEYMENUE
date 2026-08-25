@@ -999,7 +999,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=62;
+const DM_BUILD=63;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -4592,12 +4592,12 @@ function renderRywal(){
 }
 
 /* ================= PUNKTY I ZAKŁADY =================
-   Zasady: 1 godzina nauki = 1 pkt; w KAŻDYM zakończonym tygodniu (pon-nd) i miesiącu
-   po 10 pkt dla osoby z większą liczbą godzin i po 10 pkt za wyższą średnią produktywność;
+   Zasady: 1 godzina nauki = 1 pkt; w KAŻDYM zakończonym tygodniu (pon-nd) po 5 pkt, a w
+   miesiącu po 15 pkt — osobno za większą liczbę godzin i za wyższą średnią produktywność;
    do tego wygrane zakłady (1-7 pkt).
    Bonusy liczymy tylko za okresy ZAKOŃCZONE — inaczej punkty skakałyby w trakcie tygodnia
    przy każdej sesji nauki. Bieżący okres pokazujemy osobno jako „w toku". */
-const PKT_ZA_OKRES=10;
+const PKT_ZA_TYDZIEN=5, PKT_ZA_MIESIAC=15;
 let rywalBets=[],shopItems=[],shopPurchases=[];
 // lokalna data (bez pułapki toISOString, które przy północy potrafi cofnąć o dzień)
 function dsLok(d){const p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())}
@@ -4653,15 +4653,18 @@ function pktOblicz(){
   const osoby=pktUczestnicy().map(u=>({...u,nauka:0,tyg:0,mies:0,zaklady:0,razem:0,wydane:0,saldo:0}));
   const wszystkieDni=rywalDatesFrom(od);
   osoby.forEach(u=>{u.nauka=Math.round(rywalSum(u.days,wszystkieDni,"study_min")/60*10)/10});
-  const przyznaj=(okresy,pole,prog)=>okresy.forEach(o=>{
+  const przyznaj=(okresy,pole,prog,stawka)=>okresy.forEach(o=>{
     const minuty=osoby.map(u=>rywalSum(u.days,o.dni,"study_min"));
-    pktLiderzy(minuty,minuty,prog).forEach(i=>osoby[i][pole]+=PKT_ZA_OKRES);
+    pktLiderzy(minuty,minuty,prog).forEach(i=>osoby[i][pole]+=stawka);
     const prod=osoby.map(u=>rywalAvg(u.days,o.dni,"prod_pct"));
-    pktLiderzy(prod,minuty,prog).forEach(i=>osoby[i][pole]+=PKT_ZA_OKRES);
+    pktLiderzy(prod,minuty,prog).forEach(i=>osoby[i][pole]+=stawka);
   });
   const tygodnie=pktPelneTygodnie(od),miesiace=pktPelneMiesiace(od);
   // bonusy mają sens tylko wtedy, gdy jest z kim rywalizować — solo nie ma „lepszego"
-  if(osoby.length>1){przyznaj(tygodnie,"tyg",PKT_PROG_TYG_MIN);przyznaj(miesiace,"mies",PKT_PROG_MIES_MIN);}
+  if(osoby.length>1){
+    przyznaj(tygodnie,"tyg",PKT_PROG_TYG_MIN,PKT_ZA_TYDZIEN);
+    przyznaj(miesiace,"mies",PKT_PROG_MIES_MIN,PKT_ZA_MIESIAC);
+  }
   rywalBets.filter(b=>b.status==="settled"&&b.winner_id).forEach(b=>{
     const u=osoby.find(x=>x.id===b.winner_id);
     if(u)u.zaklady+=b.stawka||0;
@@ -4702,8 +4705,9 @@ function renderPunkty(){
         </div>`;
       }).join("")}
     </div>`;
-  $("#pktInfo").innerHTML=`1 godzina nauki = 1 pkt. Za każdy <strong>zakończony</strong> tydzień i miesiąc po
-    ${PKT_ZA_OKRES} pkt za więcej godzin i ${PKT_ZA_OKRES} pkt za wyższą średnią produktywność.
+  $("#pktInfo").innerHTML=`1 godzina nauki = 1 pkt. Za każdy <strong>zakończony</strong> tydzień
+    po ${PKT_ZA_TYDZIEN} pkt, a za miesiąc po ${PKT_ZA_MIESIAC} pkt — osobno za więcej godzin
+    i osobno za wyższą średnią produktywność.
     <strong>Przy remisie</strong> punkty dostają obaj, jeśli każdy przekroczył próg nauki
     (${PKT_PROG_TYG_MIN/60} h w tygodniu, ${PKT_PROG_MIES_MIN/60} h w miesiącu) — poniżej progu remis nie punktuje.
     Rozliczono: ${w.tygodni} ${matsPlural(w.tygodni,"tydzień","tygodnie","tygodni")}
