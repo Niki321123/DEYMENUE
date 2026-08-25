@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — sklep za punkty i próg remisu, build 62)_
+_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — stawki bonusów 5/15 pkt, build 63)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,13 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-26 (sesja 16, cd. — stawki bonusów okresowych, build 63):**
+  `PKT_ZA_OKRES=10` rozbite na `PKT_ZA_TYDZIEN=5` i `PKT_ZA_MIESIAC=15` (decyzja użytkownika).
+  Stawka dotyczy **każdej z dwóch kategorii osobno**, więc pełny tydzień to maks. 10 pkt,
+  a pełny miesiąc 30 pkt — miesiąc waży teraz wyraźnie więcej niż pojedynczy tydzień.
+  `przyznaj()` przyjmuje stawkę jako parametr. Sprawdzone na 3 pełnych miesiącach:
+  miesięczne 3 × 2 × 15 = 90 pkt, tygodniowe 12 wygranych tygodni × 2 × 5 = 120 pkt ✓.
 
 - **2026-08-26 (sesja 16, cd. — sklep za punkty i nowa zasada remisu, build 62):**
   - **Remis punktuje po przekroczeniu progu nauki.** Poprzednia zasada („remis = nikt") była
