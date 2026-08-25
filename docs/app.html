@@ -778,6 +778,33 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     </div>
 
     <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:var(--sp-2)">
+        <h2 style="margin:0">🏆 Punkty</h2>
+        <span class="muted" id="pktOkres"></span>
+      </div>
+      <div id="pktTabela"></div>
+      <p class="muted" id="pktInfo" style="margin-top:var(--sp-3)"></p>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:var(--sp-2)">
+        <h2 style="margin:0">🤝 Zakłady</h2>
+        <span class="muted">stawka 1–7 pkt</span>
+      </div>
+      <div class="row" style="margin-bottom:var(--sp-2)">
+        <input type="text" id="betOpis" class="field" maxlength="120" placeholder="O co idzie? Np. wyższa ocena ze sprawdzianu z matematyki">
+        <select id="betKto" style="flex:none;width:auto"></select>
+        <div class="row" style="flex:none;flex-wrap:nowrap;gap:6px;width:auto">
+          <input type="number" id="betStawka" min="1" max="7" step="1" value="5" style="width:70px">
+          <span class="muted">pkt</span>
+        </div>
+        <button class="btn" id="betDodaj" style="flex:none">Załóż</button>
+      </div>
+      <p class="muted" id="betMsg" style="margin-bottom:var(--sp-2)"></p>
+      <div id="betLista"></div>
+    </div>
+
+    <div class="card">
       <div class="row" style="justify-content:space-between;margin-bottom:var(--sp-3)">
         <h2 style="margin:0">Pojedynek</h2>
         <div class="row" style="width:auto;gap:var(--sp-2)">
@@ -950,7 +977,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=60;
+const DM_BUILD=61;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -4369,6 +4396,7 @@ async function rywalLoad(){
     rywalFriends=profs.filter(p=>p.user_id!==rywalProfile.user_id)
       .map(p=>({user_id:p.user_id,name:p.name,days:byUser[p.user_id]||{},since:odKiedy[p.user_id]||null}));
     rywalFriends.myDays=byUser[rywalProfile.user_id]||{};
+    await betsLoad();
   }catch(e){console.error("rywalLoad:",e)}
   finally{rywalLoading=false}
 }
@@ -4435,6 +4463,7 @@ function renderRywal(){
   $("#rywalLogin").hidden=zalogowany;
   $("#rywalMain").hidden=!zalogowany;
   if(!zalogowany)return;
+  renderPunkty();renderZaklady();
   if(rywalProfile){
     $("#rywalCode").textContent=rywalProfile.code||"————";
     if(document.activeElement!==$("#rywalName"))$("#rywalName").value=rywalProfile.name||"";
@@ -4539,6 +4568,226 @@ function renderRywal(){
     </div>`;
 }
 
+/* ================= PUNKTY I ZAKŁADY =================
+   Zasady: 1 godzina nauki = 1 pkt; w KAŻDYM zakończonym tygodniu (pon-nd) i miesiącu
+   po 10 pkt dla osoby z większą liczbą godzin i po 10 pkt za wyższą średnią produktywność;
+   do tego wygrane zakłady (1-7 pkt).
+   Bonusy liczymy tylko za okresy ZAKOŃCZONE — inaczej punkty skakałyby w trakcie tygodnia
+   przy każdej sesji nauki. Bieżący okres pokazujemy osobno jako „w toku". */
+const PKT_ZA_OKRES=10;
+let rywalBets=[];
+// lokalna data (bez pułapki toISOString, które przy północy potrafi cofnąć o dzień)
+function dsLok(d){const p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())}
+function pktDni(od,do_){const out=[];for(const d=new Date(od);d<=do_;d.setDate(d.getDate()+1))out.push(dsLok(d));return out}
+// pełne tygodnie pon-nd, które już się skończyły
+function pktPelneTygodnie(odDs){
+  const out=[],d=new Date(odDs+"T00:00");
+  const wd=(d.getDay()+6)%7;
+  if(wd)d.setDate(d.getDate()+(7-wd));            // start od pierwszego pełnego poniedziałku
+  const dzis=new Date();dzis.setHours(0,0,0,0);
+  for(let i=0;i<520;i++){
+    const koniec=new Date(d);koniec.setDate(koniec.getDate()+6);
+    if(koniec>=dzis)break;                        // tydzień jeszcze trwa
+    out.push({dni:pktDni(new Date(d),koniec),etykieta:fmtDate(dsLok(d))});
+    d.setDate(d.getDate()+7);
+  }
+  return out;
+}
+// pełne miesiące kalendarzowe, które już się skończyły
+function pktPelneMiesiace(odDs){
+  const out=[],start=new Date(odDs+"T00:00");
+  let y=start.getFullYear(),m=start.getMonth();
+  if(start.getDate()>1){m++;if(m>11){m=0;y++}}    // miesiąc rozpoczęty w trakcie się nie liczy
+  const dzis=new Date();dzis.setHours(0,0,0,0);
+  for(let i=0;i<120;i++){
+    const pierwszy=new Date(y,m,1),nastepny=new Date(y,m+1,1);
+    if(nastepny>dzis)break;                       // miesiąc jeszcze trwa
+    const koniec=new Date(nastepny);koniec.setDate(koniec.getDate()-1);
+    out.push({dni:pktDni(pierwszy,koniec),etykieta:pierwszy.toLocaleDateString("pl-PL",{month:"long",year:"numeric"})});
+    m++;if(m>11){m=0;y++}
+  }
+  return out;
+}
+function pktUczestnicy(){
+  const me={id:(rywalProfile&&rywalProfile.user_id)||"me",name:(rywalProfile&&rywalProfile.name)||"Ty",
+            days:rywalFriends.myDays||{},me:true};
+  return [me,...rywalFriends.map(f=>({id:f.user_id,name:f.name,days:f.days}))];
+}
+/* Bonus dostaje tylko osoba ŚCIŚLE lepsza — przy remisie nikt, bo inaczej „obaj po 0 godzin"
+   dawałoby punkty za nicnierobienie. */
+function pktLider(wartosci){
+  const max=Math.max(...wartosci);
+  if(!(max>0))return -1;
+  return wartosci.filter(v=>v===max).length===1?wartosci.indexOf(max):-1;
+}
+function pktOblicz(){
+  const od=rywalStart||rywalFirstDataDate()||today();
+  const osoby=pktUczestnicy().map(u=>({...u,nauka:0,tyg:0,mies:0,zaklady:0,razem:0}));
+  const wszystkieDni=rywalDatesFrom(od);
+  osoby.forEach(u=>{u.nauka=Math.round(rywalSum(u.days,wszystkieDni,"study_min")/60*10)/10});
+  const przyznaj=(okresy,pole)=>okresy.forEach(o=>{
+    const i1=pktLider(osoby.map(u=>rywalSum(u.days,o.dni,"study_min")));
+    if(i1>=0)osoby[i1][pole]+=PKT_ZA_OKRES;
+    const i2=pktLider(osoby.map(u=>rywalAvg(u.days,o.dni,"prod_pct")));
+    if(i2>=0)osoby[i2][pole]+=PKT_ZA_OKRES;
+  });
+  const tygodnie=pktPelneTygodnie(od),miesiace=pktPelneMiesiace(od);
+  przyznaj(tygodnie,"tyg");
+  przyznaj(miesiace,"mies");
+  rywalBets.filter(b=>b.status==="settled"&&b.winner_id).forEach(b=>{
+    const u=osoby.find(x=>x.id===b.winner_id);
+    if(u)u.zaklady+=b.stawka||0;
+  });
+  osoby.forEach(u=>{u.razem=Math.round((u.nauka+u.tyg+u.mies+u.zaklady)*10)/10});
+  return{od,osoby,tygodni:tygodnie.length,miesiecy:miesiace.length};
+}
+function renderPunkty(){
+  if(!rywalFriends.length){
+    $("#pktTabela").innerHTML=`<div class="empty">Dodaj znajomego, żeby zacząć zbierać punkty.</div>`;
+    $("#pktOkres").textContent="";$("#pktInfo").textContent="";return;
+  }
+  const w=pktOblicz();
+  $("#pktOkres").textContent="od "+fmtDate(w.od);
+  const max=Math.max(...w.osoby.map(u=>u.razem));
+  $("#pktTabela").innerHTML=`
+    <div class="grid2" style="gap:var(--sp-3)">
+      ${w.osoby.map((u,i)=>{
+        const lider=u.razem===max&&max>0&&w.osoby.filter(x=>x.razem===max).length===1;
+        const kolor=u.me?RYWAL_ME_COLOR:RYWAL_COLORS[(i-1)%RYWAL_COLORS.length];
+        return `<div class="card" style="margin:0;border:2px solid ${lider?"var(--good)":"var(--border)"}">
+          <div class="row" style="justify-content:space-between;align-items:baseline">
+            <strong style="display:inline-flex;align-items:center;gap:8px">
+              <span style="width:12px;height:12px;border-radius:3px;background:${kolor}"></span>${esc(u.name)}</strong>
+            <span style="font-size:var(--fs-5);font-weight:800;color:${lider?"var(--good)":"var(--text)"}">${u.razem}${lider?" 👑":""}</span>
+          </div>
+          <div class="muted" style="margin-top:var(--sp-2);font-size:var(--fs-1);line-height:1.9">
+            Nauka: <strong>${u.nauka}</strong> pkt<br>
+            Tygodnie: <strong>${u.tyg}</strong> pkt · Miesiące: <strong>${u.mies}</strong> pkt<br>
+            Zakłady: <strong>${u.zaklady}</strong> pkt
+          </div>
+        </div>`;
+      }).join("")}
+    </div>`;
+  $("#pktInfo").innerHTML=`1 godzina nauki = 1 pkt. Za każdy <strong>zakończony</strong> tydzień i miesiąc po
+    ${PKT_ZA_OKRES} pkt za więcej godzin i ${PKT_ZA_OKRES} pkt za wyższą średnią produktywność —
+    przy remisie nikt nie dostaje. Rozliczono: ${w.tygodni} ${matsPlural(w.tygodni,"tydzień","tygodnie","tygodni")}
+    i ${w.miesiecy} ${matsPlural(w.miesiecy,"miesiąc","miesiące","miesięcy")}; bieżący okres doliczy się po zakończeniu.`;
+}
+
+/* ---- zakłady ---- */
+async function betsLoad(){
+  const tok=await sbToken();if(!tok)return;
+  const r=await fetch(`${SB_URL}/rest/v1/bets?select=*&order=created_at.desc`,
+    {headers:{apikey:SB_KEY,Authorization:"Bearer "+tok}});
+  rywalBets=r.ok?await r.json():[];
+}
+async function betsPatch(id,zmiany){
+  const tok=await sbToken();if(!tok)return false;
+  const r=await fetch(`${SB_URL}/rest/v1/bets?id=eq.${id}`,{
+    method:"PATCH",
+    headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json",Prefer:"return=minimal"},
+    body:JSON.stringify(zmiany)
+  });
+  return r.ok;
+}
+async function betsOdswiez(){await betsLoad();renderZaklady();renderPunkty()}
+async function betDodaj(){
+  const opis=$("#betOpis").value.trim(),stawka=Math.round(+$("#betStawka").value);
+  const kto=$("#betKto").value,msg=$("#betMsg");
+  if(!opis)return msg.textContent="Napisz, o co idzie zakład.";
+  if(!kto)return msg.textContent="Wybierz przeciwnika.";
+  if(!Number.isFinite(stawka)||stawka<1||stawka>7)return msg.textContent="Stawka musi być od 1 do 7 punktów.";
+  msg.textContent="Zakładam…";
+  try{
+    const tok=await sbToken();if(!tok)throw new Error("NOLOGIN");
+    const r=await fetch(`${SB_URL}/rest/v1/bets`,{
+      method:"POST",
+      headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json",Prefer:"return=minimal"},
+      body:JSON.stringify([{a_id:rywalProfile.user_id,b_id:kto,opis,stawka}])
+    });
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    $("#betOpis").value="";msg.textContent="Zakład wysłany — czeka na przyjęcie ✓";
+    await betsOdswiez();
+  }catch(e){msg.textContent="Nie udało się założyć: "+((e&&e.message)||"błąd")}
+}
+function betNazwa(id){
+  if(rywalProfile&&id===rywalProfile.user_id)return rywalProfile.name||"Ty";
+  const f=rywalFriends.find(x=>x.user_id===id);
+  return f?f.name:"?";
+}
+function renderZaklady(){
+  const sel=$("#betKto"),prev=sel.value;
+  sel.innerHTML=rywalFriends.length
+    ? rywalFriends.map(f=>`<option value="${esc(f.user_id)}">${esc(f.name)}</option>`).join("")
+    : `<option value="">— brak znajomych —</option>`;
+  if(rywalFriends.some(f=>f.user_id===prev))sel.value=prev;
+  sel.disabled=!rywalFriends.length;$("#betDodaj").disabled=!rywalFriends.length;
+
+  const ja=rywalProfile?rywalProfile.user_id:null;
+  if(!rywalBets.length){
+    $("#betLista").innerHTML=`<div class="empty">Brak zakładów. Załóż pierwszy — np. „wyższa ocena ze sprawdzianu”.</div>`;
+    return;
+  }
+  $("#betLista").innerHTML=rywalBets.map(b=>{
+    const jaZakladam=b.a_id===ja,przeciwnik=betNazwa(jaZakladam?b.b_id:b.a_id);
+    let stan="",akcje="";
+    if(b.status==="pending"){
+      stan=jaZakladam?`czeka na przyjęcie przez ${esc(przeciwnik)}`:`${esc(przeciwnik)} proponuje Ci zakład`;
+      akcje=jaZakladam
+        ? `<button class="btn ghost small" data-bet="odwolaj" data-id="${b.id}">Odwołaj</button>`
+        : `<button class="btn small" data-bet="przyjmij" data-id="${b.id}">Przyjmuję</button>
+           <button class="btn ghost small" data-bet="odrzuc" data-id="${b.id}">Odrzuć</button>`;
+    }else if(b.status==="active"){
+      stan="zakład trwa";
+      akcje=`<button class="btn ghost small" data-bet="wygralem" data-id="${b.id}">Wygrałem</button>
+             <button class="btn ghost small" data-bet="przegralem" data-id="${b.id}">Wygrał ${esc(przeciwnik)}</button>`;
+    }else if(b.status==="claimed"){
+      const zgloszony=betNazwa(b.winner_id);
+      if(b.claimed_by===ja){stan=`zgłoszono: wygrywa ${esc(zgloszony)} — czeka na potwierdzenie`;}
+      else{
+        stan=`${esc(betNazwa(b.claimed_by))} twierdzi, że wygrywa ${esc(zgloszony)}`;
+        akcje=`<button class="btn small" data-bet="potwierdz" data-id="${b.id}">Potwierdzam</button>
+               <button class="btn ghost small" data-bet="kwestionuj" data-id="${b.id}">Nie zgadzam się</button>`;
+      }
+    }else if(b.status==="settled"){
+      stan=`rozstrzygnięty — wygrał ${esc(betNazwa(b.winner_id))} (+${b.stawka} pkt)`;
+    }else if(b.status==="rejected"){stan="odrzucony";}
+    const kolor=b.status==="settled"?"var(--good)":b.status==="rejected"?"var(--text-3)":"var(--text-2)";
+    return `<div class="mats-item">
+      <div class="row" style="justify-content:space-between;align-items:flex-start;gap:var(--sp-2)">
+        <div style="flex:1;min-width:0">
+          <strong>${esc(b.opis)}</strong><br>
+          <span class="muted" style="color:${kolor}">${esc(przeciwnik)} · ${b.stawka} pkt · ${stan}</span>
+        </div>
+        <div class="row" style="width:auto;flex:none;gap:6px">${akcje}</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+$("#betLista").onclick=async e=>{
+  const b=e.target.closest("[data-bet]");if(!b)return;
+  const id=b.dataset.id,akcja=b.dataset.bet,ja=rywalProfile.user_id;
+  const zaklad=rywalBets.find(x=>x.id===id);if(!zaklad)return;
+  b.disabled=true;
+  try{
+    if(akcja==="przyjmij")await betsPatch(id,{status:"active"});
+    else if(akcja==="odrzuc")await betsPatch(id,{status:"rejected"});
+    else if(akcja==="odwolaj"){
+      const tok=await sbToken();
+      await fetch(`${SB_URL}/rest/v1/bets?id=eq.${id}`,{method:"DELETE",
+        headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,Prefer:"return=minimal"}});
+    }
+    else if(akcja==="wygralem")   await betsPatch(id,{status:"claimed",claimed_by:ja,winner_id:ja});
+    else if(akcja==="przegralem") await betsPatch(id,{status:"claimed",claimed_by:ja,
+                                    winner_id:(zaklad.a_id===ja?zaklad.b_id:zaklad.a_id)});
+    else if(akcja==="potwierdz")  await betsPatch(id,{status:"settled",settled_at:new Date().toISOString()});
+    else if(akcja==="kwestionuj") await betsPatch(id,{status:"active",claimed_by:null,winner_id:null});
+    await betsOdswiez();
+  }catch(err){toast("Błąd: "+((err&&err.message)||"nieznany"))}
+};
+$("#betDodaj").onclick=betDodaj;
+$("#betOpis").onkeydown=e=>{if(e.key==="Enter")betDodaj()};
+
 $("#rywalAdd").onclick=rywalAddFriend;
 $("#rywalAddCode").onkeydown=e=>{if(e.key==="Enter")rywalAddFriend()};
 $("#rywalCopy").onclick=async()=>{
@@ -4583,7 +4832,7 @@ function stopCloudPolling(){
   stopLibrusPolling();
   aiAccess=false;applyAiGating();
   // po wylogowaniu nie zostawiamy w pamięci ani profilu, ani cudzych statystyk
-  rywalProfile=null;rywalFriends=[];statsLastHash=null;statsBackfilled=false;
+  rywalProfile=null;rywalFriends=[];rywalBets=[];statsLastHash=null;statsBackfilled=false;
 }
 setTimeout(cloudAutoPull,2500);
 applyAiGating();               // domyślnie (przed potwierdzeniem dostępu) AI ukryte
