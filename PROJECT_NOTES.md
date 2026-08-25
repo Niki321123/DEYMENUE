@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-25 (sesja 16, cd. — porządki: koniec nastroju, Rywalizacja rozbudowana, build 57)_
+_Ostatnia aktualizacja: 2026-08-25 (sesja 16, cd. — produktywność w Rywalizacji, „Sen a nauka", build 58)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,30 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-25 (sesja 16, cd. — produktywność w Rywalizacji + „Sen a nauka", build 58):**
+  - **Produktywność w Rywalizacji.** Problem prywatności: produktywność to `pctProd` = sen 50%
+    + nauka 50%, a **sen nie jest udostępniany znajomym**. Rozwiązanie: liczymy ją lokalnie tą
+    samą funkcją co w Analizie czasu i publikujemy **wyłącznie gotowy procent** w nowej kolumnie
+    `stats_daily.prod_pct` — znajomy widzi jedną liczbę, z której nie odtworzy godzin snu.
+  - **Agregacja musiała stać się zależna od metryki:** minuty i sesje się sumują, ale procent
+    trzeba **uśredniać** — inaczej tydzień produktywności dawałby 500%. Stąd `rywalAvg()`
+    i `rywalAgg()` wybierające tryb po kluczu; stopka wykresu pisze wtedy „średnie tygodniowe"
+    zamiast „sumy tygodniowe". Oś Y dla procentów startuje z minimum 100.
+    Produktywność jest teraz **domyślną metryką** wykresu, a w tabeli pojedynku doszedł wiersz
+    „Średnia produktywność".
+  - **Backfill uwzględnia dni z samym snem** (`S.sleep`), bo one też dają produktywność —
+    wcześniej brane były tylko dni z nauką lub pomodoro.
+  - **„Sen a produktywność" → „Sen a nauka"** (na życzenie użytkownika): `renderCorr` porównuje
+    teraz sen z **minutami nauki** (`S.matura.sessions`), a nie ze zmierzoną pracą z `S.timelog`;
+    wniosek i etykiety wierszy przepisane. Poprawiony też komunikat „Brak danych w tym zakresie",
+    który po buildzie 57 wciąż prosił o zapisywanie nastroju.
+  - **Zweryfikowane:** liczenie produktywności (7 h snu + 90 min nauki = 70%, 8 h + 120 min = 83%,
+    `null` bez danych), trzy metryki wykresu z właściwym formatowaniem i osiami, utrzymanie
+    skali 0-100% w zakresach 30 dni / Rok / Wszystko (dowód, że uśrednianie działa), wiersz
+    produktywności w pojedynku, karta „Sen a nauka" pokazująca minuty nauki, regres 15 widoków
+    + 5 pod-zakładek + trzy metryki + stany bez znajomych i bez logowania.
+  - **Opublikowano build 58.**
 
 - **2026-08-25 (sesja 16, cd. — porządki wokół nastroju + rozbudowa Rywalizacji, build 57):**
   Pięć zmian zamówionych przez użytkownika naraz.
