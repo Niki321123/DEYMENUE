@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-25 (sesja 16, cd. — ukryta zakładka „Lista książek", build 55)_
+_Ostatnia aktualizacja: 2026-08-25 (sesja 16, cd. — Rywalizacja ze znajomymi, build 56)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,52 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-25 (sesja 16, cd. — Rywalizacja ze znajomymi, build 56):** Użytkownik chce
+  rywalizować z kolegą wewnątrz aplikacji. Wybrane przez niego warianty: dodawanie przez
+  **kod zaproszenia**, porównywane **sesje pomodoro + godziny nauki + nakładane wykresy**
+  (bez wspólnego wskaźnika punktowego, bez „życia"/nawyków/snu).
+  - **Najważniejsza decyzja architektoniczna:** prywatny blob `daymenu_data` **nigdy** nie
+    wychodzi poza właściciela — zawiera nastrój, sen, cele i dane Librusa. Znajomym
+    udostępniana jest wyłącznie nowa, wąska tabela `stats_daily` (jeden wiersz na dzień:
+    `study_min`, `pomo_count`). Efekt uboczny: to pierwsze dane w tym projekcie w formie,
+    którą da się odpytywać SQL-em.
+  - **Nowe tabele:** `profiles` (nazwa widoczna dla znajomych), `profile_codes` (kod
+    zaproszenia), `friendships` (symetryczna — dwa wiersze, dzięki czemu polityki są proste),
+    `stats_daily`. Funkcje `profile_ensure()` i `friend_add_by_code()` jako SECURITY DEFINER.
+  - **Dlaczego kody są w osobnej tabeli:** pierwotnie `code` siedział w `profiles`, ale test
+    RLS pokazał, że **znajomy widzi cudzy kod zaproszenia** i mógłby go rozdać dalej. RLS
+    działa na wiersze, nie na kolumny, więc kod przeniesiony do `profile_codes` z polityką
+    „tylko właściciel". `friend_add_by_code` czyta go jako SECURITY DEFINER — inaczej nie
+    dałoby się znaleźć właściciela kodu bez otwierania całej tabeli na odczyt.
+  - **`is_friend()` jako SECURITY DEFINER:** bez tego zapytanie o `friendships` wewnątrz
+    polityki innej tabeli samo podlegałoby RLS i wpadało w rekurencję.
+  - **Skąd liczby:** `study_min` = suma `minutes` z `S.matura.sessions` danego dnia;
+    `pomo_count` = drzewa z `S.forest` o statusie `alive` (uschnięte, czyli przerwane sesje,
+    słusznie się nie liczą). Wysyłka doczepiona do istniejącego pollingu `cloudAutoPull`,
+    ale tylko przy realnej zmianie (hash dzisiejszych liczb) — inaczej co 15 s waliłaby w bazę.
+    Przy pierwszym zalogowaniu jednorazowy backfill 60 dni, żeby wykres nie zaczynał się od zera.
+  - **UI:** nowa zakładka „Rywalizacja" w grupie Edukacja — kod z przyciskiem kopiowania,
+    dodawanie po kodzie, „Pojedynek tygodnia" (tabela z koroną przy liderze każdej kategorii,
+    reset w poniedziałek) i wykres z dwiema nałożonymi liniami (przełączniki nauka/pomodoro
+    oraz 7/30 dni), zbudowany na tym samym wzorcu SVG co Analiza czasu.
+  - **Umiejscowienie kodu:** blok wstawiony PRZED `startCloudPolling()`, bo ta funkcja woła
+    teraz `rywalLoad()` i jest wywoływana synchronicznie przy starcie — umieszczenie niżej
+    dałoby dokładnie ten sam TDZ, który wywalił buildy 26 i 42 (zob. [[save-at-load-tdz]]).
+  - **Zweryfikowane:** polityki RLS na trzech użytkownikach (A↔B znajomi, C obcy) — A widzi
+    statystyki swoje i B, dane C niewidoczne; obcy widzi wyłącznie własne; po przeniesieniu
+    kodów A widzi tylko swój kod. Funkcje: `profile_ensure` generuje unikalny kod,
+    `friend_add_by_code` działa też dla `c5b8f4b4` (małe litery, bez myślnika) i odrzuca
+    własny kod (`self_code`), nieistniejący (`not_found`) i za krótki (`bad_code`);
+    znajomość jest obustronna. Klient: liczenie dzienne (uschnięte drzewo nie liczone),
+    render pojedynku i wykresu na danych testowych, przełączniki metryki i zakresu, stan
+    bez logowania, stan bez znajomych, czyszczenie pamięci po wylogowaniu, regres 15 widoków.
+  - **Czego NIE zweryfikowano:** pełnej ścieżki na żywym koncie w aplikacji (tworzenie profilu
+    i dodanie znajomego przez interfejs) — testy RPC szły przez SQL z podstawionym JWT.
+    Do sprawdzenia przy pierwszym realnym użyciu z kolegą.
+  - **Świadome ograniczenie:** to system honorowy — aplikacja jest lokalna, więc liczby da się
+    podrobić w konsoli. Przy dwóch znajomych nie ma sensu tego uszczelniać.
+  - **Opublikowano build 56.**
 
 - **2026-08-25 (sesja 16, cd. — ukryta „Lista książek", build 55):** Analogicznie do
   „Wymagań" (build 50): przycisk `data-view="books"` dostał `style="display:none"`
