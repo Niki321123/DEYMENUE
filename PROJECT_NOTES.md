@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-25 (sesja 16, cd. — materiały tylko dla konta właściciela, build 59)_
+_Ostatnia aktualizacja: 2026-08-25 (sesja 16, cd. — KRYTYCZNE: dane wyciekały między kontami, build 60)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,46 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-25 (sesja 16, cd. — ⚠️ KRYTYCZNE: dane wyciekały między kontami, build 60):**
+  Użytkownik zgłosił, że po ręcznym usunięciu materiałów na koncie `miciwici.yt@gmail.com`
+  **zniknęły też z `mikolaj.sledziewski@gmail.com`**. To nie był problem z materiałami, tylko
+  **wyciek całego stanu między kontami na jednym urządzeniu**.
+  - **Przyczyna:** `localStorage` jest wspólny dla wszystkich kont, a `firstSync()` po
+    zalogowaniu porównywał `row.updated_at` z **`S.lastCloudSync` należącym do POPRZEDNIEGO
+    użytkownika**. Gdy chmura nowego konta była „starsza", warunek nie przechodził i kod
+    leciał prosto do `cloudPush()` — **wypychając dane poprzedniej osoby na cudze konto**,
+    bez żadnego pytania. Potwierdzone w bazie: 11:48 zapis na miciwici (flagi wróciły na
+    `true`), 11:50 zapis na mikolaj (materiały wyzerowane).
+  - **Fix:** nowy znacznik `localStorage["daymenu_data_owner"]` = id konta, do którego należą
+    dane na urządzeniu. `firstSync()` sprawdza go **przed** czymkolwiek innym: gdy dane należą
+    do innego konta, **nigdy nie wypycha** — albo pobiera dane właściwego konta (`applyCloud`),
+    albo (gdy konto nie ma jeszcze nic w chmurze) czyści stan lokalny do `defaults`
+    (`resetLocalData()`) i dopiero wtedy zapisuje. Dodatkowo `cloudPush()` ma twardą blokadę
+    („ostatnia linia obrony”), a `applyCloud()` ustawia znacznik. Dla użytkowników sprzed tej
+    wersji znacznik ustawia się przy starcie, jeśli istnieje sesja — ochrona działa od razu,
+    bez czekania na ponowne logowanie.
+  - **Znaleziona przy okazji kruchość:** `applyCloud()` (i `load()`) robią **płytki**
+    `Object.assign`, więc wiersz z chmury z niepełnym `matura` całkowicie zastępował obiekt
+    domyślny, a `matMigrate()` wywalał się na `for(const t of m.topics)` — zostawiając
+    `S.matura.grid` niezdefiniowane i **rozwalając cały widok Nauka**. `matMigrate()`
+    backfilluje teraz `grid`/`topics`/`plan`/`sessions` przed użyciem, a `applyCloud()`
+    wywołuje `matMigrate()`+`matRecompute()`.
+  - **Naprawa danych:** materiały przywrócone na konto `mikolaj.sledziewski@gmail.com`
+    z kopii `daymenu_data_backup` id 2 (sprawdzone: wszystkie miały 0 odhaczeń, więc żaden
+    postęp nie przepadł — był już wyzerowany wcześniejszym resetem statystyk). Flagi
+    `wpMatsSeeded`/`zbiorSeeded` wyczyszczone, żeby zasiew zadziałał ponownie, gdyby
+    przywrócenie nie dotarło. Konto miciwici pozostaje z pustą zakładką Materiały.
+  - **Zweryfikowane** scenariuszem odtwarzającym błąd (z `confirm()` zwracającym `false`,
+    czyli odpowiedzią „wyślij dane z tego urządzenia", która go wywoływała): logowanie na A,
+    przelogowanie na B → B zachowuje swoje dane, **zero wysyłek na konto B**, znacznik
+    właściciela przechodzi `AAA`→`BBB`; regres 12 widoków + 5 pod-zakładek na niepełnym
+    obiekcie `matura` bez błędów.
+  - **Uwaga metodyczna:** dwa pierwsze podejścia do testu były niemiarodajne —
+    w piaskowce `data:` URL `localStorage` jest zablokowany (ochrona się nie włączała),
+    a `confirm()` domyślnie przechodził. Dopiero podmiana `localStorage` przez
+    `Object.defineProperty` + wymuszenie `confirm()=false` dało rozstrzygający test.
+  - **Opublikowano build 60.**
 
 - **2026-08-25 (sesja 16, cd. — materiały tylko dla konta właściciela, build 59):**
   Kursy z Wielkiej Powtórki i „Zbiór Zadań Maturalnych" to prywatne materiały jednej osoby
