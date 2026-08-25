@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-25 (sesja 16, cd. — Rywalizacja ze znajomymi, build 56)_
+_Ostatnia aktualizacja: 2026-08-25 (sesja 16, cd. — porządki: koniec nastroju, Rywalizacja rozbudowana, build 57)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,39 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-25 (sesja 16, cd. — porządki wokół nastroju + rozbudowa Rywalizacji, build 57):**
+  Pięć zmian zamówionych przez użytkownika naraz.
+  - **Koniec z nastrojem:** z wykresu w Analizie czasu usunięte serie „Nastrój" i „Humor"
+    (`CHART_SERIES`, `chartOn`, martwe `pctNastroj`/`pctMood`), zakładka **Mood tracker**
+    ukryta z nawigacji (`display:none`, jak Wymagania i Lista książek — widok i dane
+    `S.moods` zostają). Pociągnęło to za sobą trzy miejsca, które inaczej zostałyby sierotami:
+    kafelek „Dzisiejszy nastrój" i karta „Nastrój — ostatnie 14 dni" **zdjęte z Pulpitu**;
+    karta „Sen, nastrój i produktywność" w Analizie czasu przemianowana na **„Sen a
+    produktywność"** i pozbawiona wniosków o nastroju oraz kropki nastroju w wierszach;
+    **kontekst analizy AI** przestał wysyłać `nastroj`/`humor`/`sredniNastroj`, a jego prompt
+    opisuje już tylko istniejące wskaźniki. W miejsce kafelka nastroju wszedł
+    **„Sesje pomodoro dzisiaj"** — pasuje do nowego profilu aplikacji.
+  - **Rywalizacja przeniesiona** z grupy Edukacja do **Produktywność** (obok Analizy czasu).
+  - **Zakresy wykresu:** było 7/30 dni, jest **7 dni / 30 dni / Rok / Wszystko**. Powyżej
+    90 dni punkty są **sumowane tygodniowo** (nie uśredniane — to liczniki, nie procenty),
+    bo 365 dziennych punktów na szerokości 720 px zlewa się w jedną kreskę; stopka wykresu
+    informuje wtedy „sumy tygodniowe". „Wszystko" liczy od najstarszego dnia z danymi.
+  - **Pojedynek dostał przełącznik „Ten tydzień / Całość".** Całość liczy od **daty powstania
+    znajomości** (`friendships.created_at`), czyli od faktycznego startu rywalizacji — nie od
+    początku danych. Wymagało to dociągnięcia `created_at` w `rywalLoad()`. Doszedł trzeci
+    wiersz tabeli: **„Dni z nauką"**, sensowniejszy w skali miesięcy niż same sumy.
+  - **Backfill przepisany:** wysyłał sztywno ostatnie 60 dni, przez co zakresy „Rok"
+    i „Wszystko" i tak nie miały czego pokazać. Teraz wysyła **całą lokalną historię**
+    (wszystkie daty z `sessions` i `forest`), partiami po 200 wierszy. Pobieranie statystyk
+    straciło filtr `date=gte`, bo ograniczał do 60 dni.
+  - **Zweryfikowane:** układ nawigacji (Mood tracker zniknął, Rywalizacja w Produktywności),
+    legenda wykresu bez nastroju i humoru, kafelki Pulpitu, pojedynek w obu zakresach na
+    danych z 200 dni (tygodniowy vs całościowy z podpisem daty startu), wszystkie cztery
+    zakresy wykresu (7/30 dni dziennie, Rok 53 punkty tygodniowo, Wszystko od pierwszych
+    danych), regres 15 widoków **wraz z ukrytymi** (mood/books/wymagania nadal działają),
+    wykres Analizy czasu we wszystkich zakresach i karta korelacji.
+  - **Opublikowano build 57.**
 
 - **2026-08-25 (sesja 16, cd. — Rywalizacja ze znajomymi, build 56):** Użytkownik chce
   rywalizować z kolegą wewnątrz aplikacji. Wybrane przez niego warianty: dodawanie przez
