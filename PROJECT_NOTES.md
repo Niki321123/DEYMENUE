@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — podsumowanie okresu, build 71)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — hotfix rozmytego ekranu, build 72)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,22 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-27 (sesja 16, cd. — HOTFIX: nakładka zasłaniała całą aplikację, build 72):**
+  Zgłoszenie: „aplikacja się nie odpala (jest zablurowana)" — zrzut pokazywał pulpit za
+  ciemnym, rozmytym ekranem. Przyczyna: `.wrap-tlo` (nakładka podsumowania z buildu 71) ma
+  własne `display:flex`, które **wygrywa z domyślnym `[hidden]{display:none}`** przeglądarki.
+  Atrybut `hidden` w HTML nic nie chował, więc nakładka z `position:fixed;inset:0` wisiała
+  na wierzchu i przechwytywała kliknięcia. Poprawka to jedna reguła: `.wrap-tlo[hidden]{display:none}`.
+  - **To trzeci raz z tą samą pułapką w tym pliku** (wcześniej `.nav-btn`, stąd ukrywanie
+    zakładek przez `style="display:none"`; są też gotowe wzorce `#loginScreen[hidden]`
+    i `.wym-row[hidden]`). Zapisane w pamięci projektu.
+  - **Czego zabrakło w testach buildu 71:** sprawdzałem, czy przełączanie ustawia właściwość
+    `hidden` i czy po otwarciu widać treść — ale **nigdy, czy stan domyślny jest naprawdę
+    niewidoczny**. Przy każdej nakładce trzeba testować `getComputedStyle(el).display`
+    oraz `document.elementFromPoint(środek ekranu)` PRZED pierwszym otwarciem; teraz tak
+    zweryfikowane: przed otwarciem `display:none` i pod środkiem ekranu jest treść widoku,
+    po otwarciu `flex`, po zamknięciu znowu `none`.
 
 - **2026-08-27 (sesja 16, cd. — podsumowanie okresu w stylu Spotify Wrapped, build 71):**
   Użytkownik chciał „wrapped" w czterech zakresach. Po propozycji zawęził go do **zawsze
