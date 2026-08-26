@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — podsumowanie pokazuje sie samo, build 73)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — format relacji i kolejka okresow, build 75)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,35 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-27 (sesja 16, cd. — podsumowanie w formacie relacji, buildy 74-75):**
+  Uwagi po obejrzeniu podglądu: usunąć przeliczenie na filmy i etykietę, poprawić nieczytelny
+  kafel rekordu, zrobić z tego **format relacji jak na Instagramie**, a gdy kilka podsumowań
+  wypada tego samego dnia — pokazać wszystkie po kolei.
+  - **Kadr 9:16.** `width:min(420px,92vw,calc(92vh*9/16))` + `aspect-ratio:9/16` — pierwsza
+    wersja z `max-height:92vh` psuła proporcję (wychodziło 0.634 zamiast 0.563), bo wysokość
+    była przycinana niezależnie od szerokości. Teraz szerokość jest wyliczana z obu
+    ograniczeń naraz, więc proporcja trzyma się dokładnie na każdym ekranie.
+  - Zamiast kropek na dole **paski postępu u góry** (jak w Stories), nawigacja dotknięciem:
+    prawe 65% kadru dalej, lewe 35% wstecz, dotknięcie na ostatniej planszy zamyka.
+    Treść wyśrodkowana w pionie przez `.wrap-srodek` (flex:1, justify-content:center).
+  - Usunięte `wrapPorownanie()` i `wrapEtykieta()` razem z martwym kodem. Kafel rekordu:
+    wartość + „Najlepszy dzień · 8 marca" (bez roku) — wcześniej podpis „Rekord: 8 marca 2027"
+    nie mówił, czego dotyczy liczba nad nim.
+  - **Kolejka okresów (build 75).** Wcześniej większy okres wypierał mniejszy, więc
+    w poniedziałek wypadający 1. dnia miesiąca tygodniowe podsumowanie przepadało bez śladu.
+    Teraz `wrapNalezne()` zwraca listę od najkrótszego do najdłuższego, a relacja ma
+    `kolejka.length * 2` plansz — 4 przy dwóch okresach, 6 przy trzech. Stan to `wrapKolejka`
+    + `wrapKrok` (indeks w całej sekwencji); okres i numer planszy wylicza się z kroku.
+    Wszystkie pokazane okresy są od razu oznaczane jako obejrzane.
+  - **Sprostowanie do poprzedniego podglądu:** kolory w pojedynku (lepszy biały, gorszy szary)
+    były w aplikacji poprawne od początku — odwrócone były w moim ręcznie składanym pliku
+    podglądu. Kolejny podgląd pobrałem już bezpośrednio z działającej aplikacji.
+  - Testy: 1 lutego 2027 (poniedziałek i 1. dnia miesiąca) → kolejka `["tydz","mies"]`,
+    4 plansze, paski wypełniają się kolejno `▮▯▯▯` → `▮▮▮▮`, cofanie przechodzi przez granicę
+    okresów, oba znaczniki zapisane ✓; pojedynczy okres → 2 plansze ✓; trzy okresy → 6 ✓;
+    proporcja 0.563, treść mieści się we wszystkich sześciu wariantach ✓; strzałki, Escape,
+    krzyżyk, klik w tło ✓; nakładka domyślnie `display:none` ✓.
 
 - **2026-08-27 (sesja 16, cd. — podsumowanie wyświetla się samo przy wejściu, build 73):**
   Doprecyzowanie: podsumowania nie ma być w Profilu, ma **samo wyskakiwać przy wejściu do
