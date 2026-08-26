@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — punkty zamiast sesji pomodoro, build 76)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — bonusy w zakresie recapu, build 78)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,29 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-27 (sesja 16, cd. — bonusy liczone z zakresu podsumowania, buildy 77-78):**
+  Prośba: bonusy tygodniowe i miesięczne mają być doliczone ZANIM pokaże się recap, tak żeby
+  od razu były w jego liczbach.
+  - **Gdzie faktycznie brakowało:** `pktPelneTygodnie()`/`pktPelneMiesiace()` wymagają, żeby
+    okres skończył się PRZED dzisiaj. Podsumowanie tygodnia i miesiąca to spełniało (dotyczą
+    okresów minionych), ale **podsumowanie roku szkolnego pokazywane 30 kwietnia gubiło bonus
+    za kwiecień i za ostatni pełny tydzień** — oba mieszczą się w podsumowywanym zakresie,
+    ale nie zakończyły się względem „dziś".
+  - Nowe `pktTygodnieWZakresie(dni)` i `pktMiesiaceWZakresie(dni)` budują okresy **z samego
+    zakresu recapu** i biorą te, które mieszczą się w nim w całości. Zakres recapu jest
+    z definicji zamknięty, więc porównanie z dzisiejszą datą jest zbędne.
+  - Efekt na danych testowych (rok szkolny, 242 dni, ja 60 min/dzień, Julo 30): 8 pełnych
+    miesięcy zamiast 7 i 33 tygodnie zamiast 32 → **812 pkt zamiast 772**. Rozbicie policzone
+    ręcznie: 242 pkt za godziny + 33 x 10 + 8 x 30 = 812 ✓.
+  - **Znana, celowa różnica:** karta „Punkty" w Rywalizacji nadal liczy tylko okresy
+    zakończone względem dziś, więc 30 kwietnia recap pokaże o bonus kwietniowy więcej niż
+    karta; karta dogoni to 1 maja. Recap zamyka rok szkolny w jego ostatnim dniu i to jest
+    właściwe zachowanie — zmiana reguły karty sprawiłaby, że punkty skakałyby w trakcie dnia.
+  - **Build 78:** punkty w pojedynku zaokrąglane do całości — „122.8" w nagłówkowym
+    porównaniu wyglądało jak błąd.
+  - Regresja: tygodniowe 19-25 kwietnia = 17 pkt (7 h + bonus 10), miesięczne marzec = 101 pkt
+    (31 h + 4 tygodnie + miesiąc) — bez zmian względem poprzedniego buildu ✓.
 
 - **2026-08-27 (sesja 16, cd. — w pojedynku punkty zamiast sesji pomodoro, build 76):**
   Uwaga użytkownika, trafna: **liczba sesji pomodoro nie jest porównywalna**, bo każdy może
