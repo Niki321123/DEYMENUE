@@ -263,6 +263,11 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 .mats-lesson-row a{flex:1;min-width:0;color:var(--text-1);text-decoration:none;font-size:var(--fs-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mats-lesson-row a:hover{color:var(--primary);text-decoration:underline}
 .mats-lesson-row .muted{flex:none;font-size:12px;font-variant-numeric:tabular-nums}
+.chat-box{display:flex;flex-direction:column;gap:var(--sp-2);max-height:340px;overflow-y:auto;padding:var(--sp-2);background:var(--surface-2);border-radius:var(--radius-s);margin-bottom:var(--sp-3)}
+.chat-day{align-self:center;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--text-3);padding:var(--sp-2) 0 2px}
+.chat-msg{max-width:78%;padding:7px 12px;border-radius:14px;background:var(--surface);border:1px solid var(--border);font-size:var(--fs-1);white-space:pre-wrap;overflow-wrap:anywhere}
+.chat-msg.mine{align-self:flex-end;background:var(--primary);color:var(--primary-text);border-color:transparent}
+.chat-msg .t{display:block;font-size:11px;opacity:.65;margin-top:3px;font-variant-numeric:tabular-nums}
 
 /* ===== TELEFON ===== */
 @media(max-width:760px){
@@ -787,6 +792,20 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     </div>
 
     <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:2px">
+        <h2 style="margin:0">💬 Czat</h2>
+        <select id="chatKto" style="flex:none;width:auto"></select>
+      </div>
+      <p class="muted" style="margin-bottom:var(--sp-3)">Rozmowa widoczna tylko dla Was dwojga.</p>
+      <div id="chatBox" class="chat-box"></div>
+      <div class="row">
+        <input type="text" id="chatTekst" class="field" maxlength="1000" placeholder="Napisz wiadomość…">
+        <button class="btn" id="chatSend" style="flex:none">Wyślij</button>
+      </div>
+      <p class="muted" id="chatMsg" style="margin-top:var(--sp-2)"></p>
+    </div>
+
+    <div class="card">
       <div class="row" style="justify-content:space-between;margin-bottom:var(--sp-2)">
         <h2 style="margin:0">🤝 Zakłady</h2>
         <span class="muted">stawka 1–7 pkt</span>
@@ -999,7 +1018,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=65;
+const DM_BUILD=66;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -4892,6 +4911,9 @@ async function rywalLoad(){
     rywalFriends.myDays=byUser[rywalProfile.user_id]||{};
     await betsLoad();
     await shopLoad();
+    await chatLoad();
+    chatLastSeen=chatKluczOstatniej();
+    chatStartPoll();
   }catch(e){console.error("rywalLoad:",e)}
   finally{rywalLoading=false}
 }
@@ -4958,7 +4980,7 @@ function renderRywal(){
   $("#rywalLogin").hidden=zalogowany;
   $("#rywalMain").hidden=!zalogowany;
   if(!zalogowany)return;
-  renderPunkty();renderZaklady();renderSklep();
+  renderPunkty();renderZaklady();renderSklep();renderChat();
   if(rywalProfile){
     $("#rywalCode").textContent=rywalProfile.code||"————";
     if(document.activeElement!==$("#rywalName"))$("#rywalName").value=rywalProfile.name||"";
@@ -5301,6 +5323,108 @@ $("#betLista").onclick=async e=>{
 $("#betDodaj").onclick=betDodaj;
 $("#betOpis").onkeydown=e=>{if(e.key==="Enter")betDodaj()};
 
+/* ---- czat ----
+   Wiadomości 1:1 (from_id/to_id), bo znajomi użytkownika nie muszą być znajomymi między sobą
+   — wspólny pokój pokazywałby osobie C rozmowę A z B. RLS przepuszcza wyłącznie wiersze,
+   w których jestem nadawcą albo odbiorcą, a pisać wolno tylko do znajomego. */
+let chatMsgs=[],chatWith=null,chatTimer=null,chatLastSeen=null;
+function chatKluczOstatniej(){return chatMsgs.length?chatMsgs[chatMsgs.length-1].created_at:null}
+async function chatLoad(){
+  const tok=await sbToken();if(!tok)return;
+  const r=await fetch(`${SB_URL}/rest/v1/rywal_messages?select=*&order=created_at.desc&limit=300`,
+    {headers:{apikey:SB_KEY,Authorization:"Bearer "+tok}});
+  chatMsgs=r.ok?(await r.json()).reverse():[];
+}
+// z kim rozmawiamy: wybór użytkownika, a gdy znajomy jest jeden — po prostu on
+function chatPartner(){
+  if(chatWith&&rywalFriends.some(f=>f.user_id===chatWith))return chatWith;
+  return rywalFriends.length?rywalFriends[0].user_id:null;
+}
+function chatWatku(id){
+  const ja=rywalProfile?rywalProfile.user_id:null;
+  return chatMsgs.filter(m=>(m.from_id===ja&&m.to_id===id)||(m.from_id===id&&m.to_id===ja));
+}
+function chatGodzina(ts){
+  const d=new Date(ts);const p=x=>String(x).padStart(2,"0");
+  return p(d.getHours())+":"+p(d.getMinutes());
+}
+function renderChat(){
+  const sel=$("#chatKto"),ja=rywalProfile?rywalProfile.user_id:null;
+  sel.innerHTML=rywalFriends.length
+    ? rywalFriends.map(f=>`<option value="${esc(f.user_id)}">${esc(f.name)}</option>`).join("")
+    : `<option value="">— brak znajomych —</option>`;
+  const kto=chatPartner();
+  if(kto)sel.value=kto;
+  sel.hidden=rywalFriends.length<2;          // przy jednym znajomym wybór jest zbędny
+  sel.disabled=!rywalFriends.length;
+  $("#chatSend").disabled=!kto;
+  $("#chatTekst").disabled=!kto;
+
+  const box=$("#chatBox");
+  if(!kto){box.innerHTML=`<div class="empty">Dodaj znajomego, żeby zacząć rozmowę.</div>`;return}
+  const w=chatWatku(kto);
+  if(!w.length){box.innerHTML=`<div class="empty">Jeszcze nic tu nie ma — napisz pierwszy.</div>`;return}
+  let dzien="",html="";
+  w.forEach(m=>{
+    const ds=String(m.created_at||"").slice(0,10);
+    if(ds!==dzien){dzien=ds;html+=`<div class="chat-day">${esc(fmtDate(ds))}</div>`;}
+    const moja=m.from_id===ja;
+    html+=`<div class="chat-msg${moja?" mine":""}">${esc(m.tresc)}<span class="t">${chatGodzina(m.created_at)}</span></div>`;
+  });
+  box.innerHTML=html;
+  box.scrollTop=box.scrollHeight;
+}
+async function chatSend(){
+  const kto=chatPartner(),el=$("#chatTekst"),tresc=el.value.trim(),msg=$("#chatMsg");
+  if(!kto)return msg.textContent="Najpierw dodaj znajomego.";
+  if(!tresc)return;
+  if(tresc.length>1000)return msg.textContent="Wiadomość może mieć maks. 1000 znaków.";
+  el.value="";msg.textContent="";
+  try{
+    const tok=await sbToken();if(!tok)throw new Error("NOLOGIN");
+    const r=await fetch(`${SB_URL}/rest/v1/rywal_messages`,{
+      method:"POST",
+      headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json",Prefer:"return=representation"},
+      body:JSON.stringify([{from_id:rywalProfile.user_id,to_id:kto,tresc}])
+    });
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const dodane=await r.json();
+    chatMsgs=chatMsgs.concat(dodane);        // bez czekania na kolejne odpytanie
+    chatLastSeen=chatKluczOstatniej();
+    renderChat();
+  }catch(e){
+    el.value=tresc;                          // nie gubimy tekstu, gdy wysyłka padnie
+    msg.textContent="Nie udało się wysłać: "+((e&&e.message)||"błąd");
+  }
+}
+/* Odpytywanie co 10 s. Gdy Rywalizacja jest otwarta — odświeżamy rozmowę; gdy jesteś gdzie
+   indziej — tylko powiadamiamy toastem. Przy schowanym oknie nie odpytujemy w ogóle. */
+function chatStartPoll(){
+  if(chatTimer)return;
+  chatTimer=setInterval(()=>{
+    if(!sbSession||document.hidden)return;
+    chatSprawdzNowe();
+  },10000);
+}
+function chatStopPoll(){clearInterval(chatTimer);chatTimer=null}
+async function chatSprawdzNowe(){
+  if(!sbSession||!rywalProfile)return;
+  const przed=chatLastSeen;
+  await chatLoad();
+  const teraz=chatKluczOstatniej();
+  if(przed&&teraz&&teraz>przed){
+    const ja=rywalProfile.user_id;
+    const nowe=chatMsgs.filter(m=>m.created_at>przed&&m.from_id!==ja);
+    if(nowe.length&&!$("#view-rywal").classList.contains("active"))
+      toast(`💬 ${betNazwa(nowe[nowe.length-1].from_id)}: ${nowe[nowe.length-1].tresc.slice(0,60)}`);
+  }
+  chatLastSeen=teraz;
+  if($("#view-rywal").classList.contains("active"))renderChat();
+}
+$("#chatSend").onclick=chatSend;
+$("#chatTekst").onkeydown=e=>{if(e.key==="Enter")chatSend()};
+$("#chatKto").onchange=()=>{chatWith=$("#chatKto").value;renderChat()};
+
 /* ---- sklep ----
    Katalog jest wspólny: RLS pokazuje nagrody moje i znajomych, więc obaj widzicie tę samą
    listę. Saldo = punkty zdobyte minus wydane; korony w tabeli punktów zakupy nie ruszają. */
@@ -5459,7 +5583,9 @@ function stopCloudPolling(){
   stopLibrusPolling();
   aiAccess=false;applyAiGating();
   // po wylogowaniu nie zostawiamy w pamięci ani profilu, ani cudzych statystyk
-  rywalProfile=null;rywalFriends=[];rywalBets=[];shopItems=[];shopPurchases=[];statsLastHash=null;statsBackfilled=false;
+  rywalProfile=null;rywalFriends=[];rywalBets=[];shopItems=[];shopPurchases=[];
+  chatMsgs=[];chatWith=null;chatLastSeen=null;chatStopPoll();
+  statsLastHash=null;statsBackfilled=false;
 }
 setTimeout(cloudAutoPull,2500);
 applyAiGating();               // domyślnie (przed potwierdzeniem dostępu) AI ukryte
