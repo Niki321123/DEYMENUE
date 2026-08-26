@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — liczba sesji z harmonogramu, build 67)_
+_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — egzekwowanie preferencji w Harmonogramie, build 68)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,38 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-26 (sesja 16, cd. — generator Harmonogramu ignorował preferencje, build 68):**
+  Zgłoszenie: przy preferencji „chcę się uczyć 3h45 dziennie, w piątki się nie uczę"
+  (pomodoro 45 min, czyli 5 bloków) AI ułożyło **4 bloki dziennie i jeden w piątek**.
+  Ta sama klasa błędu co w buildzie 67, ale w innej funkcji — `aiPlan()`/`matSanitizeBlocks()`
+  sprawdzały tylko, czy komórka jest „avail", czy nie ma duplikatu i czy przedmiot istnieje.
+  Liczba bloków na dzień i dni wolne były **wyłącznie prośbą w prompcie**.
+  - **Rozwiązanie: model tłumaczy język na strukturę, kod egzekwuje liczby.** Odpowiedź
+    zawiera teraz `limity`: `{blokowDziennie, typ:"cel"|"maks", dniWolne:[0-6]}`. Model
+    dobrze zamienia „3h45 przy 45-minutowych sesjach" na 5 i „w piątki się nie uczę" na
+    `[4]`; sam plan i tak potem sprawdzamy.
+  - `matEgzekwujLimity()`: kasuje bloki z dni wolnych, przycina dni ponad limit (zostawia
+    wcześniejsze godziny), a przy `typ:"cel"` **dokłada brakujące** w wolnych godzinach
+    „Dostępny" tego dnia. `matNastepnyPrzedmiot()` wybiera przedmiot z największym deficytem
+    względem jego procentu.
+  - **Pułapka przy dokładaniu:** pierwsza wersja bezwarunkowo omijała przedmiot sąsiadujący
+    w planie („nie dwa razy pod rząd") i przez to wszystkie dokładane bloki lądowały na tym
+    samym przedmiocie — przy 50/50 wyszło 12/18. Teraz reguła sąsiedztwa ustępuje tylko przy
+    praktycznie równym deficycie (`różnica < 0.5`), co daje 15/15.
+  - **Interpretacja jest pokazywana użytkownikowi:** „Zrozumiałem: 5 sesji dziennie · wolne:
+    Pt. Poprawki: usunąłem 1 blok z dni wolnych, dołożyłem 6 brakujących." Bez tego złe
+    zrozumienie preferencji byłoby niewidoczne. Komunikat podaje też realny czas nauki
+    (`liczba bloków × pomoWorkMin`), a nie „N godzin" — blok to godzina zegarowa, ale nauki
+    jest w niej tyle, ile trwa pomodoro.
+  - Testy: 24 bloki + 1 w piątek → 30 bloków, po 5 dziennie, zero w piątek, 15/15 ✓;
+    `typ:"maks"` przycina do 3/dzień i **nie** dokłada ✓; przy 3 wolnych godzinach dziennie
+    zgłasza „12 nie zmieściło się" ✓; brak preferencji → plan modelu nietknięty ✓;
+    planer lokalny (bez AI) i pozostałe widoki bez zmian i bez błędów ✓.
+  - **Znane ograniczenie:** egzekwujemy liczbę bloków i dni wolne, ale **nie proporcje
+    przedmiotów** — dokładane bloki wyrównują deficyt, natomiast bloki, które model już
+    rozdał źle, zostają. Przy 80/20 i planie modelu 12/12 wychodzi 18/12, nie 24/6.
+    Naprawa wymagałaby przepisania całego planu, czyli rezygnacji z AI w tym miejscu.
 
 - **2026-08-26 (sesja 16, cd. — AI dorzucało sesje ponad harmonogram, build 67):**
   Zgłoszenie: przy 5 sesjach w harmonogramie plan potrafił mieć 7. **To był błąd kodu, nie
