@@ -1088,7 +1088,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=76;
+const DM_BUILD=77;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -5593,20 +5593,50 @@ function wrapMoje(dni){
    ten sam rachunek zamknięty w zakresie dat. Bonusy przyznajemy tylko za tygodnie i miesiące
    MIESZCZĄCE SIĘ W CAŁOŚCI w okresie — inaczej podsumowanie tygodnia dopisywałoby punkty
    za miesiąc, który jeszcze trwa. */
+/* Okresy liczone Z ZAKRESU PODSUMOWANIA, a nie względem dzisiejszej daty.
+   pktPelneTygodnie()/pktPelneMiesiace() wymagają, żeby okres skończył się PRZED dziś — przez to
+   podsumowanie roku szkolnego pokazywane 30 kwietnia gubiło bonus za kwiecień i za ostatni
+   tydzień, mimo że oba mieszczą się w podsumowywanym zakresie. Zakres recapu jest z definicji
+   zamknięty, więc wystarczy sprawdzić, czy okres mieści się w nim w całości. */
+function pktTygodnieWZakresie(dni){
+  const zbior=new Set(dni),out=[],d=new Date(dni[0]+"T00:00");
+  const wd=(d.getDay()+6)%7;if(wd)d.setDate(d.getDate()+(7-wd));   // start od pierwszego poniedziałku
+  for(let i=0;i<520;i++){
+    const tydz=[],p=new Date(d);
+    for(let j=0;j<7;j++){tydz.push(dsLok(p));p.setDate(p.getDate()+1)}
+    if(!zbior.has(tydz[0]))break;                                   // wyszliśmy poza zakres
+    if(tydz.every(ds=>zbior.has(ds)))out.push({dni:tydz});
+    d.setDate(d.getDate()+7);
+  }
+  return out;
+}
+function pktMiesiaceWZakresie(dni){
+  const zbior=new Set(dni),out=[],start=new Date(dni[0]+"T00:00");
+  let y=start.getFullYear(),m=start.getMonth();
+  if(start.getDate()>1){m++;if(m>11){m=0;y++}}                      // miesiąc zaczęty w trakcie się nie liczy
+  for(let i=0;i<120;i++){
+    const pierwszy=new Date(y,m,1),nastepny=new Date(y,m+1,1),mies=[];
+    for(const x=new Date(pierwszy);x<nastepny;x.setDate(x.getDate()+1))mies.push(dsLok(x));
+    if(!zbior.has(mies[0]))break;
+    if(mies.every(ds=>zbior.has(ds)))out.push({dni:mies});
+    m++;if(m>11){m=0;y++}
+  }
+  return out;
+}
 function pktWOkresie(dni){
   const osoby=pktUczestnicy().map(u=>({...u,zdobyte:0,wydane:0}));
   if(!osoby.length||!dni.length)return osoby;
   const zbior=new Set(dni);
   osoby.forEach(u=>{u.zdobyte=Math.round(rywalSum(u.days,dni,"study_min")/60*10)/10});
-  const przyznaj=(okresy,prog,stawka)=>okresy.filter(o=>o.dni.every(ds=>zbior.has(ds))).forEach(o=>{
+  const przyznaj=(okresy,prog,stawka)=>okresy.forEach(o=>{
     const minuty=osoby.map(u=>rywalSum(u.days,o.dni,"study_min"));
     pktLiderzy(minuty,minuty,prog).forEach(i=>osoby[i].zdobyte+=stawka);
     const prod=osoby.map(u=>rywalAvg(u.days,o.dni,"prod_pct"));
     pktLiderzy(prod,minuty,prog).forEach(i=>osoby[i].zdobyte+=stawka);
   });
   if(osoby.length>1){
-    przyznaj(pktPelneTygodnie(dni[0]),PKT_PROG_TYG_MIN,PKT_ZA_TYDZIEN);
-    przyznaj(pktPelneMiesiace(dni[0]),PKT_PROG_MIES_MIN,PKT_ZA_MIESIAC);
+    przyznaj(pktTygodnieWZakresie(dni),PKT_PROG_TYG_MIN,PKT_ZA_TYDZIEN);
+    przyznaj(pktMiesiaceWZakresie(dni),PKT_PROG_MIES_MIN,PKT_ZA_MIESIAC);
   }
   rywalBets.filter(b=>b.status==="settled"&&b.winner_id&&b.settled_at&&zbior.has(String(b.settled_at).slice(0,10)))
     .forEach(b=>{const u=osoby.find(x=>x.id===b.winner_id);if(u)u.zdobyte+=b.stawka||0});
