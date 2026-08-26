@@ -1088,7 +1088,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=74;
+const DM_BUILD=75;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -5516,7 +5516,14 @@ $("#betOpis").onkeydown=e=>{if(e.key==="Enter")betDodaj()};
 /* Podsumowanie pokazuje się SAMO przy wejściu do aplikacji i dotyczy okresu, który się
    właśnie SKOŃCZYŁ — w poniedziałek podsumowujemy miniony tydzień, pierwszego dnia miesiąca
    miniony miesiąc. Podsumowanie bieżącego tygodnia w poniedziałek miałoby jeden dzień danych. */
-let wrapOkres="tydz",wrapPlansza=0,wrapSprawdzone=false;
+/* Gdy jednego dnia należy się kilka podsumowań (np. poniedziałek wypada 1. dnia miesiąca),
+   pokazujemy je JEDNO PO DRUGIM w jednej relacji: najpierw tydzień, potem miesiąc, na końcu
+   rok — czyli 4 albo 6 plansz zamiast 2. Wcześniej większy okres wypierał mniejszy i tygodnia
+   nie było widać wcale. */
+let wrapKolejka=["tydz"],wrapKrok=0,wrapSprawdzone=false;
+const wrapOkresTeraz=()=>wrapKolejka[Math.floor(wrapKrok/2)]||wrapKolejka[0];
+const wrapPlanszaTeraz=()=>wrapKrok%2;
+const wrapPlanszOgolem=()=>wrapKolejka.length*2;
 // poprzedni pełny tydzień pon-nd
 function wrapZakresTydzien(){
   const dz=new Date();dz.setHours(0,0,0,0);
@@ -5600,6 +5607,7 @@ function wrapPojedynek(dni){
     roznicaMin:pary[0].a-pary[0].b};
 }
 function renderWrapped(){
+  const wrapOkres=wrapOkresTeraz(),wrapPlansza=wrapPlanszaTeraz();
   const z=wrapZakres(wrapOkres),dni=wrapDni(z);
   const moje=wrapMoje(dni),poj=wrapPojedynek(dni);
   let tresc;
@@ -5654,16 +5662,21 @@ function renderWrapped(){
   $("#wrapTlo").innerHTML=`
     <div class="wrap-okno" id="wrapOkno">
       <button class="icon-btn del wrap-zamknij" id="wrapZamknij" title="Zamknij">✕</button>
-      <div class="wrap-pasek"><i class="on"></i><i class="${wrapPlansza===1?"on":""}"></i></div>
+      <div class="wrap-pasek">${Array.from({length:wrapPlanszOgolem()},(_,i)=>`<i class="${i<=wrapKrok?"on":""}"></i>`).join("")}</div>
       <p class="muted" style="margin:0;text-transform:uppercase;letter-spacing:.06em;font-size:11px;font-weight:700">${esc(WRAP_TYTULY[wrapOkres]||"Podsumowanie")}</p>
       <h2 style="margin:0">${wrapPlansza===0?"Pojedynek":"Twoje liczby"}</h2>
       <p class="muted" style="margin:0">${esc(z.etykieta)}</p>
       <div class="wrap-srodek">${tresc}</div>
-      <div class="wrap-stopka">${wrapPlansza===0?"Dotknij, aby zobaczyć swoje liczby":"Dotknij, aby zamknąć"}</div>
+      <div class="wrap-stopka">${wrapKrok+1<wrapPlanszOgolem()
+        ?(wrapPlansza===0?"Dotknij, aby zobaczyć swoje liczby":"Dotknij, aby przejść dalej")
+        :"Dotknij, aby zamknąć"}</div>
     </div>`;
 }
-function wrapPokaz(okres){
-  wrapOkres=okres||wrapOkres;wrapPlansza=0;
+function wrapPokaz(okresy){
+  const lista=Array.isArray(okresy)?okresy:[okresy||wrapKolejka[0]];
+  wrapKolejka=lista.filter(Boolean);
+  if(!wrapKolejka.length)wrapKolejka=["tydz"];
+  wrapKrok=0;
   $("#wrapTlo").hidden=false;
   renderWrapped();
 }
@@ -5676,15 +5689,16 @@ function wrapKlucz(okres){
   const rok=dz.getMonth()>=8?dz.getFullYear():dz.getFullYear()-1;
   return rok+"/"+(rok+1);
 }
-// który okres należy się przy tym uruchomieniu: rocznik bije miesiąc, miesiąc bije tydzień
-function wrapNalezny(){
+// wszystkie okresy należne przy tym uruchomieniu, od najkrótszego do najdłuższego
+function wrapNalezne(){
   const dz=new Date(),widziane=(S.wrapSeen||{});
   const trzeba=okres=>widziane[okres]!==wrapKlucz(okres);
+  const out=[];
+  if(((dz.getDay()+6)%7)===0&&trzeba("tydz"))out.push("tydz");
+  if(dz.getDate()===1&&trzeba("mies"))out.push("mies");
   // rocznie WYŁĄCZNIE 30 kwietnia — ostatni dzień zajęć klas maturalnych
-  if(dz.getMonth()===3&&dz.getDate()===30&&trzeba("rok"))return "rok";
-  if(dz.getDate()===1&&trzeba("mies"))return "mies";
-  if(((dz.getDay()+6)%7)===0&&trzeba("tydz"))return "tydz";
-  return null;
+  if(dz.getMonth()===3&&dz.getDate()===30&&trzeba("rok"))out.push("rok");
+  return out;
 }
 function wrapOznaczWidziane(okres){
   if(!S.wrapSeen)S.wrapSeen={};
@@ -5695,11 +5709,11 @@ function wrapOznaczWidziane(okres){
    byłaby pusta. Flaga pilnuje, żeby w jednym uruchomieniu pokazać to najwyżej raz. */
 function wrapSprawdzAuto(){
   if(wrapSprawdzone||!$("#wrapTlo").hidden)return;
-  const okres=wrapNalezny();
-  if(!okres)return;
+  const okresy=wrapNalezne();
+  if(!okresy.length)return;
   wrapSprawdzone=true;
-  wrapOznaczWidziane(okres);
-  wrapPokaz(okres);
+  okresy.forEach(wrapOznaczWidziane);
+  wrapPokaz(okresy);
 }
 function wrapZamknij(){$("#wrapTlo").hidden=true}
 $("#wrapTlo").onclick=e=>{
@@ -5710,15 +5724,19 @@ $("#wrapTlo").onclick=e=>{
   if(okno){
     const r=okno.getBoundingClientRect();
     const wprawo=(e.clientX-r.left)>r.width*0.35;
-    if(!wprawo){wrapPlansza=Math.max(0,wrapPlansza-1);renderWrapped();return}
-    if(wrapPlansza>=1)return wrapZamknij();
-    wrapPlansza++;renderWrapped();
+    if(!wprawo){wrapKrok=Math.max(0,wrapKrok-1);renderWrapped();return}
+    if(wrapKrok+1>=wrapPlanszOgolem())return wrapZamknij();
+    wrapKrok++;renderWrapped();
   }
 };
 document.addEventListener("keydown",e=>{
   if($("#wrapTlo").hidden)return;
   if(e.key==="Escape")wrapZamknij();
-  if(e.key==="ArrowRight"||e.key==="ArrowLeft"){wrapPlansza=(wrapPlansza+1)%2;renderWrapped();}
+  if(e.key==="ArrowRight"){
+    if(wrapKrok+1>=wrapPlanszOgolem())return wrapZamknij();
+    wrapKrok++;renderWrapped();
+  }
+  if(e.key==="ArrowLeft"){wrapKrok=Math.max(0,wrapKrok-1);renderWrapped();}
 });
 
 
