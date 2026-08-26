@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — wyścig przy odświeżaniu tokenu, build 65)_
+_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — czat w Rywalizacji, build 66)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,30 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-26 (sesja 16, cd. — czat w zakładce Rywalizacja, build 66):**
+  Nowa tabela `rywal_messages` (migracja `rywal_messages`): `from_id`, `to_id`, `tresc`
+  (CHECK 1-1000 znaków), `created_at`, plus CHECK `from_id <> to_id`.
+  - **Rozmowy 1:1, nie wspólny pokój.** Znajomi użytkownika nie muszą być znajomymi między
+    sobą — wspólny kanał pokazywałby osobie C rozmowę A z B. RLS: czytać wolno wiersze,
+    w których jestem nadawcą **albo** odbiorcą; pisać wyłącznie jako `auth.uid()` i wyłącznie
+    do kogoś, kto przechodzi `is_friend()`; kasować tylko własne wiadomości.
+  - Klient: `chatLoad`/`renderChat`/`chatSend`/`chatSprawdzNowe` + `chatStartPoll`.
+    Odpytywanie co 10 s, ale **tylko przy widocznym oknie** (`document.hidden`) — na
+    zakładce Rywalizacja odświeża rozmowę, poza nią pokazuje `toast` z nadawcą i początkiem
+    treści. Selektor rozmówcy chowa się, gdy znajomy jest jeden.
+  - Drobiazgi, które okazały się istotne: nieudana wysyłka **przywraca tekst do pola**
+    (inaczej wiadomość ginie przy chwilowym braku sieci), a odpowiedź serwera dokleja się
+    do listy od razu, bez czekania na kolejne odpytanie. Dymki własne po prawej
+    (`.chat-msg.mine`), nagłówki dni, przewijanie na dół po renderze.
+  - Testy: wątek 3 wiadomości renderuje się z podziałem na dni, 1 dymek własny, lista
+    przewinięta na dół ✓; wysyłka dokłada dymek po prawej, czyści pole i trafia do właściwego
+    odbiorcy ✓; błąd 500 przy wysyłce → tekst wraca do pola + komunikat ✓; nowa wiadomość poza
+    zakładką → toast „💬 Julo: …", na zakładce → bez toasta, lista odświeżona ✓;
+    **treść z HTML-em (`<img onerror>`) jest escapowana — zero wstrzyknięcia** ✓;
+    RLS w transakcji z rollbackiem: obcy widzi 0 wiadomości, nie napisze do nie-znajomego,
+    nie podszyje się pod cudze `from_id`, nie skasuje cudzej wiadomości, pusta treść
+    i wiadomość do samego siebie odrzucone ✓; stan pusty i wylogowany bez błędów ✓.
 
 - **2026-08-26 (sesja 16, cd. — aplikacja sama się wylogowywała z chmury, build 65):**
   Zgłoszenie: „znowu usunęła się rywalizacja z Julo". **Tym razem baza była nietknięta** —
