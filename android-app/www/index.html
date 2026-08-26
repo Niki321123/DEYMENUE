@@ -278,6 +278,10 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 .awatar-duzy{width:96px;height:96px;font-size:34px}
 .awatar-maly{width:26px;height:26px;font-size:12px}
 .wrap-tlo{position:fixed;inset:0;z-index:120;background:rgba(10,12,18,.82);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:var(--sp-4)}
+/* Bez tej linii atrybut hidden NIE chowa nakladki: wlasne display:flex wygrywa z domyslnym
+   [hidden]{display:none} przegladarki i cala aplikacja zostaje zaslonieta pustym, rozmytym
+   ekranem. Ta sama pulapka co przy #loginScreen i .wym-row. */
+.wrap-tlo[hidden]{display:none}
 .wrap-okno{width:min(560px,100%);max-height:94vh;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:var(--sp-5);box-shadow:0 20px 60px rgba(0,0,0,.45)}
 .wrap-hero{font-size:clamp(38px,11vw,64px);font-weight:800;letter-spacing:-2px;line-height:1;margin:var(--sp-2) 0}
 .wrap-siatka{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3);margin-top:var(--sp-4)}
@@ -1088,7 +1092,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=71;
+const DM_BUILD=72;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
