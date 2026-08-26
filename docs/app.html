@@ -1088,7 +1088,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=75;
+const DM_BUILD=76;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -5589,14 +5589,47 @@ function wrapMoje(dni){
     sen:sny.length?Math.round(sny.reduce((a,x)=>a+x,0)/sny.length):null};
   return stan;
 }
+/* pktOblicz() liczy punkty od startu rywalizacji do dziś; do podsumowania potrzebny jest
+   ten sam rachunek zamknięty w zakresie dat. Bonusy przyznajemy tylko za tygodnie i miesiące
+   MIESZCZĄCE SIĘ W CAŁOŚCI w okresie — inaczej podsumowanie tygodnia dopisywałoby punkty
+   za miesiąc, który jeszcze trwa. */
+function pktWOkresie(dni){
+  const osoby=pktUczestnicy().map(u=>({...u,zdobyte:0,wydane:0}));
+  if(!osoby.length||!dni.length)return osoby;
+  const zbior=new Set(dni);
+  osoby.forEach(u=>{u.zdobyte=Math.round(rywalSum(u.days,dni,"study_min")/60*10)/10});
+  const przyznaj=(okresy,prog,stawka)=>okresy.filter(o=>o.dni.every(ds=>zbior.has(ds))).forEach(o=>{
+    const minuty=osoby.map(u=>rywalSum(u.days,o.dni,"study_min"));
+    pktLiderzy(minuty,minuty,prog).forEach(i=>osoby[i].zdobyte+=stawka);
+    const prod=osoby.map(u=>rywalAvg(u.days,o.dni,"prod_pct"));
+    pktLiderzy(prod,minuty,prog).forEach(i=>osoby[i].zdobyte+=stawka);
+  });
+  if(osoby.length>1){
+    przyznaj(pktPelneTygodnie(dni[0]),PKT_PROG_TYG_MIN,PKT_ZA_TYDZIEN);
+    przyznaj(pktPelneMiesiace(dni[0]),PKT_PROG_MIES_MIN,PKT_ZA_MIESIAC);
+  }
+  rywalBets.filter(b=>b.status==="settled"&&b.winner_id&&b.settled_at&&zbior.has(String(b.settled_at).slice(0,10)))
+    .forEach(b=>{const u=osoby.find(x=>x.id===b.winner_id);if(u)u.zdobyte+=b.stawka||0});
+  shopPurchases.filter(p=>p.created_at&&zbior.has(String(p.created_at).slice(0,10)))
+    .forEach(p=>{const u=osoby.find(x=>x.id===p.buyer_id);if(u)u.wydane+=p.cena||0});
+  osoby.forEach(u=>{u.zdobyte=Math.round(u.zdobyte*10)/10});
+  return osoby;
+}
 function wrapPojedynek(dni){
   const ja=rywalProfile?{name:rywalProfile.name||"Ty",avatar:rywalProfile.avatar,days:rywalFriends.myDays||{}}:null;
   const rywal=rywalFriends.length?rywalFriends[0]:null;
   if(!ja||!rywal)return null;
+  /* Liczby sesji pomodoro tu nie ma celowo: każdy może mieć inną długość sesji, więc
+     „12 do 10" nie mówi nic o włożonej pracy. Zastąpione punktami rywalizacji. */
+  const pkt=pktWOkresie(dni);
+  const mojePkt=pkt.find(u=>u.me)||{zdobyte:0,wydane:0};
+  const jegoPkt=pkt.find(u=>u.id===rywal.user_id)||{zdobyte:0,wydane:0};
   const pary=[
     {co:"godziny nauki",   a:rywalSum(ja.days,dni,"study_min"), b:rywalSum(rywal.days,dni,"study_min"), fmt:v=>fmtMin(v)},
-    {co:"sesje pomodoro",  a:rywalSum(ja.days,dni,"pomo_count"),b:rywalSum(rywal.days,dni,"pomo_count"),fmt:v=>String(v)},
+    {co:"zdobyte punkty",  a:mojePkt.zdobyte,                   b:jegoPkt.zdobyte,                      fmt:v=>String(v)},
     {co:"produktywność",   a:rywalAvg(ja.days,dni,"prod_pct"),  b:rywalAvg(rywal.days,dni,"prod_pct"),  fmt:v=>v+"%"},
+    // wydawanie punktów to nie wyścig — tu nikogo nie wyszarzamy
+    {co:"wydane w sklepie",a:mojePkt.wydane,                    b:jegoPkt.wydane,                       fmt:v=>String(v), neutralny:true},
   ];
   const zbior=new Set(dni);
   const zaklady=rywalBets.filter(x=>x.status==="settled"&&x.settled_at&&zbior.has(String(x.settled_at).slice(0,10)));
@@ -5616,7 +5649,7 @@ function renderWrapped(){
       tresc=`<div class="empty">Dodaj znajomego w Rywalizacji, żeby zobaczyć pojedynek.</div>`;
     }else{
       const wiersze=poj.pary.map(p=>{
-        const jaLepszy=p.a>p.b,remis=p.a===p.b;
+        const jaLepszy=p.a>p.b,remis=p.a===p.b||p.neutralny;
         return `<div class="wrap-pojedynek">
           <div class="kto${!jaLepszy&&!remis?" gorszy":""}" style="text-align:right">${esc(p.fmt(p.a))}</div>
           <div class="co">${p.co}</div>
