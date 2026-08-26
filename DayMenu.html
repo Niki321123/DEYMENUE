@@ -999,7 +999,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=64;
+const DM_BUILD=65;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -4455,9 +4455,22 @@ const SB_SESS_KEY="daymenu_sb_session";
 try{sbSession=JSON.parse(localStorage.getItem(SB_SESS_KEY))}catch(e){}
 function sbSaveSession(s){sbSession=s;if(s)localStorage.setItem(SB_SESS_KEY,JSON.stringify(s));else localStorage.removeItem(SB_SESS_KEY)}
 async function sbAuth(path,body){
-  const r=await fetch(`${SB_URL}/auth/v1/${path}`,{method:"POST",headers:{apikey:SB_KEY,"Content-Type":"application/json"},body:JSON.stringify(body)});
+  /* Rozróżniamy DWA rodzaje porażki: brak sieci (błąd przejściowy — sesja ma przeżyć)
+     i odrzucenie przez serwer auth (token naprawdę nieważny). Wcześniej jedno i drugie
+     kończyło się tak samo, więc chwilowy brak internetu wylogowywał z chmury. */
+  let r;
+  try{
+    r=await fetch(`${SB_URL}/auth/v1/${path}`,{method:"POST",headers:{apikey:SB_KEY,"Content-Type":"application/json"},body:JSON.stringify(body)});
+  }catch(e){
+    const err=new Error("Brak połączenia z serwerem");err.network=true;throw err;
+  }
   const j=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(j.msg||j.error_description||j.message||("Błąd ("+r.status+")"));
+  if(!r.ok){
+    const err=new Error(j.msg||j.error_description||j.message||("Błąd ("+r.status+")"));
+    err.status=r.status;
+    err.authRejected=(r.status===400||r.status===401||r.status===403);
+    throw err;
+  }
   return j;
 }
 const EMAIL_RE=/^\S+@\S+\.\S+$/;
@@ -4494,14 +4507,34 @@ let recoveryToken=null,pendingAccountView=false;
   }
   history.replaceState(null,"",location.pathname+location.search);
 })();
+/* Supabase ROTUJE refresh_token: po użyciu stary przestaje działać. Gdy dwa miejsca naraz
+   (cloudAutoPull co 15 s, rywalLoad, betsLoad, shopLoad) trafiły na wygasły token, oba
+   wysyłały ten sam refresh_token — drugie dostawało 400 „Already Used" i kasowało sesję.
+   Objaw: aplikacja sama się wylogowywała z chmury, a Rywalizacja pokazywała ekran logowania,
+   jakby znajomy zniknął. Stąd JEDNO wspólne odświeżanie dla wszystkich chętnych. */
+let sbRefreshing=null;
 async function sbToken(){
   if(!sbSession)return null;
   if(sbSession.expires_at&&sbSession.expires_at*1000>Date.now()+60000)return sbSession.access_token;
-  try{
-    const j=await sbAuth("token?grant_type=refresh_token",{refresh_token:sbSession.refresh_token});
-    if(!j.user)j.user=sbSession.user;
-    sbSaveSession(j);return j.access_token;
-  }catch(e){sbSaveSession(null);return null}
+  if(!sbRefreshing)sbRefreshing=(async()=>{
+    try{
+      const j=await sbAuth("token?grant_type=refresh_token",{refresh_token:sbSession.refresh_token});
+      if(!j.user)j.user=sbSession.user;
+      sbSaveSession(j);
+      return j.access_token;
+    }catch(e){
+      if(e&&e.authRejected){
+        // token naprawdę nieważny — kończymy sesję, ale mówimy o tym wprost
+        sbSaveSession(null);stopCloudPolling();renderAccount();
+        toast("Sesja w chmurze wygasła — zaloguj się ponownie w zakładce Konto");
+      }else{
+        // brak sieci: sesja zostaje, spróbujemy przy następnym wywołaniu
+        console.warn("Odświeżenie tokenu nieudane (sieć) — sesja zachowana:",(e&&e.message)||e);
+      }
+      return null;
+    }finally{sbRefreshing=null}
+  })();
+  return sbRefreshing;
 }
 async function sbRest(method,qs,body){
   const tok=await sbToken();
