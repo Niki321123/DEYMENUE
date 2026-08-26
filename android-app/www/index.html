@@ -1017,6 +1017,16 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     <p class="muted" id="profMsg" style="margin-top:var(--sp-3)"></p>
   </div>
 
+  <div class="card" id="profRecap" hidden>
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <div>
+        <h2 style="margin:0 0 2px" id="profRecapTytul">Podsumowanie</h2>
+        <p class="muted" style="margin:0">Dziś już się pokazało — możesz je obejrzeć jeszcze raz do końca dnia.</p>
+      </div>
+      <button class="btn" id="profRecapBtn" style="flex:none">Odtwórz</button>
+    </div>
+  </div>
+
   <div class="card">
     <h2 style="margin-bottom:var(--sp-3)">Twoje liczby</h2>
     <div class="grid4" id="profStaty"></div>
@@ -1088,7 +1098,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=78;
+const DM_BUILD=79;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -5776,6 +5786,9 @@ function wrapSprawdzAuto(){
   if(!okresy.length)return;
   wrapSprawdzone=true;
   okresy.forEach(wrapOznaczWidziane);
+  // zapamiętujemy, co dziś poleciało — żeby dało się to odtworzyć po przypadkowym zamknięciu
+  S.wrapOstatni={data:dsLok(new Date()),okresy:okresy.slice()};
+  save();
   wrapPokaz(okresy);
 }
 function wrapZamknij(){$("#wrapTlo").hidden=true}
@@ -5902,7 +5915,24 @@ function profStats(){
     pierwszyDzien:posort[0]||null
   };
 }
+/* Recap potrafi zniknąć od jednego przypadkowego dotknięcia, a wraca dopiero za tydzień.
+   Dlatego przez CAŁY DZIEŃ, w którym się pokazał, wisi w Profilu przycisk odtworzenia.
+   Nazajutrz karta znika sama — S.wrapOstatni.data przestaje być dzisiejszą datą. */
+function renderRecapOdtworz(){
+  const o=S.wrapOstatni;
+  const dzis=!!(o&&o.data===dsLok(new Date())&&Array.isArray(o.okresy)&&o.okresy.length);
+  $("#profRecap").hidden=!dzis;
+  if(!dzis)return;
+  const nazwy=o.okresy.map(x=>({tydz:"tygodnia",mies:"miesiąca",rok:"roku szkolnego"}[x]||x));
+  const lista=nazwy.length>1?nazwy.slice(0,-1).join(", ")+" i "+nazwy[nazwy.length-1]:nazwy[0];
+  $("#profRecapTytul").textContent="Podsumowanie "+lista;
+}
+$("#profRecapBtn").onclick=()=>{
+  const o=S.wrapOstatni;
+  if(o&&o.data===dsLok(new Date())&&Array.isArray(o.okresy)&&o.okresy.length)wrapPokaz(o.okresy);
+};
 function renderProfil(){
+  renderRecapOdtworz();
   const zalogowany=!!sbSession;
   const nazwa=(rywalProfile&&rywalProfile.name)||(S.account&&S.account.name)||"";
   const avatar=profAvatarRoboczy!==null?profAvatarRoboczy:(rywalProfile&&rywalProfile.avatar)||"";
