@@ -1018,7 +1018,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=67;
+const DM_BUILD=68;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1830,7 +1830,7 @@ function aiJson(text){
   if(a<0||b<=a)throw new Error("Nieprawidłowa odpowiedź AI");
   return JSON.parse(text.slice(a,b+1));
 }
-const MAT_AI_RULES=`Jesteś planerem nauki w aplikacji Day Menu. Dni tygodnia: 0=Pon, 1=Wt, 2=Śr, 3=Czw, 4=Pt, 5=Sob, 6=Nd. Godziny 6-22, każdy blok ("hour") to godzina ZEGAROWA rozpoczęcia — NIE 60 minut realnej nauki. Realna nauka w jednym bloku to sesja pomodoro, jej długość w minutach dostajesz jako "pomoWorkMin" w kontekście (reszta godziny to przerwa/margines). Gdy użytkownik podaje preferencję w godzinach/minutach realnej nauki (np. "chcę się uczyć 4h dziennie"), PRZELICZ to na liczbę bloków wzorem: liczba_blokow = round(pożądane_minuty / pomoWorkMin) — NIE zakładaj, że 1 blok = 1h realnej nauki. Harmonogram powtarza się co tydzień. Zasady planowania: planuj naukę WYŁĄCZNIE w godzinach dostępnych (slots); NIGDY w godzinach szkolnych (school) ani poza dostępnymi — w godzinach szkolnych użytkownik jest w szkole i może uczyć się dopiero po ich zakończeniu; przydzielaj każdemu przedmiotowi czas proporcjonalnie do jego procentu (np. 80% vs 20% = 4× więcej blokow dla pierwszego); rozkładaj każdy przedmiot na różne dni zamiast kumulować; rób przerwy między sesjami tego samego przedmiotu; bezwzględnie szanuj preferencje użytkownika, w tym przeliczenie godzin realnej nauki opisane wyżej. W kontekście dostajesz też "activities" — własne zajęcia użytkownika wpisane w harmonogram (nazwa + typ): "busy" to godziny zajęte czymś innym (trening, praca), a "study" to jego własna forma nauki. Traktuj JEDNE I DRUGIE jako niedostępne — NIGDY nie planuj nauki w tych godzinach i nie usuwaj ich. Możesz się do nich odwoływać po nazwie, gdy tłumaczysz swoje decyzje (np. „w środy masz trening, więc przeniosłem matematykę na czwartek"). Odpowiadasz WYŁĄCZNIE poprawnym JSON, bez markdown i bez komentarzy.`;
+const MAT_AI_RULES=`Jesteś planerem nauki w aplikacji Day Menu. Dni tygodnia: 0=Pon, 1=Wt, 2=Śr, 3=Czw, 4=Pt, 5=Sob, 6=Nd. Godziny 6-22, każdy blok ("hour") to godzina ZEGAROWA rozpoczęcia — NIE 60 minut realnej nauki. Realna nauka w jednym bloku to sesja pomodoro, jej długość w minutach dostajesz jako "pomoWorkMin" w kontekście (reszta godziny to przerwa/margines). Gdy użytkownik podaje preferencję w godzinach/minutach realnej nauki (np. "chcę się uczyć 4h dziennie"), PRZELICZ to na liczbę bloków wzorem: liczba_blokow = round(pożądane_minuty / pomoWorkMin) — NIE zakładaj, że 1 blok = 1h realnej nauki. Harmonogram powtarza się co tydzień. Zasady planowania: planuj naukę WYŁĄCZNIE w godzinach dostępnych (slots); NIGDY w godzinach szkolnych (school) ani poza dostępnymi — w godzinach szkolnych użytkownik jest w szkole i może uczyć się dopiero po ich zakończeniu; przydzielaj każdemu przedmiotowi czas proporcjonalnie do jego procentu (np. 80% vs 20% = 4× więcej blokow dla pierwszego); rozkładaj każdy przedmiot na różne dni zamiast kumulować; rób przerwy między sesjami tego samego przedmiotu; bezwzględnie szanuj preferencje użytkownika, w tym przeliczenie godzin realnej nauki opisane wyżej. W kontekście dostajesz też "activities" — własne zajęcia użytkownika wpisane w harmonogram (nazwa + typ): "busy" to godziny zajęte czymś innym (trening, praca), a "study" to jego własna forma nauki. Traktuj JEDNE I DRUGIE jako niedostępne — NIGDY nie planuj nauki w tych godzinach i nie usuwaj ich. Możesz się do nich odwoływać po nazwie, gdy tłumaczysz swoje decyzje (np. „w środy masz trening, więc przeniosłem matematykę na czwartek"). ZANIM ułożysz plan, PRZETŁUMACZ preferencje użytkownika na liczby i zwróć je w polu "limity": {"blokowDziennie":<ile bloków dziennie albo null>,"typ":"cel"|"maks","dniWolne":[<numery dni 0-6, w które użytkownik NIE chce się uczyć>]}. "blokowDziennie" liczysz wzorem round(minuty_realnej_nauki / pomoWorkMin) — np. 3h45 przy pomoWorkMin=45 to round(225/45)=5. "typ" to "cel", gdy użytkownik mówi ile CHCE się uczyć, i "maks", gdy podaje górną granicę ("nie więcej niż", "max"). Gdy z preferencji nic takiego nie wynika, daj null i pustą listę. Te liczby są następnie egzekwowane przez aplikację, więc muszą być zgodne z tym, co układasz w "blocks". Odpowiadasz WYŁĄCZNIE poprawnym JSON, bez markdown i bez komentarzy.`;
 function matAiContext(){
   return {
     subjects:S.matura.topics.filter(t=>(t.percent||0)>0).map(t=>({id:t.id,nazwa:t.name,procent:t.percent})),
@@ -1850,16 +1850,99 @@ function matSanitizeBlocks(blocks){
   }
   return out;
 }
+/* Model dostaje preferencje jako zdanie po polsku i regularnie się w nich gubi: przy
+   „3h45 dziennie, w piątki się nie uczę" ułożył 4 bloki zamiast 5 i wstawił blok w piątek.
+   Dlatego prosimy go o PRZETŁUMACZENIE preferencji na liczby ("limity"), a pilnowanie ich
+   robimy tutaj — tłumaczenie języka na strukturę model robi dobrze, arytmetyki nie.
+   typ="cel"  → dokładnie tyle bloków dziennie (nadmiar tniemy, braki dokładamy)
+   typ="maks" → tylko górny limit (braków nie uzupełniamy) */
+function matLimity(raw){
+  const l=(raw&&typeof raw==="object")?raw:{};
+  const na=Math.round(+l.blokowDziennie);
+  return{
+    blokowDziennie:(Number.isFinite(na)&&na>0&&na<=16)?na:null,
+    typ:l.typ==="maks"?"maks":"cel",
+    dniWolne:[...new Set((Array.isArray(l.dniWolne)?l.dniWolne:[]).map(Number).filter(d=>d>=0&&d<=6))]
+  };
+}
+// który przedmiot dołożyć: ten, który najbardziej odstaje od swojego procentu
+function matNastepnyPrzedmiot(blocks,subs,dzien,godzina){
+  const totalW=subs.reduce((a,t)=>a+(t.percent||0),0)||1;
+  const ile={};subs.forEach(t=>ile[t.id]=0);
+  blocks.forEach(b=>{if(ile[b.topicId]!==undefined)ile[b.topicId]++});
+  const suma=blocks.length+1;
+  const sasiad=blocks.find(b=>b.day===dzien&&Math.abs(b.hour-godzina)===1);
+  const ranking=subs.map(t=>({id:t.id,deficyt:(t.percent/totalW)*suma-ile[t.id]}))
+    .sort((a,b)=>b.deficyt-a.deficyt);
+  /* Unikamy dwóch tych samych przedmiotów pod rząd, ale TYLKO gdy to nie psuje proporcji:
+     przy bezwarunkowym omijaniu sąsiada dokładane bloki lądowały w kółko na tym samym
+     przedmiocie (50/50 wychodziło 12/18). Ustępujemy więc tylko przy praktycznie równym
+     deficycie. */
+  const inny=sasiad?ranking.find(r=>r.id!==sasiad.topicId):null;
+  if(inny&&ranking[0].id===sasiad.topicId&&ranking[0].deficyt-inny.deficyt<0.5)return inny.id;
+  return ranking[0].id;
+}
+function matEgzekwujLimity(blocks,lim){
+  const subs=S.matura.topics.filter(t=>(t.percent||0)>0);
+  const zmiany={wolneDni:0,przyciete:0,dolozone:0,brakMiejsca:0};
+  let out=blocks.slice();
+  if(lim.dniWolne.length){
+    const przed=out.length;
+    out=out.filter(b=>!lim.dniWolne.includes(b.day));
+    zmiany.wolneDni=przed-out.length;
+  }
+  if(lim.blokowDziennie&&subs.length){
+    const wolne=new Set(lim.dniWolne);
+    for(let d=0;d<7;d++){
+      if(wolne.has(d))continue;
+      const dnia=out.filter(b=>b.day===d).sort((a,b)=>a.hour-b.hour);
+      if(dnia.length>lim.blokowDziennie){
+        const zostaw=new Set(dnia.slice(0,lim.blokowDziennie).map(b=>b.hour));
+        out=out.filter(b=>b.day!==d||zostaw.has(b.hour));
+        zmiany.przyciete+=dnia.length-lim.blokowDziennie;
+      }else if(dnia.length<lim.blokowDziennie&&lim.typ==="cel"){
+        const zajete=new Set(dnia.map(b=>b.hour));
+        const wolneGodziny=MAT_HOURS.filter(g=>S.matura.grid[matKey(d,g)]==="avail"&&!zajete.has(g));
+        let brakuje=lim.blokowDziennie-dnia.length;
+        for(const g of wolneGodziny){
+          if(!brakuje)break;
+          out.push({day:d,hour:g,topicId:matNastepnyPrzedmiot(out,subs,d,g)});
+          brakuje--;zmiany.dolozone++;
+        }
+        zmiany.brakMiejsca+=brakuje;   // dzień nie miał tylu wolnych godzin
+      }
+    }
+  }
+  out.sort((a,b)=>a.day-b.day||a.hour-b.hour);
+  return{blocks:out,zmiany};
+}
+function matOpisKorekt(lim,z){
+  const cz=[];
+  if(lim.blokowDziennie)cz.push(`${lim.blokowDziennie} ${matsPlural(lim.blokowDziennie,"sesja","sesje","sesji")} dziennie`);
+  if(lim.dniWolne.length)cz.push("wolne: "+lim.dniWolne.map(d=>MAT_DAYS[d]).join(", "));
+  const nagl=cz.length?"Zrozumiałem: "+cz.join(" · ")+". ":"";
+  const p=[];
+  if(z.wolneDni)p.push(`usunąłem ${z.wolneDni} ${matsPlural(z.wolneDni,"blok","bloki","bloków")} z dni wolnych`);
+  if(z.przyciete)p.push(`przyciąłem ${z.przyciete} ponad limit`);
+  if(z.dolozone)p.push(`dołożyłem ${z.dolozone} brakujących`);
+  if(z.brakMiejsca)p.push(`${z.brakMiejsca} nie zmieściło się w wolnych godzinach — pomaluj więcej okienek na „Dostępny"`);
+  return nagl+(p.length?"Poprawki: "+p.join(", ")+". ":"");
+}
+
 async function aiPlan(prefs){
   const ctx=matAiContext();
   const text=await aiCall(
-    MAT_AI_RULES+' Format odpowiedzi: {"blocks":[{"day":0,"hour":18,"topicId":"..."}]}',
+    MAT_AI_RULES+' Format odpowiedzi: {"limity":{"blokowDziennie":5,"typ":"cel","dniWolne":[4]},"blocks":[{"day":0,"hour":18,"topicId":"..."}]}',
     [{role:"user",content:`Godziny dostępne (day/hour): ${JSON.stringify(ctx.slots)}\nGodziny szkolne (nie planuj tu nauki): ${JSON.stringify(ctx.school)}\nWłasne zajęcia użytkownika (też nie planuj tu nauki): ${JSON.stringify(ctx.activities)}\nPrzedmioty (id/nazwa/procent): ${JSON.stringify(ctx.subjects)}\nRealny czas nauki w jednym bloku (pomoWorkMin): ${ctx.pomoWorkMin} min\nPreferencje użytkownika: ${prefs||"brak"}\nUłóż plan nauki na tydzień.`}],
     2500
   );
-  const out=matSanitizeBlocks(aiJson(text).blocks);
-  if(!out.length)throw new Error("AI zwróciło pusty plan");
-  return out;
+  const odp=aiJson(text);
+  const lim=matLimity(odp.limity);
+  const czyste=matSanitizeBlocks(odp.blocks);
+  if(!czyste.length)throw new Error("AI zwróciło pusty plan");
+  const{blocks,zmiany}=matEgzekwujLimity(czyste,lim);
+  if(!blocks.length)throw new Error("Po zastosowaniu preferencji nie został żaden blok");
+  return{blocks,opis:prefs?matOpisKorekt(lim,zmiany):""};
 }
 $("#matGen").onclick=async()=>{
   S.matura.prefs=$("#matPrefs").value.trim();save();
@@ -1873,9 +1956,10 @@ $("#matGen").onclick=async()=>{
       // wersja z AI
       $("#matPlanHint").textContent="AI układa plan…";
       try{
-        const blocks=await aiPlan(S.matura.prefs);
+        const{blocks,opis}=await aiPlan(S.matura.prefs);
         S.matura.plan=blocks;save();
-        $("#matPlanHint").textContent=`AI ułożyło ${blocks.length} godzin nauki — pojawiły się w zielonych okienkach. Kliknij okienko, aby odhaczyć zrobioną godzinę.`;
+        const realMin=blocks.length*(S.matura.pomo.work||60);
+        $("#matPlanHint").textContent=`${opis}Plan ma ${blocks.length} ${matsPlural(blocks.length,"sesję","sesje","sesji")} po ${S.matura.pomo.work||60} min — ${fmtMin(realMin)} realnej nauki w tygodniu. Kliknij okienko, aby odhaczyć zrobioną sesję.`;
         renderMatSched();toast("Plan wygenerowany przez AI ✓");
       }catch(e){
         const{blocks,msg}=matGeneratePlan();
