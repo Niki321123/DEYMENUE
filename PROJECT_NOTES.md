@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — zakładka Profil, build 69)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — nowe logo, build 70)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,38 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-27 (sesja 16, cd. — nowe logo aplikacji, build 70):**
+  Użytkownik dostarczył nowy znak (granatowy kalendarz z trzema kolorowymi pozycjami listy
+  i ptaszkiem) jako obrazek wklejony w rozmowie. **Pliku nie było na dysku i nie dało się go
+  zapisać z czatu**, więc znak został odrysowany w istniejącym mechanizmie `gen-icon.js`
+  — geometria zapisana jako proporcje 0..1, rysowana kanwą.
+  - **Dlaczego odrysowanie, a nie skalowanie PNG:** ikony powstają w siedmiu rozmiarach od
+    16×16 (zasobnik, pasek zadań) do 256×256. Bitmapa 1250×1250 przeskalowana do 16 px rozmywa
+    się nie do poznania; rysunek wektorowy w każdym rozmiarze jest ostry. Ten sam powód stał
+    za poprzednim logo rysowanym kodem.
+  - `gen-icon.js` rozszerzony: poza `build/icon.ico`, `icon-256.png` i `tray.png` generuje
+    teraz **wszystkie ikony Androida** — `ic_launcher`, `ic_launcher_round` (przycięte do koła)
+    i `ic_launcher_foreground` w pięciu gęstościach. Warstwa `foreground` jest przezroczysta
+    i ma większy margines, bo ikona adaptacyjna Androida ma strefę bezpieczną 66 ze 108 dp;
+    tło bierze się z `ic_launcher_background` (białe, już było ustawione).
+  - **Aplikacja dostała favicon** — wcześniej karta przeglądarki nie miała żadnej ikony.
+    Znak wstawiony jako SVG w data URI (1,5 kB), ten sam kod użyty na pasku bocznym zamiast
+    dotychczasowej kolorowej kropki.
+  - **Problem znaleziony w testach:** granat znaku (`#2b3950`) na ciemnym pasku bocznym
+    (`#1d2029`) ma kontrast **1.40** — ramka kalendarza praktycznie znikała, zostawała
+    pływająca biała karta. Znak dostał białą płytkę z zaokrągleniem, przez co czyta się
+    identycznie w obu motywach, jak ikona na pulpicie.
+  - `build/` jest w `.gitignore` (ikony pulpitu generuje się lokalnie przez
+    `npx electron gen-icon.js`), ale sam generator i ikony Androida są śledzone, więc logo
+    jest odtwarzalne.
+  - Weryfikacja: wygenerowane PNG obejrzane bezpośrednio — 256 px, wariant okrągły i 32 px
+    (zasobnik) czytelne ✓; favicon parsuje się jako obrazek 150×150 ✓; SVG na pasku bocznym
+    ma komplet elementów (9 prostokątów + ptaszek) ✓; oba motywy i wszystkie zakładki bez
+    błędów ✓.
+  - **Do zrobienia, jeśli ma być plik 1:1 z oryginałem:** wystarczy wrzucić PNG do katalogu
+    projektu — wtedy da się go użyć jako źródła zamiast rysunku, kosztem ostrości w małych
+    rozmiarach.
 
 - **2026-08-26 (sesja 16, cd. — zakładka Profil: zdjęcie, nazwa, statystyki, build 69):**
   Nowy widok `#view-profil` w grupie „Ustawienia" + `profil:renderProfil` w mapie rendererów.
