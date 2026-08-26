@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — zadania z fizykamatura.pl, build 64)_
+_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — wyścig przy odświeżaniu tokenu, build 65)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,34 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-26 (sesja 16, cd. — aplikacja sama się wylogowywała z chmury, build 65):**
+  Zgłoszenie: „znowu usunęła się rywalizacja z Julo". **Tym razem baza była nietknięta** —
+  oba wiersze `friendships`, oba profile i statystyki na miejscu, RLS w obie strony zwraca
+  komplet. Logika klienta też okazała się poprawna: `rywalLoad()` odpalony na podstawionych
+  odpowiedziach serwera (dokładnie takich, jakie zwraca produkcja) prawidłowo pokazał Julo.
+  - **Przyczyna: wyścig przy odświeżaniu tokenu.** Supabase **rotuje** `refresh_token` —
+    po użyciu stary przestaje działać. `sbToken()` nie miał żadnej synchronizacji, a wołają
+    go równolegle `cloudAutoPull` (co 15 s i przy każdym `visibilitychange`), `rywalLoad`,
+    `betsLoad` i `shopLoad`. Gdy token wygasł, kilka z nich wysyłało **ten sam** refresh_token:
+    pierwsze odświeżenie się udawało, kolejne dostawały 400 „Invalid Refresh Token: Already
+    Used", a stary `catch` na **każdy** błąd robił `sbSaveSession(null)`. Efekt: ciche
+    wylogowanie z chmury, a zakładka Rywalizacja pokazywała ekran logowania — co wygląda
+    identycznie jak zniknięcie znajomego. Odtworzone w teście: stary kod przy 3 równoległych
+    wywołaniach robi 3 zapytania i **kończy z sesją = null**, mimo że odświeżenie się udało.
+  - **Druga wada tej samej linijki:** brak internetu (fetch odrzucony) był traktowany tak samo
+    jak odrzucenie tokenu, więc chwilowy brak sieci wylogowywał z chmury.
+  - **Poprawka:** `sbAuth()` rozróżnia błąd sieci (`err.network`) od odrzucenia przez serwer
+    auth (`err.authRejected` dla 400/401/403). `sbToken()` trzyma **jedno wspólne odświeżanie**
+    w `sbRefreshing` — wszyscy chętni czekają na ten sam promise. Sesję kasujemy wyłącznie
+    przy prawdziwym odrzuceniu, i wtedy z komunikatem (`toast` + `stopCloudPolling` +
+    `renderAccount`), a nie po cichu.
+  - Testy: 3 równoległe `sbToken()` przy rotacji → **1** zapytanie do auth, wszystkie dostają
+    nowy token, sesja żyje ✓; błąd sieci → sesja zachowana, zwraca null ✓; 401 → sesja
+    zakończona z komunikatem ✓; 15 widoków bez błędów w konsoli ✓.
+  - Przy okazji: Julo nie miał wiersza w `profile_codes` (jego profil wstawiłem wczoraj ręcznie,
+    z pominięciem `profile_ensure`). `profile_ensure` i tak by go dogenerował przy jego
+    następnym uruchomieniu, ale kod został dopisany od razu.
 
 - **2026-08-26 (sesja 16, cd. — 328 zadań CKE z fizykamatura.pl w Materiałach, build 64):**
   - **Skrobanie:** strona jest renderowana serwerowo (SSR), więc całość poszła zwykłym
