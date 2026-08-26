@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — nowe logo, build 70)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — podsumowanie okresu, build 71)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,41 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-27 (sesja 16, cd. — podsumowanie okresu w stylu Spotify Wrapped, build 71):**
+  Użytkownik chciał „wrapped" w czterech zakresach. Po propozycji zawęził go do **zawsze
+  dwóch plansz: pojedynku i własnych liczb** — więc zamiast sekwencji kilkunastu ekranów
+  powstały dwie gęste karty w pełnoekranowej nakładce, przełączane strzałkami, klawiszami
+  lub kropkami.
+  - **Zakresy:** tydzień (od poniedziałku), miesiąc kalendarzowy, rok kalendarzowy i **rok
+    szkolny klas maturalnych: 1 września → 30 kwietnia**. Użytkownik napisał „do 31 kwietnia" —
+    kwiecień ma 30 dni; w 2027 wypada to w piątek, czyli zgodnie z ostatnim dniem zajęć.
+    W wakacje zakres pokazuje rok, który się właśnie skończył (poprawne, choć pusty).
+  - **Plansza pojedynku** bierze dane z chmury (`stats_daily`), bo tylko one są wspólne dla
+    obu stron: godziny nauki, sesje pomodoro i średnia produktywność w układzie „ja vs on",
+    gorszy wynik wyszarzony, pod spodem różnica słownie i bilans zakładów rozstrzygniętych
+    w tym okresie. **Plansza własna** korzysta z lokalnego stanu, bo jest bogatszy:
+    łączny czas, podział na przedmioty, rekordowy dzień, najdłuższa seria, drzewa i procent
+    ukończonych sesji, średni sen oraz **ulubiona pora nauki** — liczona z `ts` drzewa
+    (moment posadzenia zapisuje tylko pomodoro).
+  - **Etykieta** (Nocny Maratończyk, Ranny Ptaszek, Snajper, Maszyna, Widmo…) wyliczana
+    z trzech cech: pory dnia, średniej długości sesji i regularności.
+  - **Przeliczenie czasu na coś namacalnego** („tyle trwa 5 filmów pod rząd") — sama liczba
+    godzin nic nie mówi, a to jest ta część, którą wysyła się dalej.
+  - Testy: tydzień na spreparowanych danych policzony ręcznie i zgodny co do minuty
+    (450 min, 3/4 dni, seria 3, 3 drzewa żywe + 1 uschłe = 75%, pora 21:00, rekord 3 h,
+    przedmioty 225/225) ✓; pojedynek: prowadzenie o 3 h 45 min, remis w pomodoro bez
+    wyszarzenia, produktywność 80% vs 52%, zakład zaliczony do okresu ✓; przełączanie
+    zakresów, zawijanie plansz, Escape, krzyżyk, klik w tło ✓; strzałki nie otwierają
+    zamkniętej nakładki ✓; stan pusty („0 min", etykieta „Widmo", myślniki, brak sekcji
+    przedmiotów) ✓; ciemny motyw ✓.
+  - **Nie zrobione świadomie (poza zakresem prośby):** automatyczne pokazywanie w poniedziałek
+    i 1. dnia okresu, archiwum poprzednich podsumowań, karta do wysłania jako obrazek
+    (czat obsługuje dziś tylko tekst).
+  - **Wciąż otwarte i pilne:** odhaczenie lekcji/zadania **nie zapisuje daty**, więc plansza
+    „ile materiału przerobiłeś w okresie" jest niepoliczalna. Poprawka działa tylko w przód,
+    więc żeby podsumowanie roku szkolnego 2026/2027 objęło materiały, trzeba ją wprowadzić
+    **przed 1 września 2026**.
 
 - **2026-08-27 (sesja 16, cd. — nowe logo aplikacji, build 70):**
   Użytkownik dostarczył nowy znak (granatowy kalendarz z trzema kolorowymi pozycjami listy
