@@ -1012,16 +1012,6 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   </div>
 
   <div class="card">
-    <div class="row" style="justify-content:space-between;align-items:center">
-      <div>
-        <h2 style="margin:0 0 2px">Podsumowanie okresu</h2>
-        <p class="muted" style="margin:0">Dwie plansze: pojedynek z rywalem i Twoje liczby.</p>
-      </div>
-      <button class="btn" id="wrapOtworz" style="flex:none">Pokaż</button>
-    </div>
-  </div>
-
-  <div class="card">
     <h2 style="margin-bottom:var(--sp-3)">Twoje liczby</h2>
     <div class="grid4" id="profStaty"></div>
     <p class="muted" id="profOd" style="margin-top:var(--sp-3)"></p>
@@ -1092,7 +1082,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=72;
+const DM_BUILD=73;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -5517,29 +5507,37 @@ $("#betOpis").onkeydown=e=>{if(e.key==="Enter")betDodaj()};
    Liczby liczymy sami, bez AI — to zwykła arytmetyka po zapisanych danych.
    Pojedynek bierze dane z chmury (stats_daily), bo tylko one są wspólne dla obu stron;
    własna plansza korzysta z lokalnego stanu, który jest bogatszy (przedmioty, pory dnia). */
-const WRAP_OKRESY=[
-  {id:"tydz",  label:"Tydzień"},
-  {id:"mies",  label:"Miesiąc"},
-  {id:"rok",   label:"Rok"},
-  {id:"szkolny",label:"Rok szkolny"},
-];
-let wrapOkres="tydz",wrapPlansza=0;
+/* Podsumowanie pokazuje się SAMO przy wejściu do aplikacji i dotyczy okresu, który się
+   właśnie SKOŃCZYŁ — w poniedziałek podsumowujemy miniony tydzień, pierwszego dnia miesiąca
+   miniony miesiąc. Podsumowanie bieżącego tygodnia w poniedziałek miałoby jeden dzień danych. */
+let wrapOkres="tydz",wrapPlansza=0,wrapSprawdzone=false;
+// poprzedni pełny tydzień pon-nd
+function wrapZakresTydzien(){
+  const dz=new Date();dz.setHours(0,0,0,0);
+  const pon=new Date(dz);pon.setDate(pon.getDate()-((pon.getDay()+6)%7));
+  const od=new Date(pon);od.setDate(od.getDate()-7);
+  const doD=new Date(pon);doD.setDate(doD.getDate()-1);
+  return{od,do:doD,etykieta:"tydzień "+fmtDate(dsLok(od))+" – "+fmtDate(dsLok(doD))};
+}
+// poprzedni pełny miesiąc kalendarzowy
+function wrapZakresMiesiac(){
+  const dz=new Date();
+  const od=new Date(dz.getFullYear(),dz.getMonth()-1,1);
+  const doD=new Date(dz.getFullYear(),dz.getMonth(),0);
+  return{od,do:doD,etykieta:od.toLocaleDateString("pl-PL",{month:"long",year:"numeric"})};
+}
 // rok szkolny klas maturalnych: 1 września → 30 kwietnia (nie 31 — kwiecień ma 30 dni)
 function wrapZakresSzkolny(){
   const dz=new Date();
   const rok=dz.getMonth()>=8?dz.getFullYear():dz.getFullYear()-1;
-  const od=new Date(rok,8,1);
-  const doD=new Date(rok+1,3,30);
-  return{od,do:doD>dz?dz:doD,etykieta:"rok szkolny "+rok+"/"+(rok+1)};
+  return{od:new Date(rok,8,1),do:new Date(rok+1,3,30),etykieta:"rok szkolny "+rok+"/"+(rok+1)};
 }
 function wrapZakres(id){
-  const dz=new Date();dz.setHours(0,0,0,0);
-  if(id==="tydz"){const d=new Date(dz);d.setDate(d.getDate()-((d.getDay()+6)%7));return{od:d,do:dz,etykieta:"ten tydzień"}}
-  if(id==="mies"){const d=new Date(dz.getFullYear(),dz.getMonth(),1);
-    return{od:d,do:dz,etykieta:d.toLocaleDateString("pl-PL",{month:"long",year:"numeric"})}}
-  if(id==="rok"){return{od:new Date(dz.getFullYear(),0,1),do:dz,etykieta:"rok "+dz.getFullYear()}}
+  if(id==="tydz")return wrapZakresTydzien();
+  if(id==="mies")return wrapZakresMiesiac();
   return wrapZakresSzkolny();
 }
+const WRAP_TYTULY={tydz:"Podsumowanie tygodnia",mies:"Podsumowanie miesiąca",rok:"Podsumowanie roku szkolnego"};
 function wrapDni(z){
   const out=[];
   for(const d=new Date(z.od);d<=z.do;d.setDate(d.getDate()+1))out.push(dsLok(d));
@@ -5620,9 +5618,6 @@ function wrapPojedynek(dni){
 function renderWrapped(){
   const z=wrapZakres(wrapOkres),dni=wrapDni(z);
   const moje=wrapMoje(dni),poj=wrapPojedynek(dni);
-  const zakladki=WRAP_OKRESY.map(o=>
-    `<button data-wo="${o.id}"${o.id===wrapOkres?' class="on"':""}>${o.label}</button>`).join("");
-
   let tresc;
   if(wrapPlansza===0){
     if(!poj){
@@ -5676,14 +5671,15 @@ function renderWrapped(){
 
   $("#wrapTlo").innerHTML=`
     <div class="wrap-okno">
-      <div class="row" style="justify-content:space-between;align-items:flex-start;margin-bottom:var(--sp-3)">
+      <div class="row" style="justify-content:space-between;align-items:flex-start;margin-bottom:var(--sp-2)">
         <div>
+          <p class="muted" style="margin:0;text-transform:uppercase;letter-spacing:.06em;font-size:11px;font-weight:700">${esc(WRAP_TYTULY[wrapOkres]||"Podsumowanie")}</p>
           <h2 style="margin:0">${wrapPlansza===0?"Pojedynek":"Twoje liczby"}</h2>
           <p class="muted" style="margin:0">${esc(z.etykieta)}</p>
         </div>
         <button class="icon-btn del" id="wrapZamknij" title="Zamknij">✕</button>
       </div>
-      <div class="tabs" id="wrapOkresy" style="margin-bottom:var(--sp-4)">${zakladki}</div>
+      <div style="height:var(--sp-3)"></div>
       ${tresc}
       <div class="row" style="justify-content:space-between;align-items:center;margin-top:var(--sp-4)">
         <button class="btn ghost small" data-wnav="-1" style="flex:none">‹ Poprzednia</button>
@@ -5692,17 +5688,49 @@ function renderWrapped(){
       </div>
     </div>`;
 }
-function wrapPokaz(){
-  wrapPlansza=0;
+function wrapPokaz(okres){
+  wrapOkres=okres||wrapOkres;wrapPlansza=0;
   $("#wrapTlo").hidden=false;
   renderWrapped();
+}
+/* Znacznik obejrzanych podsumowań leży w S, więc jedzie do chmury — telefon nie pokaże
+   drugi raz tego, co widziałeś na komputerze. */
+function wrapKlucz(okres){
+  const dz=new Date();
+  if(okres==="tydz")return weekId();                                   // klucz bieżącego tygodnia
+  if(okres==="mies")return dz.getFullYear()+"-"+(dz.getMonth()+1);
+  const rok=dz.getMonth()>=8?dz.getFullYear():dz.getFullYear()-1;
+  return rok+"/"+(rok+1);
+}
+// który okres należy się przy tym uruchomieniu: rocznik bije miesiąc, miesiąc bije tydzień
+function wrapNalezny(){
+  const dz=new Date(),widziane=(S.wrapSeen||{});
+  const trzeba=okres=>widziane[okres]!==wrapKlucz(okres);
+  // rocznie WYŁĄCZNIE 30 kwietnia — ostatni dzień zajęć klas maturalnych
+  if(dz.getMonth()===3&&dz.getDate()===30&&trzeba("rok"))return "rok";
+  if(dz.getDate()===1&&trzeba("mies"))return "mies";
+  if(((dz.getDay()+6)%7)===0&&trzeba("tydz"))return "tydz";
+  return null;
+}
+function wrapOznaczWidziane(okres){
+  if(!S.wrapSeen)S.wrapSeen={};
+  S.wrapSeen[okres]=wrapKlucz(okres);
+  save();
+}
+/* Wołane po starcie i po dociągnięciu danych rywalizacji — plansza pojedynku bez nich
+   byłaby pusta. Flaga pilnuje, żeby w jednym uruchomieniu pokazać to najwyżej raz. */
+function wrapSprawdzAuto(){
+  if(wrapSprawdzone||!$("#wrapTlo").hidden)return;
+  const okres=wrapNalezny();
+  if(!okres)return;
+  wrapSprawdzone=true;
+  wrapOznaczWidziane(okres);
+  wrapPokaz(okres);
 }
 function wrapZamknij(){$("#wrapTlo").hidden=true}
 $("#wrapTlo").onclick=e=>{
   if(e.target.id==="wrapTlo")return wrapZamknij();          // kliknięcie w tło zamyka
   if(e.target.closest("#wrapZamknij"))return wrapZamknij();
-  const o=e.target.closest("[data-wo]");
-  if(o){wrapOkres=o.dataset.wo;renderWrapped();return}
   const nav=e.target.closest("[data-wnav]");
   if(nav){wrapPlansza=(wrapPlansza+ +nav.dataset.wnav+2)%2;renderWrapped();}
 };
@@ -5711,7 +5739,7 @@ document.addEventListener("keydown",e=>{
   if(e.key==="Escape")wrapZamknij();
   if(e.key==="ArrowRight"||e.key==="ArrowLeft"){wrapPlansza=(wrapPlansza+1)%2;renderWrapped();}
 });
-$("#wrapOtworz").onclick=wrapPokaz;
+
 
 /* ================= PROFIL =================
    Zdjęcie skalujemy w przeglądarce do kwadratu 160x160 JPEG i trzymamy jako data URI
@@ -6127,7 +6155,10 @@ function startCloudPolling(){
   startLibrusPolling();librusPollEvents();
   checkAiAccess();
   matsSeedForOwner();
-  rywalLoad().then(()=>{if($("#view-rywal").classList.contains("active"))renderRywal()});
+  rywalLoad().then(()=>{
+    if($("#view-rywal").classList.contains("active"))renderRywal();
+    wrapSprawdzAuto();          // dopiero teraz plansza pojedynku ma z czego liczyć
+  });
 }
 function stopCloudPolling(){
   clearInterval(cloudPollTimer);cloudPollTimer=null;
@@ -6139,6 +6170,8 @@ function stopCloudPolling(){
   statsLastHash=null;statsBackfilled=false;
 }
 setTimeout(cloudAutoPull,2500);
+// niezalogowani też dostają podsumowanie — plansza pojedynku pokaże wtedy pusty stan
+setTimeout(wrapSprawdzAuto,1800);
 applyAiGating();               // domyślnie (przed potwierdzeniem dostępu) AI ukryte
 // Użytkownicy sprzed tej wersji nie mają jeszcze znacznika właściciela danych. Skoro są
 // zalogowani, dane na urządzeniu są ich — ustawiamy znacznik, żeby ochrona działała od razu,
