@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — format relacji i kolejka okresow, build 75)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — punkty zamiast sesji pomodoro, build 76)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,27 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-27 (sesja 16, cd. — w pojedynku punkty zamiast sesji pomodoro, build 76):**
+  Uwaga użytkownika, trafna: **liczba sesji pomodoro nie jest porównywalna**, bo każdy może
+  mieć inną długość sesji — „12 do 10" nie mówi nic o włożonej pracy. Wiersz zastąpiony
+  dwoma: **zdobyte punkty** i **wydane w sklepie**.
+  - **Nowa funkcja `pktWOkresie(dni)`** — ten sam rachunek co `pktOblicz()`, ale zamknięty
+    w zakresie dat: godziny nauki (1 pkt/h) + bonusy tygodniowe i miesięczne + zakłady
+    rozstrzygnięte w okresie, minus zakupy w sklepie z tego okresu.
+  - **Kluczowy szczegół:** bonusy przyznajemy tylko za tygodnie i miesiące mieszczące się
+    **w całości** w okresie (`o.dni.every(ds=>zbior.has(ds))`). Bez tego podsumowanie tygodnia
+    dopisywałoby punkty za miesiąc, który jeszcze trwa.
+  - **Wiersz „wydane w sklepie" jest neutralny** (flaga `neutralny`) — nikogo nie wyszarzamy,
+    bo wydanie większej liczby punktów nie znaczy, że ktoś wygrywa. Wyszarzanie zostaje tam,
+    gdzie jest wyścig: godziny, zdobyte punkty, produktywność.
+  - Testy na spreparowanym lutym 2027 (28 dni, ja 60 min/dzień, Julo 30 min/dzień):
+    zdobyte 105 = 28 h + 4 pełne tygodnie × 10 pkt + miesiąc 30 pkt + zakład 7 — policzone
+    ręcznie i zgodne co do punktu ✓; Julo 14 = same godziny ✓; wydane 20 vs 45, przy czym
+    **zakup ze stycznia poprawnie pominięty** ✓; podsumowanie tygodnia 22-28 lutego → 17 pkt
+    (7 h + bonus 10) ✓; solo bez znajomego → 35 pkt (bez bonusów okresowych, tak jak w karcie
+    punktów) ✓; cztery wiersze mieszczą się w kadrze 9:16 ✓; pusty stan i pozostałe zakładki
+    bez błędów ✓.
 
 - **2026-08-27 (sesja 16, cd. — podsumowanie w formacie relacji, buildy 74-75):**
   Uwagi po obejrzeniu podglądu: usunąć przeliczenie na filmy i etykietę, poprawić nieczytelny
