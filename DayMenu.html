@@ -1088,7 +1088,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=77;
+const DM_BUILD=78;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -5656,10 +5656,10 @@ function wrapPojedynek(dni){
   const jegoPkt=pkt.find(u=>u.id===rywal.user_id)||{zdobyte:0,wydane:0};
   const pary=[
     {co:"godziny nauki",   a:rywalSum(ja.days,dni,"study_min"), b:rywalSum(rywal.days,dni,"study_min"), fmt:v=>fmtMin(v)},
-    {co:"zdobyte punkty",  a:mojePkt.zdobyte,                   b:jegoPkt.zdobyte,                      fmt:v=>String(v)},
+    {co:"zdobyte punkty",  a:mojePkt.zdobyte,                   b:jegoPkt.zdobyte,                      fmt:v=>String(Math.round(v))},
     {co:"produktywność",   a:rywalAvg(ja.days,dni,"prod_pct"),  b:rywalAvg(rywal.days,dni,"prod_pct"),  fmt:v=>v+"%"},
     // wydawanie punktów to nie wyścig — tu nikogo nie wyszarzamy
-    {co:"wydane w sklepie",a:mojePkt.wydane,                    b:jegoPkt.wydane,                       fmt:v=>String(v), neutralny:true},
+    {co:"wydane w sklepie",a:mojePkt.wydane,                    b:jegoPkt.wydane,                       fmt:v=>String(Math.round(v)), neutralny:true},
   ];
   const zbior=new Set(dni);
   const zaklady=rywalBets.filter(x=>x.status==="settled"&&x.settled_at&&zbior.has(String(x.settled_at).slice(0,10)));
