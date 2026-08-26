@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — incydent: skasowana znajomość, odtworzona)_
+_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — zadania z fizykamatura.pl, build 64)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,51 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-26 (sesja 16, cd. — 328 zadań CKE z fizykamatura.pl w Materiałach, build 64):**
+  - **Skrobanie:** strona jest renderowana serwerowo (SSR), więc całość poszła zwykłym
+    `fetch` w Node — bez klikania w przeglądarce. Skrypty: `scrape-fm.js` (10 kategorii →
+    `fm-raw.json`), `klasyfikuj-fm.js`, `gen-fm-const.js`. Zebrane pola: tytuł, slug, punkty,
+    poziom, sesja CKE, liczba podpunktów, tagi tematyczne. Liczby zgadzają się z witryną
+    co do sztuki (328).
+  - **Kluczowa decyzja: działy = moduły kursu Wielkiej Powtórki, NIE kategorie ze strony.**
+    Strona ma 10 kategorii i wrzuca bryłę sztywną, hydrostatykę oraz pęd do jednego worka
+    „Dynamika" (70 zadań). Przy takim podziale zakładka Lekcja przy temacie „Hydrostatyka"
+    dobierałaby zadania o tarciu. Przypisanie robi się po tagach tematycznych, ale **tylko
+    w granicach kategorii, z której zadanie pochodzi** — inaczej zadanie z mechaniki z tagiem
+    „światło" wpadłoby do Optyki. Rozkład: Kinematyka 21, Dynamika 17, Energia i pęd 11,
+    Bryła sztywna 30, Hydrostatyka 12, Termodynamika 33, Drgania 15, Fale 14, Grawitacja 36,
+    Elektrostatyka 18, Prąd 22, Magnetyzm 12, Elektromagnetyzm 9, Optyka 33, Atomowa 19,
+    Jądrowa+relatywistyka 26.
+  - **Efekt uboczny, który był celem:** nazwy działów materiału są IDENTYCZNE z nazwami
+    modułów kursu, więc `lekResolveTasks()` dopasowuje je dokładnym porównaniem, bez
+    zgadywania. Do kontekstu AI dochodzi jedno zdanie, że te nazwy się pokrywają.
+  - **Zadania trzymane w KODZIE (`MATS_FM_ZADANIA`), nie w stanie.** 328 pozycji to ~87 KB,
+    które przy każdym `save()` szłyby do localStorage i do chmury. W `S.materialy` zostaje
+    tylko lista działów + licznik; linki dokłada `matsLinked()` przy renderowaniu. Kursy
+    z Wielkiej Powtórki robią to inaczej (lekcje siedzą w stanie) — tamto zostawiłem, żeby
+    nie ruszać działającego kodu, ale przy kolejnym takim materiale wzorcem jest ten nowy.
+  - **Nowy sposób renderowania:** materiał z linkami rysuje się wierszami (numer lokalny,
+    tytuł jako odnośnik, punkty i sesja CKE), a nie kwadracikami z numerem — w kwadracik
+    nie dało się kliknąć treści. Ta sama forma w planie zakładki Lekcja. Numeracja bez zmian:
+    globalna 1..328 w `m.done`, lokalna w dziale przez `matsLocalNo()`.
+  - **Analiza pokrycia (przed dodaniem):** wszystkie 13 działów wymagań CKE ma pokrycie i w
+    kursie, i na stronie. Dwie dziury warte zapamiętania: **tylko 86 z 328 zadań pochodzi
+    z arkuszy 2023-2025** (reszta to Formuła 2015 — strona ma filtr lat), oraz **brak zadań
+    pod wymagania przekrojowe PR.I** (niepewności pomiarowe, opracowanie wyników) — tego
+    trzeba szukać w module 18 kursu. Cienko też z relatywistyką.
+  - **Uwaga o jakości:** strona jest darmowa i robiona przez uczniów, nie przez CKE — tagi
+    tematyczne bywają błędne (zweryfikowane: zadanie o bilansie cieplnym ma tagi „pole
+    elektryczne · ładunek punktowy"; to błąd witryny, nie parsera). Na przypisanie do działu
+    wpływa to tylko tam, gdzie kategoria dopuszcza więcej niż jeden moduł.
+  - Testy: 328 zadań i 16 działów po zasianiu ✓; numeracja lokalna startuje od 1 w każdym
+    dziale ✓; odhaczenie 1. zadania Dynamiki daje globalny numer 22, a 3. Hydrostatyki — 82 ✓;
+    `lekResolveTasks(m,"Hydrostatyka",3)` pomija odhaczone i zwraca 1, 2, 4 ✓; plan renderuje
+    klikalne wiersze z poprawnymi adresami ✓; **wszystkie 328 linków sprawdzone HTTP-em —
+    zero 404** ✓; regresja: zbiór matematyczny nadal rysuje 605 kwadracików, kurs fizyki 169
+    wierszy lekcji, 15 widoków bez błędów w konsoli ✓.
+  - Materiał, jak kursy i zbiór, wgrywa się **tylko na koncie właściciela**
+    (`matsSeedForOwner`, flaga `S.matura.fmSeeded`).
 
 - **2026-08-26 (sesja 16, cd. — INCYDENT: skasowana prawdziwa znajomość):**
   Użytkownik zgłosił, że utworzona kilka godzin wcześniej rywalizacja z kolegą zniknęła.
