@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — czat w Rywalizacji, build 66)_
+_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — liczba sesji z harmonogramu, build 67)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,36 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-26 (sesja 16, cd. — AI dorzucało sesje ponad harmonogram, build 67):**
+  Zgłoszenie: przy 5 sesjach w harmonogramie plan potrafił mieć 7. **To był błąd kodu, nie
+  tylko halucynacja modelu.** `lekAskAI` budowało plan przez `raw.sessions.map(...)` — czyli
+  z tablicy zwróconej przez AI. Sesja bez odpowiadającego bloku dostawała `blk=null`
+  i `subject` prosto z modelu, więc przechodziła przez `filter(s=>s.subject)` i lądowała
+  w planie. Zasada nr 1 promptu („nie dokładaj ani nie pomijaj sesji") nie miała żadnego
+  odpowiednika w kodzie.
+  - **Poprawka:** iterujemy po `ctx.blocks` (realny harmonogram) i tylko DOBIERAMY do nich
+    propozycje modelu — `dopasuj()` szuka najpierw po godzinie i przedmiocie, potem po samej
+    godzinie, na końcu po samym przedmiocie, każdą propozycję zużywając najwyżej raz.
+    Liczba sesji w planie jest teraz **zawsze** równa liczbie bloków, a godzina i przedmiot
+    biorą się z harmonogramu, nie z odpowiedzi.
+  - **Widoczność zamiast cichego poprawiania:** nadmiar trafia do `#lekStatus`
+    („AI zaproponowało 7 sesji zamiast 5 — 2 nadmiarowe pominąłem"), blok bez propozycji
+    dostaje adnotację „AI pominęło tę sesję", a sesja, która po rezerwacjach wyszła pusta
+    (model powtórzył materiał z wcześniejszej) — „to już jest zrobione albo trafiło wcześniej".
+  - Prompt też wzmocniony: do zapytania idzie wprost `LICZBA SESJI DO ROZPISANIA: N` z listą
+    godzin, a zasada 1 każe policzyć elementy tablicy przed odpowiedzią. Traktujemy to jako
+    pomoc, nie zabezpieczenie.
+  - Testy (5 bloków: 15,16,17 Matematyka + 18,19 Fizyka): 7 propozycji → 5 sesji + komunikat
+    o 2 nadmiarowych ✓; 3 propozycje → 5 sesji, 2 z adnotacją o pominięciu ✓; trzy duplikaty
+    tej samej godziny → 5 sesji, każda propozycja użyta raz ✓; zmyślone godziny (8:00, 9:00)
+    → dopasowane po przedmiocie, reszta oznaczona ✓; pusta odpowiedź → 5 pustych sesji
+    z adnotacjami ✓. Regresja: przycinanie do budżetu nadal działa (4 lekcje → 2, 41 z 45 min)
+    i rezerwacje nie dopuszczają tej samej lekcji w dwóch sesjach ✓.
+  - **Wniosek do zapamiętania (drugi raz w tej samej zakładce):** każdą regułę liczbową
+    z promptu trzeba mieć zaimplementowaną deterministycznie po stronie klienta. Najpierw
+    było to 111 min lekcji w 45-minutowej sesji, teraz 7 sesji zamiast 5 — obie wpadki miały
+    to samo źródło: zaufanie, że model policzy.
 
 - **2026-08-26 (sesja 16, cd. — czat w zakładce Rywalizacja, build 66):**
   Nowa tabela `rywal_messages` (migracja `rywal_messages`): `from_id`, `to_id`, `tresc`
