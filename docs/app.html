@@ -282,9 +282,18 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    [hidden]{display:none} przegladarki i cala aplikacja zostaje zaslonieta pustym, rozmytym
    ekranem. Ta sama pulapka co przy #loginScreen i .wym-row. */
 .wrap-tlo[hidden]{display:none}
-.wrap-okno{width:min(560px,100%);max-height:94vh;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:var(--sp-5);box-shadow:0 20px 60px rgba(0,0,0,.45)}
-.wrap-hero{font-size:clamp(38px,11vw,64px);font-weight:800;letter-spacing:-2px;line-height:1;margin:var(--sp-2) 0}
-.wrap-siatka{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3);margin-top:var(--sp-4)}
+/* Relacja jak na Instagramie: pionowy kadr 9:16, treść wyśrodkowana w pionie, paski
+   postępu u góry, przejście dalej dotknięciem prawej połowy kadru. */
+.wrap-okno{position:relative;width:min(420px,92vw,calc(92vh*9/16));aspect-ratio:9/16;overflow-y:auto;
+  display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);
+  border-radius:20px;padding:var(--sp-5) var(--sp-4);box-shadow:0 20px 60px rgba(0,0,0,.5);cursor:pointer}
+.wrap-srodek{flex:1;display:flex;flex-direction:column;justify-content:center;min-height:0}
+.wrap-pasek{display:flex;gap:4px;margin-bottom:var(--sp-4)}
+.wrap-pasek i{flex:1;height:3px;border-radius:2px;background:var(--border);display:block}
+.wrap-pasek i.on{background:var(--text)}
+.wrap-stopka{text-align:center;color:var(--text-3);font-size:11px;letter-spacing:.04em;padding-top:var(--sp-3)}
+.wrap-hero{font-size:clamp(34px,9vw,52px);font-weight:800;letter-spacing:-2px;line-height:1;margin:var(--sp-2) 0}
+.wrap-siatka{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-2);margin-top:var(--sp-4)}
 .wrap-kafel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-s);padding:var(--sp-3)}
 .wrap-kafel .v{font-size:var(--fs-4);font-weight:700;letter-spacing:-.5px}
 .wrap-kafel .l{font-size:var(--fs-1);color:var(--text-2)}
@@ -293,10 +302,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 .wrap-pojedynek .kto{font-size:var(--fs-3);font-weight:700;font-variant-numeric:tabular-nums}
 .wrap-pojedynek .kto.gorszy{color:var(--text-3);font-weight:600}
 .wrap-pojedynek .co{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-3);text-align:center;white-space:nowrap}
-.wrap-kropki{display:flex;gap:6px;justify-content:center;margin-top:var(--sp-4)}
-.wrap-kropki i{width:7px;height:7px;border-radius:50%;background:var(--border);display:block}
-.wrap-kropki i.on{background:var(--primary)}
-.wrap-etykieta{display:inline-block;background:var(--accent-soft);color:var(--accent);font-weight:700;border-radius:99px;padding:4px 14px;font-size:var(--fs-1);margin-top:var(--sp-2)}
+.wrap-zamknij{position:absolute;top:var(--sp-3);right:var(--sp-3);z-index:2}
 
 /* ===== TELEFON ===== */
 @media(max-width:760px){
@@ -1082,7 +1088,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=73;
+const DM_BUILD=74;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -5543,27 +5549,6 @@ function wrapDni(z){
   for(const d=new Date(z.od);d<=z.do;d.setDate(d.getDate()+1))out.push(dsLok(d));
   return out;
 }
-// „47 h" samo w sobie nic nie mówi — przeliczenie na coś namacalnego mówi
-function wrapPorownanie(min){
-  if(min<60)return "tyle trwa jeden odcinek serialu";
-  const h=min/60;
-  if(h<6)return `tyle trwa ${Math.round(h/1.5*10)/10} filmu`;
-  if(h<40)return `tyle trwa ${Math.round(h/1.5)} filmów pod rząd`;
-  if(h<200)return `to ${Math.round(h/24*10)/10} doby non stop`;
-  return `to ponad ${Math.floor(h/24)} dni bez przerwy`;
-}
-// etykieta z trzech cech: pora dnia, długość sesji, regularność
-function wrapEtykieta(s){
-  if(!s.minuty)return "Widmo";
-  const dlugie=s.sesji?s.minuty/s.sesji>=50:false;
-  const czesto=s.dniZNauka>=s.dniWOkresie*0.6;
-  if(s.poraGodzina!=null&&s.poraGodzina>=21)return dlugie?"Nocny Maratończyk":"Nocny Marek";
-  if(s.poraGodzina!=null&&s.poraGodzina<10)return czesto?"Ranny Ptaszek":"Poranny Zryw";
-  if(dlugie&&!czesto)return "Maratończyk";
-  if(!dlugie&&czesto)return "Snajper";
-  if(dlugie&&czesto)return "Maszyna";
-  return "Spokojny Rytm";
-}
 function wrapMoje(dni){
   const zbior=new Set(dni);
   const ses=(S.matura.sessions||[]).filter(s=>zbior.has(s.date));
@@ -5595,7 +5580,6 @@ function wrapMoje(dni){
   const stan={minuty,sesji:ses.length,przedmioty,najlepszy,zywe,uschle,
     poraGodzina,seria,dniZNauka:dniZ.size,dniWOkresie:dni.length,
     sen:sny.length?Math.round(sny.reduce((a,x)=>a+x,0)/sny.length):null};
-  stan.etykieta=wrapEtykieta(stan);
   return stan;
 }
 function wrapPojedynek(dni){
@@ -5656,36 +5640,26 @@ function renderWrapped(){
     tresc=`
       <p class="muted" style="margin:0">Uczyłeś się</p>
       <div class="wrap-hero">${fmtMin(moje.minuty)}</div>
-      <p class="muted">${esc(wrapPorownanie(moje.minuty))}</p>
-      <span class="wrap-etykieta">${esc(moje.etykieta)}</span>
       <div class="wrap-siatka">
         <div class="wrap-kafel"><div class="v">${moje.dniZNauka}/${moje.dniWOkresie}</div><div class="l">Dni z nauką</div></div>
         <div class="wrap-kafel"><div class="v">${moje.seria}</div><div class="l">Najdłuższa seria</div></div>
         <div class="wrap-kafel"><div class="v">${moje.zywe}</div><div class="l">Drzew w lesie${ukonczone!=null?` · ${ukonczone}% sesji`:""}</div></div>
         <div class="wrap-kafel"><div class="v">${moje.poraGodzina==null?"—":moje.poraGodzina+":00"}</div><div class="l">Ulubiona pora nauki</div></div>
-        <div class="wrap-kafel"><div class="v">${moje.najlepszy?fmtMin(moje.najlepszy[1]):"—"}</div><div class="l">${moje.najlepszy?"Rekord: "+fmtDate(moje.najlepszy[0]):"Najlepszy dzień"}</div></div>
+        <div class="wrap-kafel"><div class="v">${moje.najlepszy?fmtMin(moje.najlepszy[1]):"—"}</div><div class="l">Najlepszy dzień${moje.najlepszy?" · "+fmtDate(moje.najlepszy[0]).replace(/\s\d{4}$/,""):""}</div></div>
         <div class="wrap-kafel"><div class="v">${moje.sen==null?"—":fmtMin(moje.sen)}</div><div class="l">Średni sen</div></div>
       </div>
       ${top?`<div style="margin-top:var(--sp-4)"><strong>Na co poszedł czas</strong>${top}</div>`:""}`;
   }
 
   $("#wrapTlo").innerHTML=`
-    <div class="wrap-okno">
-      <div class="row" style="justify-content:space-between;align-items:flex-start;margin-bottom:var(--sp-2)">
-        <div>
-          <p class="muted" style="margin:0;text-transform:uppercase;letter-spacing:.06em;font-size:11px;font-weight:700">${esc(WRAP_TYTULY[wrapOkres]||"Podsumowanie")}</p>
-          <h2 style="margin:0">${wrapPlansza===0?"Pojedynek":"Twoje liczby"}</h2>
-          <p class="muted" style="margin:0">${esc(z.etykieta)}</p>
-        </div>
-        <button class="icon-btn del" id="wrapZamknij" title="Zamknij">✕</button>
-      </div>
-      <div style="height:var(--sp-3)"></div>
-      ${tresc}
-      <div class="row" style="justify-content:space-between;align-items:center;margin-top:var(--sp-4)">
-        <button class="btn ghost small" data-wnav="-1" style="flex:none">‹ Poprzednia</button>
-        <div class="wrap-kropki"><i class="${wrapPlansza===0?"on":""}"></i><i class="${wrapPlansza===1?"on":""}"></i></div>
-        <button class="btn ghost small" data-wnav="1" style="flex:none">Następna ›</button>
-      </div>
+    <div class="wrap-okno" id="wrapOkno">
+      <button class="icon-btn del wrap-zamknij" id="wrapZamknij" title="Zamknij">✕</button>
+      <div class="wrap-pasek"><i class="on"></i><i class="${wrapPlansza===1?"on":""}"></i></div>
+      <p class="muted" style="margin:0;text-transform:uppercase;letter-spacing:.06em;font-size:11px;font-weight:700">${esc(WRAP_TYTULY[wrapOkres]||"Podsumowanie")}</p>
+      <h2 style="margin:0">${wrapPlansza===0?"Pojedynek":"Twoje liczby"}</h2>
+      <p class="muted" style="margin:0">${esc(z.etykieta)}</p>
+      <div class="wrap-srodek">${tresc}</div>
+      <div class="wrap-stopka">${wrapPlansza===0?"Dotknij, aby zobaczyć swoje liczby":"Dotknij, aby zamknąć"}</div>
     </div>`;
 }
 function wrapPokaz(okres){
@@ -5731,8 +5705,15 @@ function wrapZamknij(){$("#wrapTlo").hidden=true}
 $("#wrapTlo").onclick=e=>{
   if(e.target.id==="wrapTlo")return wrapZamknij();          // kliknięcie w tło zamyka
   if(e.target.closest("#wrapZamknij"))return wrapZamknij();
-  const nav=e.target.closest("[data-wnav]");
-  if(nav){wrapPlansza=(wrapPlansza+ +nav.dataset.wnav+2)%2;renderWrapped();}
+  // dotknięcie kadru: prawa część dalej, lewa wstecz; z ostatniej planszy zamykamy
+  const okno=e.target.closest("#wrapOkno");
+  if(okno){
+    const r=okno.getBoundingClientRect();
+    const wprawo=(e.clientX-r.left)>r.width*0.35;
+    if(!wprawo){wrapPlansza=Math.max(0,wrapPlansza-1);renderWrapped();return}
+    if(wrapPlansza>=1)return wrapZamknij();
+    wrapPlansza++;renderWrapped();
+  }
 };
 document.addEventListener("keydown",e=>{
   if($("#wrapTlo").hidden)return;
