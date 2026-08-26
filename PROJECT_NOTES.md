@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — bonusy w zakresie recapu, build 78)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — odtwarzanie podsumowania, build 79)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,27 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-27 (sesja 16, cd. — „Odtwórz" podsumowanie w Profilu, build 79):**
+  Podsumowanie znikało od jednego przypadkowego dotknięcia i wracało dopiero za tydzień.
+  Teraz przez **cały dzień, w którym się pokazało**, wisi w Profilu karta z przyciskiem
+  odtworzenia; nazajutrz znika sama. Odtwarza dokładnie tę samą kolejkę okresów
+  (`S.wrapOstatni={data,okresy}`), więc przy dwóch podsumowaniach naraz wraca komplet
+  4 plansz. Tytuł karty wymienia okresy: „Podsumowanie tygodnia, miesiąca i roku szkolnego".
+  - **Znalezione przy okazji, warte zapamiętania: `today()` liczy datę w UTC**
+    (`new Date().toISOString().slice(0,10)`). Test przeprowadzany o 01:54 czasu polskiego
+    pokazał `today() = 2026-08-26` przy dacie lokalnej `2026-08-27` — karta „recap z wczoraj"
+    wychodziła widoczna. Znacznik przestawiony na `dsLok(new Date())`, bo sam recap odpala się
+    według daty LOKALNEJ (`getDay`/`getDate`).
+  - **Szerszy problem, NIE ruszany:** `today()` jest używane w całej aplikacji — sesje nauki,
+    drzewa, sen, nawyki. Między północą a 2:00 czasu letniego (1:00 zimowego) wszystko, co
+    zapisane, ląduje pod datą dnia POPRZEDNIEGO. Dla ucznia uczącego się po północy to realne
+    przesunięcie statystyk. Poprawka jest jednolinijkowa (`dsLok`), ale zmieniłaby
+    interpretację danych już zapisanych, więc wymaga świadomej decyzji.
+  - Testy: brak recapu → karta ukryta (`display:none`); recap dzisiaj → widoczna;
+    wczoraj i tydzień temu → ukryta; jeden/dwa/trzy okresy → poprawna odmiana w tytule;
+    odtworzenie otwiera kolejkę 6 plansz od pierwszej; uszkodzony wpis (`okresy:[]`,
+    śmieciowa wartość) nie wywala widoku ✓.
 
 - **2026-08-27 (sesja 16, cd. — bonusy liczone z zakresu podsumowania, buildy 77-78):**
   Prośba: bonusy tygodniowe i miesięczne mają być doliczone ZANIM pokaże się recap, tak żeby
