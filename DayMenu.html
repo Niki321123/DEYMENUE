@@ -1018,7 +1018,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=66;
+const DM_BUILD=67;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -2221,7 +2221,7 @@ function lekResolveTasks(m,sectionName,count,reserved){
 
 const LEK_AI_RULES=`Jesteś nauczycielem-planerem w aplikacji Day Menu. Rozpisujesz naukę na DZISIAJ, sesja po sesji, na podstawie harmonogramu użytkownika.
 ZASADY:
-1) Dostajesz listę dzisiejszych SESJI (godzina + przedmiot). Rozpisz KAŻDĄ osobno. Nie dokładaj ani nie pomijaj sesji.
+1) Dostajesz listę dzisiejszych SESJI (godzina + przedmiot). Rozpisz DOKŁADNIE tyle sesji, ile jest na liście — ani jednej więcej, ani mniej, i dokładnie o tych godzinach. Liczba sesji i ich godziny są PODANE W ZAPYTANIU; nie wymyślaj własnych, nie dziel jednej sesji na dwie i nie dorzucaj „dodatkowej powtórki". Zanim odpowiesz, policz elementy tablicy "sessions" i sprawdź, że zgadzają się co do sztuki z listą godzin.
 2) Budżet czasu jednej sesji to "sesjaMin" minut. Lekcja z kursu zjada swój realny czas ("min"), a to, co zostaje, idzie na zadania. Jedno zadanie zajmuje "minNaZadanie" minut. Budżetu NIE WOLNO przekroczyć.
    - ZANIM zwrócisz sesję: ZSUMUJ "min" wszystkich wybranych do niej lekcji i quizów. Jeśli suma przekracza "sesjaMin", USUWAJ pozycje od końca, aż się zmieści. Nigdy nie zwracaj sesji, w której suma jest większa niż "sesjaMin".
    - Lepiej dać jedną lekcję i zero zadań niż wcisnąć trzy i przekroczyć czas. Nie „próbuj zmieścić" — albo się mieści, albo tego nie ma.
@@ -2291,6 +2291,7 @@ async function lekAskAI(){
     const inne=lekTodayActs();
     const msg=`Dzisiejsze sesje (godzina | przedmiot): ${ctx.blocks.map(b=>`${b.hour}:00 | ${b.subject}`).join(" ; ")}\n`
       +(inne.length?`Inne zajęcia użytkownika dziś (NIE rozpisuj ich, tylko uwzględnij, że dzień jest zajęty): ${inne.map(a=>`${a.hour}:00 ${a.name}${a.kind==="study"?" (własna nauka)":""}`).join(" ; ")}\n`:"")
+      +`LICZBA SESJI DO ROZPISANIA: ${ctx.blocks.length} (godziny: ${ctx.blocks.map(b=>b.hour+":00").join(", ")}) — tablica "sessions" ma mieć dokładnie tyle elementów.\n`
       +`sesjaMin: ${ctx.sesjaMin}\nminNaZadanie: ${ctx.minNaZadanie}\n`
       +`Temat na dziś: ${topic||"brak — kontynuuj od pierwszego nieprzerobionego modułu"}\n\n`
       +ctx.text+"\n\nRozpisz każdą dzisiejszą sesję.";
@@ -2299,9 +2300,26 @@ async function lekAskAI(){
     // rezerwacje w obrębie jednego dnia: ta sama lekcja/zadanie nie może trafić do dwóch sesji
     const takenTasks=new Map(),takenIdx=new Map();
     const reserveFor=(map,key)=>{if(!map.has(key))map.set(key,new Set());return map.get(key)};
-    const sessions=(Array.isArray(raw.sessions)?raw.sessions:[]).sort((a,b)=>(+a.hour||0)-(+b.hour||0)).map(s=>{
-      const blk=ctx.blocks.find(b=>b.hour===+s.hour)||null;
-      const subj=blk?blk.subject:String(s.subject||"");
+    /* Liczbę sesji dyktuje HARMONOGRAM, nie model. Wcześniej plan powstawał z tablicy
+       zwróconej przez AI, więc gdy wymyśliło 7 sesji zamiast 5, dwie nadmiarowe (bez
+       odpowiadającego bloku) przechodziły dalej — wystarczyło, że miały pole "subject".
+       Teraz iterujemy po realnych blokach dnia i tylko DOBIERAMY do nich propozycje modelu;
+       reszta jest odrzucana, a braki zostają puste z adnotacją. */
+    const propozycje=(Array.isArray(raw.sessions)?raw.sessions:[]).slice();
+    const zuzyte=new Set();
+    const dopasuj=blk=>{
+      const rowna=(a,b)=>String(a||"").trim().toLowerCase()===String(b||"").trim().toLowerCase();
+      let j=propozycje.findIndex((s,k)=>!zuzyte.has(k)&&(+s.hour)===blk.hour&&rowna(s.subject,blk.subject));
+      if(j<0)j=propozycje.findIndex((s,k)=>!zuzyte.has(k)&&(+s.hour)===blk.hour);
+      if(j<0)j=propozycje.findIndex((s,k)=>!zuzyte.has(k)&&rowna(s.subject,blk.subject));
+      if(j<0)return null;
+      zuzyte.add(j);return propozycje[j];
+    };
+    const sessions=ctx.blocks.map(blk=>{
+      const dop=dopasuj(blk);
+      const s=dop||{};
+      const brakPropozycji=!dop;
+      const subj=blk.subject;
       const course=lekCourseFor(subj);
       const done=course?new Set(matsDone(course)):new Set();
       const usedIdx=course?reserveFor(takenIdx,course.id):new Set();
@@ -2341,12 +2359,21 @@ async function lekAskAI(){
       }).filter(Boolean);
       let note=String(s.note||"").slice(0,400);
       if(przyciete)note=(note?note+" ":"")+`⚠️ Skróciłem tę sesję do budżetu ${budget} min — reszta wejdzie na następnej.`;
-      return{hour:blk?blk.hour:(+s.hour||0),subject:subj,courseId:course?course.id:null,lessons,quiz,tasks,note};
-    }).filter(s=>s.subject).sort((a,b)=>a.hour-b.hour);
+      if(brakPropozycji)note=(note?note+" ":"")+"⚠️ AI pominęło tę sesję — kliknij „Zaproponuj plan” jeszcze raz albo dobierz materiał ręcznie.";
+      // model potrafi powtórzyć w kolejnej sesji to samo, co już przydzielił wcześniej;
+      // po rezerwacjach zostaje wtedy pustka i bez adnotacji wyglądałoby to na błąd aplikacji
+      else if(!lessons.length&&!quiz.length&&!tasks.length)
+        note=(note?note+" ":"")+"⚠️ To, co AI tu zaproponowało, jest już zrobione albo trafiło do wcześniejszej sesji.";
+      return{hour:blk.hour,subject:subj,courseId:course?course.id:null,lessons,quiz,tasks,note};
+    }).sort((a,b)=>a.hour-b.hour);
+    // ile propozycji model wymyślił ponad harmonogram — mówimy o tym wprost
+    const nadmiarowe=propozycje.length-zuzyte.size;
     S.matura.lekcjaPlan={date:today(),topic,sesjaMin:ctx.sesjaMin,sessions};
     save();
     lekRenderPlan(S.matura.lekcjaPlan);
-    $("#lekStatus").textContent="";
+    $("#lekStatus").textContent=nadmiarowe>0
+      ? `AI zaproponowało ${propozycje.length} ${matsPlural(propozycje.length,"sesję","sesje","sesji")} zamiast ${ctx.blocks.length} z harmonogramu — ${nadmiarowe} ${matsPlural(nadmiarowe,"nadmiarową pominąłem","nadmiarowe pominąłem","nadmiarowych pominąłem")}.`
+      : "";
   }catch(e){
     $("#lekStatus").textContent="Błąd AI: "+((e&&e.message)||"nieznany");
   }
