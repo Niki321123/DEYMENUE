@@ -268,6 +268,9 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 .chat-msg{max-width:78%;padding:7px 12px;border-radius:14px;background:var(--surface);border:1px solid var(--border);font-size:var(--fs-1);white-space:pre-wrap;overflow-wrap:anywhere}
 .chat-msg.mine{align-self:flex-end;background:var(--primary);color:var(--primary-text);border-color:transparent}
 .chat-msg .t{display:block;font-size:11px;opacity:.65;margin-top:3px;font-variant-numeric:tabular-nums}
+.awatar{flex:none;border-radius:50%;object-fit:cover;background:var(--surface-2);display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:var(--text-2);overflow:hidden;border:1px solid var(--border)}
+.awatar-duzy{width:96px;height:96px;font-size:34px}
+.awatar-maly{width:26px;height:26px;font-size:12px}
 
 /* ===== TELEFON ===== */
 @media(max-width:760px){
@@ -357,6 +360,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     <button class="nav-btn" data-view="time">Analiza czasu</button>
   </div>
   <div class="nav-group"><h3>Ustawienia</h3>
+    <button class="nav-btn" data-view="profil">Profil</button>
     <button class="nav-btn" data-view="look">Wygląd</button>
     <button class="nav-btn" data-view="account">Konto</button>
   </div>
@@ -960,6 +964,39 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 </section>
 
 <!-- ============ WYGLĄD ============ -->
+<!-- ============ PROFIL ============ -->
+<section class="view" id="view-profil">
+  <h1>Profil</h1>
+  <p class="sub">Zdjęcie i nazwa widoczne dla znajomych w Rywalizacji, plus podsumowanie Twoich liczb.</p>
+
+  <div class="card">
+    <div class="row" style="align-items:center;gap:var(--sp-4);flex-wrap:nowrap">
+      <div id="profAwatar" style="flex:none"></div>
+      <div style="flex:1;min-width:0">
+        <input type="text" id="profNazwa" class="field" placeholder="Twoja nazwa" maxlength="40" style="margin-bottom:var(--sp-2)">
+        <div class="row" style="gap:var(--sp-2)">
+          <button class="btn ghost small" id="profZdjecie" style="flex:none">Wybierz zdjęcie</button>
+          <button class="btn ghost small" id="profUsunZdjecie" style="flex:none">Usuń zdjęcie</button>
+          <button class="btn small" id="profZapisz" style="flex:none">Zapisz</button>
+        </div>
+      </div>
+    </div>
+    <input type="file" id="profPlik" accept="image/*" hidden>
+    <p class="muted" id="profMsg" style="margin-top:var(--sp-3)"></p>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-bottom:var(--sp-3)">Twoje liczby</h2>
+    <div class="grid4" id="profStaty"></div>
+    <p class="muted" id="profOd" style="margin-top:var(--sp-3)"></p>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-bottom:var(--sp-3)">Postęp materiałów</h2>
+    <div id="profMaterialy"></div>
+  </div>
+</section>
+
 <section class="view" id="view-look">
   <h1>Wygląd</h1><p class="sub">Motyw, kolory interfejsu i własne tło ze zdjęcia.</p>
   <div class="card">
@@ -1018,7 +1055,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=68;
+const DM_BUILD=69;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1196,7 +1233,7 @@ $("#themeBtn").onclick=()=>{
 applyTheme();loadBg();
 
 /* ================= NAV ================= */
-const renderers={dash:renderDash,mood:renderMood,goals:renderGoals,books:renderBooks,time:renderTime,sleep:renderSleep,look:renderLook,habits:renderHabits,account:renderAccount,matura:renderMatura,exams:renderExams,wymagania:renderWymagania,mats:renderMats,frekwencja:renderFrekwencja,rywal:renderRywal};
+const renderers={dash:renderDash,mood:renderMood,goals:renderGoals,books:renderBooks,time:renderTime,sleep:renderSleep,look:renderLook,habits:renderHabits,account:renderAccount,matura:renderMatura,exams:renderExams,wymagania:renderWymagania,mats:renderMats,frekwencja:renderFrekwencja,rywal:renderRywal,profil:renderProfil};
 $$(".nav-btn").forEach(b=>b.onclick=()=>show(b.dataset.view));
 function show(v){
   $$(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
@@ -5005,7 +5042,7 @@ async function rywalLoad(){
     const tok=await sbToken();if(!tok)return;
     const H={apikey:SB_KEY,Authorization:"Bearer "+tok};
     // znajomi: profile wszystkich poza mną (RLS i tak zwróci tylko znajomych)
-    const pr=await fetch(`${SB_URL}/rest/v1/profiles?select=user_id,name`,{headers:H});
+    const pr=await fetch(`${SB_URL}/rest/v1/profiles?select=user_id,name,avatar`,{headers:H});
     const profs=pr.ok?await pr.json():[];
     // kiedy powstała każda znajomość — to jest „start rywalizacji" dla pojedynku całościowego
     const fr=await fetch(`${SB_URL}/rest/v1/friendships?select=friend_id,created_at&user_id=eq.${rywalProfile.user_id}`,{headers:H});
@@ -5017,8 +5054,10 @@ async function rywalLoad(){
     const stats=sr.ok?await sr.json():[];
     const byUser={};
     stats.forEach(s=>{(byUser[s.user_id]||(byUser[s.user_id]={}))[s.date]=s});
+    const mojProfil=profs.find(p=>p.user_id===rywalProfile.user_id);
+    if(mojProfil)rywalProfile.avatar=mojProfil.avatar||null;
     rywalFriends=profs.filter(p=>p.user_id!==rywalProfile.user_id)
-      .map(p=>({user_id:p.user_id,name:p.name,days:byUser[p.user_id]||{},since:odKiedy[p.user_id]||null}));
+      .map(p=>({user_id:p.user_id,name:p.name,avatar:p.avatar||null,days:byUser[p.user_id]||{},since:odKiedy[p.user_id]||null}));
     rywalFriends.myDays=byUser[rywalProfile.user_id]||{};
     await betsLoad();
     await shopLoad();
@@ -5092,6 +5131,7 @@ function renderRywal(){
   $("#rywalMain").hidden=!zalogowany;
   if(!zalogowany)return;
   renderPunkty();renderZaklady();renderSklep();renderChat();
+  if($("#view-profil").classList.contains("active"))renderProfil();
   if(rywalProfile){
     $("#rywalCode").textContent=rywalProfile.code||"————";
     if(document.activeElement!==$("#rywalName"))$("#rywalName").value=rywalProfile.name||"";
@@ -5238,8 +5278,8 @@ function pktPelneMiesiace(odDs){
 }
 function pktUczestnicy(){
   const me={id:(rywalProfile&&rywalProfile.user_id)||"me",name:(rywalProfile&&rywalProfile.name)||"Ty",
-            days:rywalFriends.myDays||{},me:true};
-  return [me,...rywalFriends.map(f=>({id:f.user_id,name:f.name,days:f.days}))];
+            avatar:(rywalProfile&&rywalProfile.avatar)||null,days:rywalFriends.myDays||{},me:true};
+  return [me,...rywalFriends.map(f=>({id:f.user_id,name:f.name,avatar:f.avatar,days:f.days}))];
 }
 /* Ściśły lider bierze bonus sam. Przy remisie punkty dostają wszyscy remisujący, ale tylko
    jeśli KAŻDY z nich przekroczył w tym okresie próg nauki — inaczej „obaj po 0 godzin"
@@ -5298,6 +5338,7 @@ function renderPunkty(){
         return `<div class="card" style="margin:0;border:2px solid ${lider?"var(--good)":"var(--border)"}">
           <div class="row" style="justify-content:space-between;align-items:baseline">
             <strong style="display:inline-flex;align-items:center;gap:8px">
+              ${awatarHtml(u.avatar,u.name,"awatar-maly")}
               <span style="width:12px;height:12px;border-radius:3px;background:${kolor}"></span>${esc(u.name)}</strong>
             <span style="font-size:var(--fs-5);font-weight:800;color:${lider?"var(--good)":"var(--text)"}">${u.razem}${lider?" 👑":""}</span>
           </div>
@@ -5433,6 +5474,167 @@ $("#betLista").onclick=async e=>{
 };
 $("#betDodaj").onclick=betDodaj;
 $("#betOpis").onkeydown=e=>{if(e.key==="Enter")betDodaj()};
+
+/* ================= PROFIL =================
+   Zdjęcie skalujemy w przeglądarce do kwadratu 160x160 JPEG i trzymamy jako data URI
+   w profiles.avatar — kilka kB na osobę, więc osobny bucket w Storage byłby przerostem
+   formy nad treścią. Baza pilnuje limitu 60 kB CHECKiem. */
+const PROF_ROZMIAR=160;
+function inicjaly(nazwa){
+  const s=String(nazwa||"").trim();
+  if(!s)return "—";
+  return s.split(/\s+/).slice(0,2).map(w=>w[0]).join("").toUpperCase();
+}
+function awatarHtml(url,nazwa,klasa){
+  return url
+    ? `<img class="awatar ${klasa}" src="${esc(url)}" alt="${esc(nazwa||"")}">`
+    : `<span class="awatar ${klasa}">${esc(inicjaly(nazwa))}</span>`;
+}
+// skalowanie i kadrowanie do kwadratu; jakość zbijamy, dopóki nie zmieści się w limicie
+function profSkaluj(file){
+  return new Promise((resolve,reject)=>{
+    const fr=new FileReader();
+    fr.onerror=()=>reject(new Error("Nie udało się odczytać pliku"));
+    fr.onload=()=>{
+      const img=new Image();
+      img.onerror=()=>reject(new Error("To nie jest obrazek"));
+      img.onload=()=>{
+        const bok=Math.min(img.width,img.height);
+        const c=document.createElement("canvas");
+        c.width=c.height=PROF_ROZMIAR;
+        const ctx=c.getContext("2d");
+        ctx.drawImage(img,(img.width-bok)/2,(img.height-bok)/2,bok,bok,0,0,PROF_ROZMIAR,PROF_ROZMIAR);
+        let q=0.82,url=c.toDataURL("image/jpeg",q);
+        while(url.length>60000&&q>0.3){q-=0.12;url=c.toDataURL("image/jpeg",q);}
+        if(url.length>60000)return reject(new Error("Zdjęcie jest za duże nawet po kompresji"));
+        resolve(url);
+      };
+      img.src=fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+let profAvatarRoboczy=null,profOstatniaNazwa="";   // null = bez zmian, "" = usuń, string = nowe zdjęcie
+async function profZapisz(){
+  const msg=$("#profMsg"),nazwa=$("#profNazwa").value.trim();
+  if(!sbSession)return msg.textContent="Zaloguj się w zakładce Konto, żeby zapisać profil w chmurze.";
+  if(!nazwa)return msg.textContent="Wpisz nazwę.";
+  msg.textContent="Zapisuję…";
+  try{
+    if(!rywalProfile)rywalProfile=await rywalEnsureProfile();
+    if(!rywalProfile)throw new Error("Nie udało się utworzyć profilu");
+    const tok=await sbToken();if(!tok)throw new Error("NOLOGIN");
+    const zmiany={name:nazwa};
+    if(profAvatarRoboczy!==null)zmiany.avatar=profAvatarRoboczy||null;
+    const r=await fetch(`${SB_URL}/rest/v1/profiles?user_id=eq.${rywalProfile.user_id}`,{
+      method:"PATCH",
+      headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json",Prefer:"return=minimal"},
+      body:JSON.stringify(zmiany)
+    });
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    rywalProfile.name=nazwa;
+    if(profAvatarRoboczy!==null)rywalProfile.avatar=profAvatarRoboczy||null;
+    profAvatarRoboczy=null;
+    msg.textContent="Zapisane ✓";
+    renderProfil();
+    if($("#view-rywal").classList.contains("active"))renderRywal();
+  }catch(e){msg.textContent="Nie udało się zapisać: "+((e&&e.message)||"błąd")}
+}
+// zbiorcze liczby użytkownika — wszystko liczone z lokalnego stanu, więc działa też bez logowania
+function profStats(){
+  const ses=S.matura.sessions||[];
+  const minuty=ses.reduce((a,s)=>a+(s.minutes||0),0);
+  const drzewa=(S.forest||[]).filter(t=>t.status==="alive").length;
+  const tydzien=rywalWeekDates?rywalWeekDates():[];
+  const wTygodniu=ses.filter(s=>tydzien.includes(s.date)).reduce((a,s)=>a+(s.minutes||0),0);
+  // seria: kolejne dni z jakąkolwiek nauką, licząc wstecz od dziś (albo od wczoraj)
+  const dni=new Set(ses.map(s=>s.date));
+  let seria=0;const d=new Date();
+  if(!dni.has(dsLok(d)))d.setDate(d.getDate()-1);
+  while(dni.has(dsLok(d))){seria++;d.setDate(d.getDate()-1);}
+  // najdłuższa seria w historii
+  const posort=[...dni].sort();
+  let najd=0,biez=0,poprz=null;
+  for(const ds of posort){
+    if(poprz){
+      const roznica=Math.round((new Date(ds+"T00:00")-new Date(poprz+"T00:00"))/86400000);
+      biez=roznica===1?biez+1:1;
+    }else biez=1;
+    if(biez>najd)najd=biez;
+    poprz=ds;
+  }
+  const ost30=[];for(let i=0;i<30;i++){const x=new Date();x.setDate(x.getDate()-i);ost30.push(dsLok(x))}
+  const prod=ost30.map(pctProd).filter(v=>v!=null);
+  const sen=ost30.map(ds=>{const s=slOf(ds);return s?sleepMin(s):null}).filter(v=>v!=null);
+  return{
+    minuty,sesji:ses.length,drzewa,wTygodniu,seria,najdluzszaSeria:najd,
+    dniNauki:dni.size,
+    prod:prod.length?Math.round(prod.reduce((a,x)=>a+x,0)/prod.length):null,
+    sen:sen.length?Math.round(sen.reduce((a,x)=>a+x,0)/sen.length):null,
+    pierwszyDzien:posort[0]||null
+  };
+}
+function renderProfil(){
+  const zalogowany=!!sbSession;
+  const nazwa=(rywalProfile&&rywalProfile.name)||(S.account&&S.account.name)||"";
+  const avatar=profAvatarRoboczy!==null?profAvatarRoboczy:(rywalProfile&&rywalProfile.avatar)||"";
+  $("#profAwatar").innerHTML=awatarHtml(avatar,nazwa,"awatar-duzy");
+  /* Pole nazwy nadpisujemy tylko wtedy, gdy użytkownik go nie ruszał — inaczej każde
+     przerysowanie (np. po wgraniu zdjęcia) kasowałoby wpisany, jeszcze niezapisany tekst. */
+  const pole=$("#profNazwa");
+  if(document.activeElement!==pole&&(pole.value===""||pole.value===profOstatniaNazwa))pole.value=nazwa;
+  profOstatniaNazwa=nazwa;
+  ["profZdjecie","profUsunZdjecie","profZapisz"].forEach(id=>{$("#"+id).disabled=!zalogowany});
+  if(!zalogowany&&!$("#profMsg").textContent)
+    $("#profMsg").textContent="Zaloguj się w zakładce Konto, żeby zdjęcie i nazwa były widoczne dla znajomych.";
+
+  const st=profStats();
+  $("#profStaty").innerHTML=`
+    <div class="stat"><div class="v">${fmtMin(st.minuty)}</div><div class="l">Łącznie nauki</div></div>
+    <div class="stat"><div class="v">${fmtMin(st.wTygodniu)}</div><div class="l">W tym tygodniu</div></div>
+    <div class="stat"><div class="v">${st.drzewa}</div><div class="l">Sesje pomodoro</div></div>
+    <div class="stat"><div class="v">${st.seria}</div><div class="l">Dni nauki pod rząd</div></div>
+    <div class="stat"><div class="v">${st.najdluzszaSeria}</div><div class="l">Najdłuższa seria</div></div>
+    <div class="stat"><div class="v">${st.dniNauki}</div><div class="l">Dni z nauką</div></div>
+    <div class="stat"><div class="v">${st.prod==null?"—":st.prod+"%"}</div><div class="l">Produktywność (30 dni)</div></div>
+    <div class="stat"><div class="v">${st.sen==null?"—":fmtMin(st.sen)}</div><div class="l">Średni sen (30 dni)</div></div>`;
+  $("#profOd").textContent=st.pierwszyDzien
+    ? `Pierwsza zapisana nauka: ${fmtDate(st.pierwszyDzien)} · ${st.sesji} ${matsPlural(st.sesji,"sesja","sesje","sesji")} w historii.`
+    : "Nie masz jeszcze zapisanej żadnej sesji nauki.";
+
+  const mats=matsList();
+  $("#profMaterialy").innerHTML=mats.length?mats.map(m=>{
+    const cal=Array.isArray(m.lessons)&&m.lessons.length?m.lessons.length:(m.tasks||0);
+    const zr=matsDone(m).length,[one,few,many]=matsUnit(m);
+    return `<div class="mats-item">
+      <div class="row" style="justify-content:space-between;align-items:baseline">
+        <strong>${esc(m.name)}</strong>
+        <span class="muted">${zr}/${cal} ${matsPlural(cal,one,few,many)}</span>
+      </div>
+      <div class="mats-prog"><div class="progress"><div class="g-good" style="width:${matsPct(m)}%"></div></div>
+        <span class="muted">${matsPct(m)}%</span></div>
+    </div>`;
+  }).join(""):`<div class="empty">Brak materiałów — dodaj je w zakładce Materiały.</div>`;
+}
+$("#profZdjecie").onclick=()=>$("#profPlik").click();
+$("#profPlik").onchange=async e=>{
+  const f=e.target.files&&e.target.files[0];
+  e.target.value="";                       // ten sam plik da się wybrać ponownie
+  if(!f)return;
+  $("#profMsg").textContent="Przetwarzam zdjęcie…";
+  try{
+    profAvatarRoboczy=await profSkaluj(f);
+    $("#profMsg").textContent="Podgląd gotowy — kliknij „Zapisz”.";
+    renderProfil();
+  }catch(err){$("#profMsg").textContent="Nie udało się wczytać zdjęcia: "+((err&&err.message)||"błąd")}
+};
+$("#profUsunZdjecie").onclick=()=>{
+  profAvatarRoboczy="";
+  $("#profMsg").textContent="Zdjęcie usunięte — kliknij „Zapisz”.";
+  renderProfil();
+};
+$("#profZapisz").onclick=profZapisz;
+$("#profNazwa").onkeydown=e=>{if(e.key==="Enter")profZapisz()};
 
 /* ---- czat ----
    Wiadomości 1:1 (from_id/to_id), bo znajomi użytkownika nie muszą być znajomymi między sobą
