@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — hotfix rozmytego ekranu, build 72)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — podsumowanie pokazuje sie samo, build 73)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,32 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-27 (sesja 16, cd. — podsumowanie wyświetla się samo przy wejściu, build 73):**
+  Doprecyzowanie: podsumowania nie ma być w Profilu, ma **samo wyskakiwać przy wejściu do
+  aplikacji** — tygodniowe co tydzień, miesięczne co miesiąc, roczne **wyłącznie 30 kwietnia**.
+  - Zniknęła karta z przyciskiem w Profilu i przełącznik zakresów w nakładce; okres wybiera
+    teraz `wrapNalezny()`. Wariant roku kalendarzowego wypadł — „roczne" to rok szkolny.
+  - **Zmiana zakresów na ZAKOŃCZONE okresy.** Wcześniej tydzień liczył się od poniedziałku
+    do dziś, co przy pokazywaniu w poniedziałek dałoby jeden dzień danych. Teraz tygodniowe
+    podsumowuje **poprzedni pełny tydzień pon-nd**, miesięczne **poprzedni pełny miesiąc**,
+    a roczne 1 września – 30 kwietnia.
+  - **Kiedy się pokazuje:** rocznie tylko 30 kwietnia, miesięcznie 1. dnia miesiąca,
+    tygodniowo w poniedziałek. Gdy zbiega się kilka, wygrywa większy okres (rok > miesiąc >
+    tydzień) — żeby nie pokazywać dwóch nakładek pod rząd. Znacznik obejrzanych leży
+    w `S.wrapSeen`, więc jedzie do chmury i telefon nie pokaże drugi raz tego, co widziałeś
+    na komputerze.
+  - **Dwa punkty wywołania:** 1,8 s po starcie (żeby niezalogowany też dostał swoją planszę)
+    oraz po `rywalLoad()` — bez danych znajomego plansza pojedynku byłaby pusta. Flaga
+    `wrapSprawdzone` pilnuje, żeby w jednym uruchomieniu pokazać to najwyżej raz.
+  - Testy z podmienionym `Date`: czwartek → nic; poniedziałek → tygodniowe (zakres 24–30
+    sierpnia, nie bieżący tydzień); 1 września → miesięczne (sierpień, 1–31); 30 kwietnia
+    2027 → roczne (1.09.2026–30.04.2027); zwykły wtorek → nic; 1 lutego 2027 (poniedziałek
+    i 1. dnia miesiąca jednocześnie) → miesięczne; drugie wejście tego samego dnia → nic;
+    znacznik zapisany poprawnie ✓. Profil ma znowu trzy karty, bez podsumowania ✓.
+  - **Świadomy skutek uboczny:** nie ma już ręcznego wejścia w podsumowanie — po zamknięciu
+    wraca dopiero w kolejnym okresie. Zgodne z prośbą; gdyby przeszkadzało, wystarczy dodać
+    dyskretny przycisk w Profilu.
 
 - **2026-08-27 (sesja 16, cd. — HOTFIX: nakładka zasłaniała całą aplikację, build 72):**
   Zgłoszenie: „aplikacja się nie odpala (jest zablurowana)" — zrzut pokazywał pulpit za
