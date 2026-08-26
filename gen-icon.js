@@ -1,51 +1,87 @@
-// Generuje build/icon.ico, build/icon-256.png i build/tray.png z logo Day Menu.
+// Generuje wszystkie ikony aplikacji z logo Day Menu (kalendarz z listą i ptaszkiem).
 // Uruchom: npx electron gen-icon.js
+//
+// Powstaje:
+//   build/icon.ico        – ikona okna i instalatora (Windows, 7 rozmiarów w jednym pliku)
+//   build/icon-256.png    – ikona okna Electrona
+//   build/tray.png        – ikona w zasobniku systemowym
+//   android-app/.../mipmap-*/ic_launcher.png, ic_launcher_round.png, ic_launcher_foreground.png
+//
+// Logo rysujemy kodem, a nie skalujemy z jednego pliku PNG, żeby każdy rozmiar był ostry —
+// przy 16x16 (zasobnik, pasek zadań) przeskalowany bitmap rozmywa się nie do poznania.
 const { app, BrowserWindow } = require("electron");
 const fs = require("fs");
 const path = require("path");
 
-const DRAW = `(function(S){
+// Rysunek znaku w kwadracie SxS. `pad` = margines wokół znaku (0..1 szerokości),
+// `tlo` = kolor tła albo null dla przezroczystego (tak potrzebuje ikona adaptacyjna Androida),
+// `kolo` = przyciąć do koła (ic_launcher_round).
+const DRAW = `(function(S,pad,tlo,kolo){
   const c=document.createElement("canvas");c.width=c.height=S;
   const x=c.getContext("2d");
-  const rr=(x0,y0,w,h,rad)=>{x.beginPath();x.moveTo(x0+rad,y0);x.arcTo(x0+w,y0,x0+w,y0+h,rad);x.arcTo(x0+w,y0+h,x0,y0+h,rad);x.arcTo(x0,y0+h,x0,y0,rad);x.arcTo(x0,y0,x0+w,y0,rad);x.closePath();};
-  // teczowy gradient stozkowy jak w logo
-  const g=x.createConicGradient(-Math.PI*0.75,S/2,S/2);
-  g.addColorStop(0.00,"#22d3ee");g.addColorStop(0.14,"#4ade80");
-  g.addColorStop(0.28,"#facc15");g.addColorStop(0.42,"#fb923c");
-  g.addColorStop(0.56,"#f43f5e");g.addColorStop(0.72,"#d946ef");
-  g.addColorStop(0.86,"#8b5cf6");g.addColorStop(1.00,"#22d3ee");
-  rr(0,0,S,S,S*0.24);x.fillStyle=g;x.fill();
-  // delikatne rozjasnienie srodka
-  const rg=x.createRadialGradient(S/2,S*0.42,S*0.05,S/2,S*0.42,S*0.75);
-  rg.addColorStop(0,"rgba(255,255,255,0.25)");rg.addColorStop(1,"rgba(255,255,255,0)");
-  rr(0,0,S,S,S*0.24);x.fillStyle=rg;x.fill();
-  // slonce wystajace zza kalendarza
-  x.fillStyle="#fb923c";x.beginPath();x.arc(S/2,S*0.42,S*0.155,0,7);x.fill();
-  // bialy kalendarz
-  const cw=S*0.54,ch=S*0.40,cx0=(S-cw)/2,cy0=S*0.42;
-  x.shadowColor="rgba(0,0,0,0.28)";x.shadowBlur=S*0.05;x.shadowOffsetY=S*0.015;
-  rr(cx0,cy0,cw,ch,S*0.075);x.fillStyle="#ffffff";x.fill();
-  x.shadowBlur=0;x.shadowOffsetY=0;
-  // czerwone kropki (siatka dni)
-  x.fillStyle="#ef4444";
-  const cols=4,rows=2,dx=cw/(cols+1),dy=ch/(rows+1),dr=Math.max(1,S*0.032);
-  for(let i=1;i<=cols;i++)for(let j=1;j<=rows;j++){x.beginPath();x.arc(cx0+dx*i,cy0+dy*j,dr,0,7);x.fill();}
+  const GRANAT="#2b3950", BIALY="#ffffff";
+  const PASKI=["#4a80d4","#4a9d52","#7069e6"];   // niebieski, zielony, fioletowy
+
+  if(tlo){x.fillStyle=tlo;x.fillRect(0,0,S,S);}
+  if(kolo){x.save();x.beginPath();x.arc(S/2,S/2,S/2,0,7);x.clip();}
+
+  // znak w kwadracie o boku m, wyśrodkowany
+  const m=S*(1-2*pad), ox=(S-m)/2, oy=(S-m)/2;
+  const X=u=>ox+u*m, Y=v=>oy+v*m, R=u=>u*m;
+  const rr=(x0,y0,w,h,rad)=>{
+    const r=Math.min(rad,w/2,h/2);
+    x.beginPath();x.moveTo(x0+r,y0);
+    x.arcTo(x0+w,y0,x0+w,y0+h,r);x.arcTo(x0+w,y0+h,x0,y0+h,r);
+    x.arcTo(x0,y0+h,x0,y0,r);x.arcTo(x0,y0,x0+w,y0,r);x.closePath();
+  };
+  const pasek=(u0,v0,u1,v1,kolor)=>{
+    const w=R(u1-u0),h=R(v1-v0);
+    rr(X(u0),Y(v0),w,h,Math.min(w,h)/2);x.fillStyle=kolor;x.fill();
+  };
+
+  // 1) korpus kalendarza (granatowa zaokrąglona ramka)
+  rr(X(0),Y(0.117),R(1),R(0.883),R(0.135));x.fillStyle=GRANAT;x.fill();
+
+  // 2) uchwyty u góry — najpierw biała otoczka (daje przerwę w ramce), potem granat
+  const uchwyt=(uc,kolor,grubosc)=>pasek(uc-grubosc/2,0-(grubosc-0.098)/2,uc+grubosc/2,0.245+(grubosc-0.098)/2,kolor);
+  uchwyt(0.266,BIALY,0.148);
+  uchwyt(0.734,BIALY,0.148);
+  uchwyt(0.266,GRANAT,0.098);
+  uchwyt(0.734,GRANAT,0.098);
+
+  // 3) biała karta w środku
+  rr(X(0.115),Y(0.319),R(0.77),R(0.628),R(0.075));x.fillStyle=BIALY;x.fill();
+
+  // 4) trzy kolorowe pozycje listy
+  const vs=[0.479,0.638,0.787];
+  vs.forEach((v,i)=>pasek(0.159,v-0.030,0.446,v+0.030,PASKI[i]));
+
+  // 5) ptaszek
+  x.strokeStyle=GRANAT;x.lineWidth=R(0.072);x.lineCap="round";x.lineJoin="round";
+  x.beginPath();x.moveTo(X(0.511),Y(0.649));x.lineTo(X(0.641),Y(0.745));x.lineTo(X(0.826),Y(0.532));x.stroke();
+
+  if(kolo)x.restore();
   return c.toDataURL("image/png");
 })`;
+
+const png = (dataUrl) => Buffer.from(dataUrl.split(",")[1], "base64");
 
 app.whenReady().then(async () => {
   const w = new BrowserWindow({ show: false });
   await w.loadURL("data:text/html,<title>icon</title>");
+  const rysuj = (S, pad, tlo, kolo) =>
+    w.webContents.executeJavaScript(`${DRAW}(${S},${pad},${tlo ? `"${tlo}"` : "null"},${!!kolo})`).then(png);
+
+  const root = __dirname;
+  const zapisz = (p, buf) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, buf); };
+
+  // ---- Windows: ico + okno + zasobnik ----
   const sizes = [16, 24, 32, 48, 64, 128, 256];
   const pngs = {};
-  for (const s of sizes) {
-    const dataUrl = await w.webContents.executeJavaScript(`${DRAW}(${s})`);
-    pngs[s] = Buffer.from(dataUrl.split(",")[1], "base64");
-  }
-  fs.mkdirSync(path.join(__dirname, "build"), { recursive: true });
-  fs.writeFileSync(path.join(__dirname, "build", "icon-256.png"), pngs[256]);
-  fs.writeFileSync(path.join(__dirname, "build", "tray.png"), pngs[32]);
-  // ICO z wpisami PNG
+  for (const s of sizes) pngs[s] = await rysuj(s, 0.06, "#ffffff", false);
+  zapisz(path.join(root, "build", "icon-256.png"), pngs[256]);
+  zapisz(path.join(root, "build", "tray.png"), pngs[32]);
+
   let offset = 6 + 16 * sizes.length;
   const header = Buffer.alloc(6);
   header.writeUInt16LE(0, 0); header.writeUInt16LE(1, 2); header.writeUInt16LE(sizes.length, 4);
@@ -58,7 +94,20 @@ app.whenReady().then(async () => {
     e.writeUInt32LE(d.length, 8); e.writeUInt32LE(offset, 12);
     offset += d.length; entries.push(e); datas.push(d);
   }
-  fs.writeFileSync(path.join(__dirname, "build", "icon.ico"), Buffer.concat([header, ...entries, ...datas]));
-  console.log("Ikony zapisane w build/");
+  zapisz(path.join(root, "build", "icon.ico"), Buffer.concat([header, ...entries, ...datas]));
+
+  // ---- Android ----
+  // ic_launcher / ic_launcher_round: pełny kwadrat z białym tłem (starsze wersje systemu).
+  // ic_launcher_foreground: przezroczyste, znak zmieszczony w strefie bezpiecznej ikony
+  // adaptacyjnej (66 z 108 dp) — poza nią system przycina obraz przy animacjach.
+  const res = path.join(root, "android-app", "android", "app", "src", "main", "res");
+  const gestosci = { mdpi: [48, 108], hdpi: [72, 162], xhdpi: [96, 216], xxhdpi: [144, 324], xxxhdpi: [192, 432] };
+  for (const [g, [ikona, przod]] of Object.entries(gestosci)) {
+    zapisz(path.join(res, "mipmap-" + g, "ic_launcher.png"), await rysuj(ikona, 0.10, "#ffffff", false));
+    zapisz(path.join(res, "mipmap-" + g, "ic_launcher_round.png"), await rysuj(ikona, 0.14, "#ffffff", true));
+    zapisz(path.join(res, "mipmap-" + g, "ic_launcher_foreground.png"), await rysuj(przod, 0.26, null, false));
+  }
+
+  console.log("Ikony zapisane: build/ oraz android-app/.../mipmap-*");
   app.quit();
 });
