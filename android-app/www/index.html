@@ -999,7 +999,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=63;
+const DM_BUILD=64;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -2255,6 +2255,7 @@ function lekBuildCtx(topic){
     if(!tms.length)parts.push("Materiały zadaniowe: (brak)");
     else tms.forEach(m=>{
       parts.push(`Materiał zadaniowy: materialId=${m.id} | ${m.name}`);
+      if(m.source==="fizykamatura")parts.push("(Działy tego materiału mają DOKŁADNIE te same nazwy co moduły kursu — do modułu „X” wybieraj dział „X”. Zadania są z arkuszy CKE.)");
       parts.push("Działy (nazwa | zrobione/wszystkie):");
       lekTaskState(m).forEach(s=>parts.push(`${s.name} | ${s.doneCount}/${s.count}`));
     });
@@ -2377,6 +2378,23 @@ function lekRenderPlan(plan){
       const left=t.nums.filter(n=>!matsDone(m).includes(n));
       const lbl=t.section?`dział ${t.sectionNo}. ${t.section}`:m.name;
       if(!left.length)return `<div class="row"><span class="muted">${esc(m.name)} · ${esc(lbl)} — zrobione ✓</span></div>`;
+      // materiał z linkami: każde zadanie osobnym wierszem, żeby dało się w nie kliknąć
+      const linked=matsLinked(m);
+      if(linked){
+        const rows=left.map(x=>{
+          const z=linked[x-1];if(!z)return"";
+          return `<div class="mats-lesson-row">
+            <input type="checkbox" data-lekmt="${m.id}" data-lekn="${x}">
+            <a href="${esc(z.url)}" target="_blank" rel="noopener">${matsLocalNo(m,x)}. ${esc(z.name)}</a>
+            <span class="muted">${z.pkt} pkt</span>
+          </div>`;
+        }).join("");
+        return `<div class="mats-lesson-sec">${esc(m.name)} — ${esc(lbl)}</div>
+          <div class="mats-lessons">${rows}</div>
+          <div class="row" style="justify-content:flex-end;margin-top:var(--sp-2)">
+            <button class="btn ghost small" data-lekdo="${si}" data-lekti="${ti}" style="flex:none">Odhacz ${left.length}</button>
+          </div>`;
+      }
       return `<div class="row" style="justify-content:space-between;align-items:center;gap:var(--sp-2)">
         <span><strong>${esc(m.name)}</strong><br><span class="muted">${esc(lbl)} · zad. ${esc(matsFmtNums(left.map(n=>matsLocalNo(m,n))))}</span></span>
         <button class="btn ghost small" data-lekdo="${si}" data-lekti="${ti}">Odhacz ${left.length}</button>
@@ -3407,6 +3425,403 @@ function matsSeedZbior(){
   m.tasks=MATS_ZBIOR_SECTIONS.reduce((a,s)=>a+s.count,0);
   if(!Array.isArray(m.done))m.done=[];
 }
+/* Zadania maturalne CKE z fizykamatura.pl (328 zadań, arkusze 2015-2025, dostęp darmowy).
+   DZIAŁY = moduły kursu Wielkiej Powtórki, a nie kategorie ze strony. Strona wrzuca bryłę
+   sztywną i hydrostatykę do jednego worka „Dynamika", więc gdyby zostawić jej podział,
+   zakładka Lekcja przy temacie „Hydrostatyka" dobierałaby zadania o tarciu. Przypisanie
+   robi się po tagach tematycznych zadania, w granicach kategorii, z której pochodzi.
+   Numeracja: globalna 1..328 w kolejności działów (m.done trzyma numery globalne),
+   a użytkownik widzi numer lokalny w dziale — przelicza matsLocalNo().
+   Pozycja: [nazwa, slug, punkty, poziom, sesja CKE]. */
+const MATS_FM_ZADANIA=[
+  ["Kinematyka",[
+    ["Walec o promieniu i masie toczy się bez poślizgu ze stałą prędkością o wartości po poziomym, płaskim podłożu.","kinematyka/walec-o-promieniu-i-zadanie-4",8,"Średnie","Czerwiec 2025"],
+    ["Rozważamy rzuty wykonane w doświadczalnej komorze próżniowej.","kinematyka/rozwazamy-rzuty-wykonane-w-zadanie-2",5,"Średnie","Maj 2025"],
+    ["Ze szczytu równi pochyłej puszczano kulkę.","kinematyka/ze-szczytu-rowni-pochylej-zadanie-2",6,"Średnie","Czerwiec 2023"],
+    ["Samochód policyjny jechał ze stałą prędkością.","kinematyka/samochod-policyjny-jechal-ze-zadanie-2",4,"Średnie","Maj 2023"],
+    ["Na wykresie 1. przedstawiono w kartezjańskim układzie współrzędnych tor ruchu ciała w inercjalnym układzie…","kinematyka/na-wykresie-1-przedstawiono-zadanie-2",7,"Średnie","Grudzień 2022"],
+    ["Robot sprzątający rozpoczął ruch po płaskiej powierzchni.","kinematyka/robot-sprzatajacy-rozpoczal-ruch-zadanie-2",7,"Łatwe","Czerwiec 2022"],
+    ["Ciała A i B poruszały się w układzie inercjalnym w tę samą stronę, wzdłuż linii prostych równoległych.","dynamika/ciala-a-i-b-zadanie-2",6,"Średnie","Maj 2022"],
+    ["Z wieży obserwacyjnej wystrzelono małą kulkę.","kinematyka/z-wiezy-obserwacyjnej-wystrzelono-zadanie-2",7,"Średnie","Czerwiec 2021"],
+    ["Z wysokości m ponad punktem rzucono kulkę.","kinematyka/z-wysokosci-m-ponad-zadanie-2",5,"Średnie","Maj 2021"],
+    ["Pewien samolot pasażerski odrywa się od ziemi po osiągnięciu prędkości o wartości 288 km/h w kierunku…","kinematyka/pewien-samolot-pasazerski-odrywa-zadanie-2",4,"Łatwe","Lipiec 2020"],
+    ["Hokeista uderzył kijem w nieruchomy krążek.","kinematyka/hokeista-uderzyl-kijem-w-zadanie-2",6,"Łatwe","Czerwiec 2020"],
+    ["Samochód A jedzie z maksymalną prędkością dozwoloną na danym odcinku trasy.","kinematyka/samochod-a-jedzie-z-zadanie-2-a",4,"Łatwe","Kwiecień 2020"],
+    ["Pewne ciało porusza się ruchem prostoliniowym wzdłuż osi x.","kinematyka/pewne-cialo-porusza-sie-zadanie-2",6,"Średnie","Czerwiec 2019"],
+    ["Rzut z autu jest elementem gry w piłkę nożną i polega na wprowadzeniu piłki do gry z linii bocznej boiska.","kinematyka/rzut-z-autu-jest-zadanie-2",6,"Łatwe","Maj 2019"],
+    ["Samochód A jedzie z maksymalną prędkością dozwoloną na danym odcinku trasy.","kinematyka/samochod-a-jedzie-z-zadanie-2",4,"Średnie","Czerwiec 2018"],
+    ["Rozważamy ruch dwóch samochodów, które poruszały się po poziomym i prostym odcinku trasy.","kinematyka/rozwazamy-ruch-dwoch-samochodow-zadanie-2",5,"Łatwe","Maj 2018"],
+    ["Podczas prób testowych kierowca samochodu, jadący po poziomym prostym torze z prędkością, rozpoczął hamowanie…","kinematyka/podczas-prob-testowych-kierowca-zadanie-2",6,"Średnie","Maj 2017"],
+    ["Aby nadać kuli pewną prędkość i obliczyć jej wartość, położono kulę (bez prędkości początkowej) na równi…","kinematyka/aby-nadac-kuli-pewna-zadanie-6",3,"Średnie","Maj 2017"],
+    ["Kamień o masie 255 g upuszczono z okna na wysokości 19,4 m i zmierzono czas spadania.","dynamika/kamien-o-masie-255-zadanie-5",4,"Trudne","Maj 2017"],
+    ["Samochód i motocykl poruszały się wzdłuż tej samej prostej z prędkościami o takich samych zwrotach.","kinematyka/samochod-i-motocykl-poruszaly-zadanie-2",2,"Łatwe","Czerwiec 2016"],
+    ["Wózek poruszał się bez tarcia (np.","dynamika/wozek-poruszal-sie-bez-zadanie-2",6,"Średnie","Maj 2016"],
+  ]],
+  ["Dynamika",[
+    ["Ciało porusza się wzdłuż osi. Zależność współrzędnej położenia ciała od czasu opisują równania: Wszystkie…","kinematyka/cialo-porusza-sie-wzdluz-zadanie-2",8,"Średnie","Czerwiec 2025"],
+    ["Kropla wody oderwała się od dachu budynku w chwili i następnie opadała pionowo w powietrzu.","dynamika/kropla-wody-oderwala-sie-zadanie-2",8,"Średnie","Maj 2024"],
+    ["Klocek o masie porusza się ruchem jednostajnym prostoliniowym po powierzchni równi pochyłej z prędkością pod…","dynamika/klocek-o-masie-porusza-zadanie-4",6,"Trudne","Maj 2023"],
+    ["Rozważamy spadek ciała w powietrzu.","dynamika/rozwazamy-spadek-ciala-w-zadanie-4",6,"Średnie","Czerwiec 2022"],
+    ["Na poziomym podłożu stoi skrzynia.","dynamika/na-poziomym-podlozu-stoi-zadanie-5",4,"Trudne","Czerwiec 2022"],
+    ["Niewielkie ciało ℬ o masie 𝑚 zawieszono na nierozciągliwej nici o długości 𝑙, a następnie wprawiono je w…","dynamika/niewielkie-cialo-o-masie-zadanie-3",6,"Średnie","Maj 2021"],
+    ["Magnetyczny wieszak (metalowy haczyk z magnesem) jest przeznaczony do mocowania na płaskiej, ustawionej…","dynamika/magnetyczny-wieszak-metalowy-haczyk-zadanie-3",3,"Średnie","Lipiec 2020"],
+    ["Tenisista uderzył rakietą w podrzuconą pionowo piłkę tenisową.","dynamika/tenisista-uderzyl-rakieta-w-zadanie-3-a",1,"Łatwe","Kwiecień 2020"],
+    ["Rozważamy ruch skoczka spadochronowego w ziemskim polu grawitacyjnym.","dynamika/rozwazamy-ruch-skoczka-spadochronowego-zadanie-5-a",5,"Średnie","Kwiecień 2020"],
+    ["Rozważmy hipotetyczną sytuację, w której zawodnik z piłką znajdował się przez pewien czas w kabinie…","dynamika/rozwazmy-hipotetyczna-sytuacje-w-zadanie-3",1,"Średnie","Maj 2019"],
+    ["Tenisista uderzył rakietą w podrzuconą pionowo piłkę tenisową.","dynamika/tenisista-uderzyl-rakieta-w-zadanie-3",1,"Łatwe","Czerwiec 2018"],
+    ["Rozważamy ruch skoczka spadochronowego w ziemskim polu grawitacyjnym.","dynamika/rozwazamy-ruch-skoczka-spadochronowego-zadanie-5",3,"Łatwe","Czerwiec 2018"],
+    ["Dwa pudełka połączono linką przerzuconą przez bloczek.","dynamika/dwa-pudelka-polaczono-linka-zadanie-6",3,"Średnie","Maj 2018"],
+    ["Na sankach spoczywa paczka o masie 5 kg.","dynamika/na-sankach-spoczywa-paczka-zadanie-2",7,"Średnie","Czerwiec 2017"],
+    ["Na poniższych rysunkach kropką zaznaczono trzy różne osie prostopadłe do płaszczyzny rysunku, wokół których…","dynamika/na-ponizszych-rysunkach-kropka-zadanie-14",1,"Łatwe","Maj 2017"],
+    ["Siła tarcia występuje nie tylko w przypadku poślizgu (tarcie poślizgowe) lub styku powierzchni dwóch ciał…","dynamika/sila-tarcia-wystepuje-nie-zadanie-6",3,"Łatwe","Maj 2016"],
+    ["Słupy energetyczne linii przesyłowych wysokiego napięcia można składać z części na powierzchni ziemi, a…","dynamika/slupy-energetyczne-linii-przesylowych-zadanie-4",8,"Średnie","Maj 2015"],
+  ]],
+  ["Energia i pęd",[
+    ["Dwie identyczne kule i, każda o masie, poruszają się naprzeciwko siebie w inercjalnym układzie odniesienia z…","dynamika/dwie-identyczne-kule-i-zadanie-3",5,"Średnie","Czerwiec 2023"],
+    ["Krążek porusza się w inercjalnym układzie odniesienia ze stałą prędkością, a krążek spoczywa.","dynamika/krazek-porusza-sie-w-zadanie-3",2,"Średnie","Maj 2023"],
+    ["Dwie kule i o różnych masach – odpowiednio – i, poruszały się naprzeciw siebie w inercjalnym układzie…","dynamika/dwie-kule-i-o-zadanie-3",4,"Średnie","Grudzień 2022"],
+    ["Najkrótsza droga hamowania samochodu, tzn.","dynamika/najkrotsza-droga-hamowania-samochodu-zadanie-3",3,"Średnie","Czerwiec 2022"],
+    ["Dwie naelektryzowane metalowe kulki umieszczono w pewnej odległości od siebie.","dynamika/dwie-naelektryzowane-metalowe-kulki-zadanie-5",2,"Średnie","Lipiec 2020"],
+    ["Ciało, które potraktujemy jako punkt materialny, początkowo poruszało się ruchem jednostajnym wzdłuż prostej…","dynamika/cialo-ktore-potraktujemy-jako-zadanie-3",6,"Średnie","Czerwiec 2020"],
+    ["Na spoczywającym wózku umieszczono naczynie całkowicie wypełnione wodą (zobacz rysunek I).","dynamika/na-spoczywajacym-wozku-umieszczono-zadanie-8-a",1,"Średnie","Kwiecień 2020"],
+    ["Dwaj chłopcy przeprowadzili doświadczenia.","dynamika/dwaj-chlopcy-przeprowadzili-doswiadczenia-zadanie-8",4,"Średnie","Maj 2018"],
+    ["Podczas centralnego sprężystego zderzenia gładkiej kuli z taką samą kulą spoczywającą wymieniają się one…","dynamika/podczas-centralnego-sprezystego-zderzenia-zadanie-3",3,"Trudne","Maj 2017"],
+    ["Mrówka o masie 5 mg porusza się po płycie obracającej się jednostajnie i wykonującej 3 obroty na sekundę.","dynamika/mrowka-o-masie-5-zadanie-6",5,"Średnie","Czerwiec 2016"],
+    ["Na obrotowym krzesełku usiadł uczeń, trzymając w wyciągniętych poziomo rękach dwie hantle (ciężarki…","dynamika/na-obrotowym-krzeselku-usiadl-zadanie-3",7,"Średnie","Czerwiec 2015"],
+  ]],
+  ["Mechanika bryły sztywnej",[
+    ["Uczniowie wykonywali doświadczenie z wagą.","dynamika/uczniowie-wykonywali-doswiadczenie-z-zadanie-3",8,"Średnie","Czerwiec 2025"],
+    ["Dany jest jednorodny pełny walec W1 oraz wydrążony częściowo (i osiowosymetrycznie) jednorodny walec W2.","dynamika/dany-jest-jednorodny-pelny-zadanie-3",6,"Trudne","Maj 2025"],
+    ["W chwili początkowo nieruchoma, sztywna platforma w kształcie koła o środku rozpoczyna obrót dookoła osi…","kinematyka/w-chwili-poczatkowo-nieruchoma-zadanie-2",7,"Średnie","Grudzień 2024"],
+    ["Walec toczy się po poziomym płaskim podłożu wzdłuż osi x.","dynamika/walec-toczy-sie-po-zadanie-4",6,"Trudne","Grudzień 2024"],
+    ["Deseczka z wycięciami, w których umieszczono trzy jednakowe monety: M1, M2, M3, obraca się ze stałą…","dynamika/deseczka-z-wycieciami-w-zadanie-2",6,"Średnie","Czerwiec 2024"],
+    ["Dana jest jednorodna, sztywna belka o masie kg i długości m.","dynamika/dana-jest-jednorodna-sztywna-zadanie-3",5,"Średnie","Czerwiec 2024"],
+    ["Jednorodny walec o masie i promieniu był ciągnięty siłą o wartości po płaskiej poziomej powierzchni.","dynamika/jednorodny-walec-o-masie-zadanie-3",6,"Trudne","Maj 2024"],
+    ["Cienka jednorodna belka o masie została podparta w punkcie, pokrywającym się z punktem środka masy belki (tzn.","dynamika/cienka-jednorodna-belka-o-zadanie-3",5,"Średnie","Maj 2024"],
+    ["Jednorodna belka podparta w punkcie – w środku swojej długości – utrzymuje się nieruchomo w pozycji poziomej…","dynamika/jednorodna-belka-podparta-w-zadanie-4",6,"Trudne","Czerwiec 2023"],
+    ["Wzdłuż osi jednorodnego walca o masie i promieniu przechodzi cienki pręt, wokół którego walec może się…","dynamika/wzdluz-osi-jednorodnego-walca-zadanie-4",6,"Trudne","Maj 2023"],
+    ["Dany jest cienki jednorodny pręt o masie, długości i końcach w punktach oraz.","dynamika/dany-jest-cienki-jednorodny-zadanie-4",7,"Trudne","Grudzień 2022"],
+    ["Na płaskiej, poziomej powierzchni stołu leży książka, a na książce leży zeszyt.","dynamika/na-plaskiej-poziomej-powierzchni-zadanie-3",2,"Łatwe","Maj 2022"],
+    ["Kątomierz zawieszono na szpilce w punkcie 𝐴 na tle kartki w kratkę tak, że nie dotyka on kartki i pozostaje…","dynamika/katomierz-zawieszono-na-szpilce-zadanie-4",2,"Średnie","Maj 2022"],
+    ["Lekki, sztywny pręt o długości zamocowano na statywie tak, że może się on swobodnie obracać wokół osi…","dynamika/lekki-sztywny-pret-o-zadanie-3",4,"Średnie","Czerwiec 2021"],
+    ["Rozważamy pewną planetę skalistą, która ma kształt kulisty oraz sferycznie symetryczny rozkład masy.","dynamika/rozwazamy-pewna-planete-skalista-zadanie-4",4,"Trudne","Czerwiec 2021"],
+    ["Sześciokątna hantla do ćwiczeń gimnastycznych (zobacz rysunek obok) ma masę m = 2 kg i jest wykonana z…","dynamika/szesciokatna-hantla-do-cwiczen-zadanie-4",6,"Trudne","Lipiec 2020"],
+    ["Drewnianą jednorodną belkę o ciężarze i długości podwieszano pod sufitem na uchwytach i.","dynamika/drewniana-jednorodna-belke-o-zadanie-4",5,"Średnie","Czerwiec 2020"],
+    ["Płaska, prostopadłościenna, jednorodna belka o masie jest podparta w punkcie (zobacz rysunek poniżej).","dynamika/plaska-prostopadloscienna-jednorodna-belka-zadanie-4-a",4,"Średnie","Kwiecień 2020"],
+    ["Dwaj pracownicy podjęli się zadania przesunięcia ciężkiej skrzyni.","dynamika/dwaj-pracownicy-podjeli-sie-zadanie-3",9,"Trudne","Czerwiec 2019"],
+    ["Cztery bryły obrotowe: dwie cienkościenne jednorodne rury i oraz dwa jednorodne walce i, ustawiono na równi…","dynamika/cztery-bryly-obrotowe-dwie-zadanie-4",4,"Średnie","Czerwiec 2019"],
+    ["Uczniowie badali zależność ruchu bryły sztywnej od jej momentu bezwładności.","dynamika/uczniowie-badali-zaleznosc-ruchu-zadanie-4",12,"Trudne","Maj 2019"],
+    ["Płaska, prostopadłościenna, jednorodna belka o masie 10 kg jest podparta w punkcie Y (zobacz rysunek poniżej).","dynamika/plaska-prostopadloscienna-jednorodna-belka-zadanie-4",1,"Łatwe","Czerwiec 2018"],
+    ["Pracownik na budowie miał podnieść do pozycji pionowej długą, jednorodną, sztywną i cienką deskę o masie 20…","dynamika/pracownik-na-budowie-mial-zadanie-7",7,"Trudne","Maj 2018"],
+    ["Zawodniczka wykonała skok do wody, który rozpoczęła od pozycji A ukazanej na rysunku – stanęła na rękach tuż…","dynamika/zawodniczka-wykonala-skok-do-zadanie-4",7,"Trudne","Czerwiec 2017"],
+    ["Samochód jedzie bez poślizgu z prędkością 10 m/s względem ziemi.","kinematyka/samochod-jedzie-bez-poslizgu-zadanie-3",2,"Łatwe","Czerwiec 2016"],
+    ["Ciężarki 1 i 2 umieszczono na sztywnym pręcie w równowadze.","dynamika/ciezarki-1-i-2-zadanie-9",5,"Średnie","Czerwiec 2016"],
+    ["Jednorodna kulka zaczyna toczyć się bez poślizgu z wysokości po pochylni 1, a druga taka sama kulka – z tej…","dynamika/jednorodna-kulka-zaczyna-toczyc-zadanie-4",4,"Średnie","Maj 2016"],
+    ["Uczniowie położyli na krawędzi stołu łańcuszek o bardzo drobnych ogniwach w ten sposób, że wyprostowana,…","dynamika/uczniowie-polozyli-na-krawedzi-zadanie-2",4,"Średnie","Czerwiec 2015"],
+    ["Gimnastyczka rzuciła ukośnie w górę plastikową obręcz, nadając jej jednocześnie ruch obrotowy w płaszczyźnie…","dynamika/gimnastyczka-rzucila-ukosnie-w-zadanie-2",4,"Łatwe","Maj 2015"],
+    ["Uczniowie w pracowni fizycznej wykonali następujące doświadczenie.","dynamika/uczniowie-w-pracowni-fizycznej-zadanie-3",1,"Średnie","Maj 2015"],
+  ]],
+  ["Hydrostatyka",[
+    ["Ciała i mają różne masy i są bryłami w kształcie prostopadłościanów o takich samych wymiarach.","dynamika/ciala-i-maja-rozne-zadanie-3",6,"Średnie","Grudzień 2024"],
+    ["Rozważamy ruch kulki szklanej w pewnej cieczy (w układzie inercjalnym, w ziemskim polu grawitacyjnym).","dynamika/rozwazamy-ruch-kulki-szklanej-zadanie-5",8,"Trudne","Maj 2022"],
+    ["W niewielkim basenie pływa łódka, w której siedzi chłopiec.","dynamika/w-niewielkim-basenie-plywa-zadanie-12",1,"Średnie","Czerwiec 2021"],
+    ["Kra lodowa o objętości pływa częściowo zanurzona w wodzie.","dynamika/kra-lodowa-o-objetosci-zadanie-13-a",3,"Średnie","Kwiecień 2020"],
+    ["Uczniowie zamierzali wyznaczyć gęstość pewnej cieczy.","dynamika/uczniowie-zamierzali-wyznaczyc-gestosc-zadanie-7",8,"Trudne","Maj 2019"],
+    ["Na spoczywającym wózku umieszczono naczynie całkowicie wypełnione wodą (zobacz rysunek I).","dynamika/na-spoczywajacym-wozku-umieszczono-zadanie-8",1,"Łatwe","Czerwiec 2018"],
+    ["Kra lodowa o objętości pływa częściowo zanurzona w wodzie.","dynamika/kra-lodowa-o-objetosci-zadanie-13",1,"Łatwe","Czerwiec 2018"],
+    ["Keson to stalowa lub żelbetonowa skrzynia o szczelnych ścianach i otwartym dnie.","dynamika/keson-to-stalowa-lub-zadanie-6",9,"Średnie","Czerwiec 2017"],
+    ["W szklanej rurce o kształcie litery U, której przekrój jest jednakowy w obu ramionach, znajduje się woda.","dynamika/w-szklanej-rurce-o-zadanie-10",3,"Średnie","Maj 2017"],
+    ["Kulista łódź podwodna o masie 1300 ton, całkowicie zanurzona, poruszała się ruchem jednostajnym pionowo w dół.","dynamika/kulista-lodz-podwodna-o-zadanie-4",3,"Średnie","Czerwiec 2016"],
+    ["Zbudowano tratwę z 10 drewnianych pni.","dynamika/zbudowano-tratwe-z-10-zadanie-5",6,"Średnie","Maj 2016"],
+    ["Wykorzystując dane z tabeli, oblicz, jaka część objętości góry lodowej wystaje ponad powierzchnię wody.","dynamika/wykorzystujac-dane-z-tabeli-zadanie-7",3,"Średnie","Maj 2015"],
+  ]],
+  ["Termodynamika",[
+    ["Naczynie zawierało wodę o masie i temperaturze.","termodynamika/naczynie-zawieralo-wode-o-zadanie-7",3,"Średnie","Czerwiec 2025"],
+    ["Jeden mol jednoatomowego gazu doskonałego został poddany rozprężaniu adiabatycznemu od stanu do stanu.","termodynamika/jeden-mol-jednoatomowego-gazu-zadanie-8",6,"Średnie","Czerwiec 2025"],
+    ["Na wykresie 1. przedstawiono zależność ciśnienia p od temperatury T w cyklu przemian termodynamicznych…","termodynamika/na-wykresie-1-przedstawiono-zadanie-7",8,"Trudne","Maj 2025"],
+    ["Na poniższym wykresie przedstawiono zależność ciśnienia od objętości w cyklu przemian termodynamicznych…","termodynamika/na-ponizszym-wykresie-przedstawiono-zadanie-6",6,"Średnie","Grudzień 2024"],
+    ["Na poniższym wykresie przedstawiono zależność ciśnienia od objętości w cyklu przemian termodynamicznych…","termodynamika/na-ponizszym-wykresie-przedstawiono-zadanie-7",8,"Średnie","Czerwiec 2024"],
+    ["Na poniższym wykresie przedstawiono zależność ciśnienia od objętości w cyklu przemian termodynamicznych…","termodynamika/na-ponizszym-wykresie-przedstawiono-zadanie-9",4,"Średnie","Maj 2024"],
+    ["Dwa zbiorniki o jednakowych objętościach napełniono gazami jednoatomowymi: argonem i helem.","termodynamika/dwa-zbiorniki-o-jednakowych-zadanie-10",2,"Średnie","Maj 2024"],
+    ["W cylindrze szczelnie zamkniętym ruchomym tłokiem znajdowała się pewna ustalona masa powietrza.","termodynamika/w-cylindrze-szczelnie-zamknietym-zadanie-7",8,"Trudne","Czerwiec 2023"],
+    ["W cylindrze szczelnie zamkniętym ruchomym tłokiem znajduje się mol jednoatomowego gazu doskonałego.","termodynamika/w-cylindrze-szczelnie-zamknietym-zadanie-7-b",5,"Trudne","Maj 2023"],
+    ["Ustaloną masę jednoatomowego gazu doskonałego poddano przemianie izotermicznej ze stanu do stanu, po czym gaz…","termodynamika/ustalona-mase-jednoatomowego-gazu-zadanie-6",8,"Średnie","Grudzień 2022"],
+    ["W celu wyznaczenia ciepła właściwego wody uczniowie wykonali pomiary czasów ogrzewania różnych mas wody w…","termodynamika/w-celu-wyznaczenia-ciepla-zadanie-7",8,"Trudne","Czerwiec 2022"],
+    ["Początkowo otwartą probówkę zanurzono w ciepłej wodzie w ten sposób, że otwór probówki wystawał nieznacznie…","termodynamika/poczatkowo-otwarta-probowke-zanurzono-zadanie-10",4,"Średnie","Czerwiec 2022"],
+    ["W doświadczeniu 1. ustaloną masę gazu doskonałego poddano najpierw przemianie izochorycznej ze stanu do…","termodynamika/w-doswiadczeniu-1-ustalona-zadanie-7",5,"Trudne","Maj 2022"],
+    ["Na poniższym diagramie przedstawiono wykres zależności ciśnienia od objętości w cyklu przemian…","termodynamika/na-ponizszym-diagramie-przedstawiono-zadanie-7",7,"Trudne","Czerwiec 2021"],
+    ["W zamkniętym zbiorniku znajduje się gaz doskonały – azot o masie i masie molowej.","termodynamika/w-zamknietym-zbiorniku-znajduje-zadanie-8",7,"Średnie","Maj 2021"],
+    ["W cylindrze z ruchomym tłokiem znajdują się dwa milimole gazu doskonałego.","termodynamika/w-cylindrze-z-ruchomym-zadanie-7",9,"Trudne","Lipiec 2020"],
+    ["Silnik cieplny to urządzenie działające cyklicznie, które w wyniku wymiany ciepła z otoczeniem wykonuje pracę.","termodynamika/silnik-cieplny-to-urzadzenie-zadanie-7",5,"Średnie","Czerwiec 2020"],
+    ["Oceń prawdziwość każdego dokończenia poniższego zdania.","termodynamika/ocen-prawdziwosc-kazdego-dokonczenia-zadanie-8",1,"Łatwe","Czerwiec 2020"],
+    ["Na wykresie poniżej, w płaszczyźnie parametrów stanu - temperatury i ciśnienia, przedstawiono pewien cykl…","termodynamika/na-wykresie-ponizej-w-zadanie-9-a",2,"Średnie","Kwiecień 2020"],
+    ["W celu wyznaczenia ciepła właściwego mleka wykorzystano strumień pary wodnej o temperaturze 100 °C, którą…","termodynamika/w-celu-wyznaczenia-ciepla-zadanie-10-a",8,"Średnie","Kwiecień 2020"],
+    ["Na wykresie poniżej, w płaszczyźnie parametrów – objętości i ciśnienia, przedstawiono wykres cyklu przemian…","termodynamika/na-wykresie-ponizej-w-zadanie-11",5,"Trudne","Maj 2019"],
+    ["Na wykresie poniżej, w płaszczyźnie parametrów stanu – temperatury i ciśnienia, przedstawiono pewien cykl…","termodynamika/na-wykresie-ponizej-w-zadanie-9",1,"Łatwe","Czerwiec 2018"],
+    ["W celu wyznaczenia ciepła właściwego mleka wykorzystano strumień pary wodnej o temperaturze, którą skraplano…","termodynamika/w-celu-wyznaczenia-ciepla-zadanie-10",3,"Łatwe","Czerwiec 2018"],
+    ["Na wykresach poniżej przedstawiono cykle termodynamiczne dwóch silników cieplnych.","termodynamika/na-wykresach-ponizej-przedstawiono-zadanie-9",5,"Trudne","Maj 2018"],
+    ["W cylindrze zamkniętym szczelnym tłokiem znajduje się gaz doskonały.","termodynamika/w-cylindrze-zamknietym-szczelnym-zadanie-5",1,"Łatwe","Czerwiec 2017"],
+    ["Rozgrzana stalowa kulka o promieniu 2 cm i masie 260 g, położona na poziomej tafli lodu o temperaturze 0 °C i…","termodynamika/rozgrzana-stalowa-kulka-o-zadanie-11",4,"Trudne","Maj 2017"],
+    ["Napompowana piłka ma objętość.","termodynamika/napompowana-pilka-ma-objetosc-zadanie-7",3,"Średnie","Czerwiec 2016"],
+    ["Sprawność silnika spalinowego o mocy 100 kW była równa 20%.","termodynamika/sprawnosc-silnika-spalinowego-o-zadanie-18",1,"Łatwe","Czerwiec 2016"],
+    ["Używając małego metalowego cylindra zamkniętego tłokiem, który mógł poruszać się praktycznie bez tarcia,…","termodynamika/uzywajac-malego-metalowego-cylindra-zadanie-12",3,"Średnie","Maj 2016"],
+    ["Plastikową butelkę napełniono wodą o temperaturze pokojowej i umieszczono w zamrażarce lodówki.","termodynamika/plastikowa-butelke-napelniono-woda-zadanie-6",2,"Średnie","Czerwiec 2015"],
+    ["W naczyniu znajduje się 1 kg zimnej wody, a w niej zanurzone są elektroniczne termometry 1.","termodynamika/w-naczyniu-znajduje-sie-zadanie-7",3,"Średnie","Czerwiec 2015"],
+    ["Wymień trzy różne zjawiska powodujące stygnięcie otwartego naczynia z gorącą wodą.","termodynamika/wymien-trzy-rozne-zjawiska-zadanie-8",2,"Łatwe","Maj 2015"],
+    ["Zjawisko termoelektryczne odkryte w 1821 roku przez T.","termodynamika/zjawisko-termoelektryczne-odkryte-w-zadanie-11",4,"Średnie","Maj 2015"],
+  ]],
+  ["Ruch drgający",[
+    ["Klocek, na który działa siła ciężkości o wartości, jest zawieszony na sprężynie i wykonuje drgania…","ruch-drgajacy-i-fale/klocek-na-ktory-dziala-zadanie-6",5,"Trudne","Czerwiec 2025"],
+    ["Ciało 𝒞 porusza się wzdłuż osi ruchem drgającym harmonicznym.","ruch-drgajacy-i-fale/cialo-porusza-sie-wzdluz-zadanie-4",7,"Średnie","Czerwiec 2024"],
+    ["Ciężarek o masie jest zawieszony na sprężynie i wykonuje drgania harmoniczne w kierunku pionowym, w…","ruch-drgajacy-i-fale/ciezarek-o-masie-jest-zadanie-4",8,"Średnie","Maj 2024"],
+    ["Ciężarek o masie m = 100 g zawieszony na sprężynie wykonuje drgania harmoniczne w kierunku pionowym w…","ruch-drgajacy-i-fale/ciezarek-o-masie-m-zadanie-4",8,"Średnie","Maj 2024"],
+    ["Uczniowie wyznaczali przyśpieszenie ziemskie.","ruch-drgajacy-i-fale/uczniowie-wyznaczali-przyspieszenie-ziemskie-zadanie-5",5,"Średnie","Czerwiec 2023"],
+    ["Sprężynę o współczynniku sprężystości zamocowano jednym końcem do pionowej ściany.","ruch-drgajacy-i-fale/sprezyne-o-wspolczynniku-sprezystosci-zadanie-5",6,"Trudne","Maj 2023"],
+    ["Ciężarek o masie kg zawieszony na sprężynie wykonuje drgania w kierunku pionowym w układzie inercjalnym, w…","ruch-drgajacy-i-fale/ciezarek-o-masie-kg-zadanie-6",7,"Trudne","Maj 2022"],
+    ["Ciężarek o masie zawieszono na sprężynie w ziemskim polu grawitacyjnym.","ruch-drgajacy-i-fale/ciezarek-o-masie-zawieszono-zadanie-5",8,"Średnie","Czerwiec 2021"],
+    ["Na lekkiej sprężynie, zwisającej pionowo na niewielkiej wysokości nad ziemią (rysunek 1.), zawieszono…","ruch-drgajacy-i-fale/na-lekkiej-sprezynie-zwisajacej-zadanie-11-a",5,"Średnie","Kwiecień 2020"],
+    ["Pręt zawieszono poziomo na trzech identycznych, bardzo lekkich sprężynach przymocowanych do sufitu.","ruch-drgajacy-i-fale/pret-zawieszono-poziomo-na-zadanie-5",4,"Średnie","Maj 2019"],
+    ["Na lekkiej sprężynie, zwisającej pionowo na niewielkiej wysokości nad ziemią (rysunek 1.), zawieszono…","ruch-drgajacy-i-fale/na-lekkiej-sprezynie-zwisajacej-zadanie-11",3,"Łatwe","Czerwiec 2018"],
+    ["Kulę o promieniu 40 cm zawieszono na linie o długości 6 m.","ruch-drgajacy-i-fale/kule-o-promieniu-40-zadanie-10",4,"Średnie","Maj 2018"],
+    ["Do demonstracji zależności wychylenia od czasu w ruchu drgającym wykorzystano małe stożkowe naczynie z…","ruch-drgajacy-i-fale/do-demonstracji-zaleznosci-wychylenia-zadanie-9",4,"Średnie","Maj 2016"],
+    ["W październiku 2009 r. w Wołgogradzie otwarto bardzo długi most na Wołdze. Wkrótce okazało się, że niewielkie…","ruch-drgajacy-i-fale/w-pazdzierniku-2009-r-zadanie-8",5,"Średnie","Czerwiec 2015"],
+    ["Wózek o masie 200 g jest doczepiony do sprężyny, której drugi koniec jest unieruchomiony (rysunek obok).","ruch-drgajacy-i-fale/wozek-o-masie-200-zadanie-5",7,"Średnie","Maj 2015"],
+  ]],
+  ["Fale mechaniczne",[
+    ["Fale dźwiękowe o dużych częstotliwościach (np.","ruch-drgajacy-i-fale/fale-dzwiekowe-o-duzych-zadanie-4",4,"Średnie","Maj 2025"],
+    ["Mały głośnik G1 jest źródłem kulistej fali dźwiękowej w powietrzu.","ruch-drgajacy-i-fale/maly-glosnik-g1-jest-zadanie-5",5,"Średnie","Maj 2025"],
+    ["Do nieruchomego obserwatora A zbliża się wzdłuż linii prostej głośnik Z.","ruch-drgajacy-i-fale/do-nieruchomego-obserwatora-a-zadanie-6",2,"Łatwe","Czerwiec 2024"],
+    ["Ambulans z włączoną syreną dźwiękową jedzie wzdłuż prostego odcinka drogi.","ruch-drgajacy-i-fale/ambulans-z-wlaczona-syrena-zadanie-5",6,"Średnie","Maj 2024"],
+    ["Ambulans z włączoną syreną dźwiękową jedzie wzdłuż prostego odcinka drogi.","ruch-drgajacy-i-fale/ambulans-z-wlaczona-syrena-zadanie-5-a",6,"Średnie","Maj 2024"],
+    ["Model statku porusza się po powierzchni płytkiej wody wzdłuż osi ze stałą prędkością o wartości.","ruch-drgajacy-i-fale/model-statku-porusza-sie-zadanie-8",4,"Średnie","Grudzień 2022"],
+    ["Rozważamy napiętą strunę metalową, której końce są unieruchomione.","ruch-drgajacy-i-fale/rozwazamy-napieta-strune-metalowa-zadanie-11",6,"Trudne","Maj 2022"],
+    ["Źródło dźwięku o częstotliwości porusza się z prędkością o stałej wartości po okręgu o promieniu w…","ruch-drgajacy-i-fale/zrodlo-dzwieku-o-czestotliwosci-zadanie-8",7,"Trudne","Czerwiec 2021"],
+    ["Rowerzysta w chwili rozpoczął jazdę i poruszał się dalej po linii prostej.","ruch-drgajacy-i-fale/rowerzysta-w-chwili-rozpoczal-zadanie-4",6,"Trudne","Maj 2021"],
+    ["W tabeli obok podano przykładowe wartości prędkości dźwięku dla różnych wartości temperatury powietrza, przy…","ruch-drgajacy-i-fale/w-tabeli-obok-podano-zadanie-7",6,"Średnie","Czerwiec 2019"],
+    ["Napięta stalowa struna ma długość 90 cm.","ruch-drgajacy-i-fale/napieta-stalowa-struna-ma-zadanie-13",4,"Średnie","Maj 2018"],
+    ["Na powierzchni jeziora wzbudzono falę harmoniczną.","ruch-drgajacy-i-fale/na-powierzchni-jeziora-wzbudzono-zadanie-8",4,"Średnie","Czerwiec 2017"],
+    ["Muzyk stwierdził, że jedna ze strun skrzypiec wydaje ton o niewłaściwej wysokości, i w celu nastrojenia…","ruch-drgajacy-i-fale/muzyk-stwierdzil-ze-jedna-zadanie-14",5,"Średnie","Czerwiec 2016"],
+    ["Zjawisko Dopplera występuje zarówno dla fal dźwiękowych, jak i dla fal świetlnych.","ruch-drgajacy-i-fale/zjawisko-dopplera-wystepuje-zarowno-zadanie-10",2,"Średnie","Maj 2016"],
+  ]],
+  ["Grawitacja i elementy astronomii",[
+    ["Satelity S1 oraz S2 poruszają się dookoła Ziemi jedynie pod wpływem grawitacji.","grawitacja-i-astronomia/satelity-s1-oraz-s2-zadanie-5",10,"Średnie","Czerwiec 2025"],
+    ["Planetoida Chiron obiega Słońce po orbicie eliptycznej, a Ziemia obiega Słońce po orbicie, którą w…","grawitacja-i-astronomia/planetoida-chiron-obiega-slonce-zadanie-6",6,"Średnie","Maj 2025"],
+    ["Satelity oraz poruszają się dookoła Ziemi po orbitach kołowych i jedynie pod wpływem siły grawitacji.","grawitacja-i-astronomia/satelity-oraz-poruszaja-sie-zadanie-5",7,"Średnie","Grudzień 2024"],
+    ["Na diagramie 1. przedstawiono aktualne położenie względne obserwatora i dwóch galaktyk oraz. Odległości…","grawitacja-i-astronomia/na-diagramie-1-przedstawiono-zadanie-9",3,"Średnie","Grudzień 2024"],
+    ["Dwa satelity C i D krążą dookoła Ziemi (Z) po orbitach kołowych o promieniach równych odpowiednio i.","grawitacja-i-astronomia/dwa-satelity-c-i-zadanie-5",6,"Średnie","Czerwiec 2024"],
+    ["Ziemia i Księżyc poruszają się dookoła punktu – ich wspólnego środka masy – po orbitach eliptycznych, które…","grawitacja-i-astronomia/ziemia-i-ksiezyc-poruszaja-zadanie-6",5,"Średnie","Maj 2024"],
+    ["Ziemia i Księżyc poruszają się dookoła punktu S – ich wspólnego środka masy – po orbitach eliptycznych, które…","grawitacja-i-astronomia/ziemia-i-ksiezyc-poruszaja-zadanie-6-a",5,"Trudne","Maj 2024"],
+    ["Cztery największe księżyce Jowisza to: Io, Europa, Kallisto oraz Ganimedes.","grawitacja-i-astronomia/cztery-najwieksze-ksiezyce-jowisza-zadanie-9",6,"Średnie","Czerwiec 2023"],
+    ["Sagittarius A (Sgr A ) to bardzo masywny obiekt znajdujący się w centrum naszej galaktyki.","grawitacja-i-astronomia/sagittarius-a-sgr-a-zadanie-6",9,"Średnie","Maj 2023"],
+    ["Satelita krąży dookoła Ziemi po orbicie kołowej o promieniu, a satelita krąży dookoła Ziemi po orbicie…","grawitacja-i-astronomia/satelita-krazy-dookola-ziemi-zadanie-5",8,"Średnie","Grudzień 2022"],
+    ["PW-Sat2 to polski satelita, który został wprowadzony na orbitę kołową znajdującą się na wysokości ponad…","grawitacja-i-astronomia/pw-sat2-to-polski-zadanie-6",7,"Średnie","Czerwiec 2022"],
+    ["Podczas misji badawczej o nazwie STEREO dwie sondy: A i B poruszają się po orbitach dookoła Słońca jedynie…","grawitacja-i-astronomia/podczas-misji-badawczej-o-zadanie-8",6,"Trudne","Maj 2022"],
+    ["Satelita początkowo krąży swobodnie (z wyłączonymi silnikami) po orbicie kołowej o promieniu dookoła pewnej…","grawitacja-i-astronomia/satelita-poczatkowo-krazy-swobodnie-zadanie-6",4,"Trudne","Czerwiec 2021"],
+    ["Dwa satelity i krążą wokół Ziemi po orbitach kołowych o promieniach i (zobacz schematyczny rysunek obok).","grawitacja-i-astronomia/dwa-satelity-i-kraza-zadanie-5",6,"Średnie","Maj 2021"],
+    ["Satelita porusza się po orbicie kołowej dookoła Ziemi jedynie pod wpływem grawitacji.","grawitacja-i-astronomia/satelita-porusza-sie-po-zadanie-6",6,"Średnie","Lipiec 2020"],
+    ["Układ planetarny o nazwie TRAPPIST-1 znajduje się w odległości około 40 lat świetlnych od naszego Słońca i…","grawitacja-i-astronomia/uklad-planetarny-o-nazwie-zadanie-12",4,"Średnie","Lipiec 2020"],
+    ["Obiekt PSR 1257+12 jest gwiazdą neutronową o średnicy kilkunastu kilometrów.","grawitacja-i-astronomia/obiekt-psr-1257-12-zadanie-13",3,"Średnie","Czerwiec 2020"],
+    ["Rozważamy trzy ciała A, B, C. Masa każdego z ciał wynosi m, a rozkład masy w każdym z nich jest sferycznie…","grawitacja-i-astronomia/rozwazamy-trzy-ciala-a-zadanie-6-a",4,"Średnie","Kwiecień 2020"],
+    ["Kąt paralaksy heliocentrycznej dla danego obiektu niebieskiego obserwowanego z Ziemi jest równy kątowi, pod…","grawitacja-i-astronomia/kat-paralaksy-heliocentrycznej-dla-zadanie-18",4,"Średnie","Kwiecień 2020"],
+    ["W tabeli poniżej, w każdym z wierszy 1–4., przedstawiono dane dotyczące ruchu orbitalnego któregoś z…","grawitacja-i-astronomia/w-tabeli-ponizej-w-zadanie-9",4,"Trudne","Czerwiec 2019"],
+    ["Trzy planety poruszają się w centralnym polu grawitacyjnym gwiazdy po orbitach i.","grawitacja-i-astronomia/trzy-planety-poruszaja-sie-zadanie-6",3,"Średnie","Maj 2019"],
+    ["Rozważamy trzy ciała A, B, C. Masa każdego z ciał wynosi, a rozkład masy w każdym z nich jest sferycznie…","grawitacja-i-astronomia/rozwazamy-trzy-ciala-a-zadanie-6",2,"Łatwe","Czerwiec 2018"],
+    ["Kąt paralaksy heliocentrycznej dla danego obiektu niebieskiego obserwowanego z Ziemi jest równy kątowi, pod…","grawitacja-i-astronomia/kat-paralaksy-heliocentrycznej-dla-zadanie-17",3,"Łatwe","Czerwiec 2018"],
+    ["Pierwszą planetę obcą, pozasłoneczną, odkrył polski radioastronom Aleksander Wolszczan w 1991 r.","grawitacja-i-astronomia/pierwsza-planete-obca-pozasloneczna-zadanie-18",4,"Łatwe","Czerwiec 2018"],
+    ["Rozważmy cztery planety o promieniach odpowiednio:, przy czym.","grawitacja-i-astronomia/rozwazmy-cztery-planety-o-zadanie-5",2,"Średnie","Maj 2018"],
+    ["W dniu 9 maja 2016 roku miało miejsce zjawisko astronomiczne – tranzyt Merkurego.","grawitacja-i-astronomia/w-dniu-9-maja-zadanie-16",4,"Trudne","Maj 2018"],
+    ["Ten dramat rozgrywa się w konstelacji Feniksa, w odległości około 326 lat świetlnych od nas.","grawitacja-i-astronomia/ten-dramat-rozgrywa-sie-zadanie-12",5,"Trudne","Czerwiec 2017"],
+    ["Na rysunku zaznaczono literą S chwilowe położenie satelity krążącego po orbicie kołowej wokół wirującej Ziemi.","grawitacja-i-astronomia/na-rysunku-zaznaczono-litera-zadanie-7",2,"Średnie","Maj 2017"],
+    ["Wokół pewnej gwiazdy krąży planeta po wydłużonej orbicie.","grawitacja-i-astronomia/wokol-pewnej-gwiazdy-krazy-zadanie-16",1,"Łatwe","Czerwiec 2016"],
+    ["Zaznacz właściwe dokończenie zdania.","grawitacja-i-astronomia/zaznacz-wlasciwe-dokonczenie-zdania-zadanie-19",1,"Łatwe","Czerwiec 2016"],
+    ["Rysunki przedstawiają widoki tego samego fragmentu sfery niebieskiej podczas dwóch nocy, otrzymane za pomocą…","grawitacja-i-astronomia/rysunki-przedstawiaja-widoki-tego-zadanie-7",1,"Łatwe","Maj 2016"],
+    ["Znajomość kąta paralaksy pozwala wyciągać pewne wnioski dotyczące gwiazd.","grawitacja-i-astronomia/znajomosc-kata-paralaksy-pozwala-zadanie-8",1,"Łatwe","Maj 2016"],
+    ["Nadanie obiektowi wystarczająco dużej prędkości początkowej (większej od pewnej granicznej wartości zwanej…","grawitacja-i-astronomia/nadanie-obiektowi-wystarczajaco-duzej-zadanie-16",6,"Trudne","Maj 2016"],
+    ["Rozważano ruch gwiazd w galaktykach o sferycznym rozkładzie masy.","grawitacja-i-astronomia/rozwazano-ruch-gwiazd-w-zadanie-12",7,"Średnie","Czerwiec 2015"],
+    ["Znaczna część gwiazd, które widzimy na nocnym niebie, występuje w układach podwójnych.","grawitacja-i-astronomia/znaczna-czesc-gwiazd-ktore-zadanie-6",5,"Trudne","Maj 2015"],
+    ["Podkreśl właściwe określenia, tak aby powstały zdania prawdziwe.","grawitacja-i-astronomia/podkresl-wlasciwe-okreslenia-tak-zadanie-17",2,"Średnie","Maj 2015"],
+  ]],
+  ["Elektrostatyka",[
+    ["Proton o pędzie początkowym i prędkości początkowej o wartości wpada w punkcie w obszar jednorodnego pola…","elektrostatyka/proton-o-pedzie-poczatkowym-zadanie-10",4,"Średnie","Czerwiec 2025"],
+    ["Na poziomej płycie umieszczono w pewnej odległości od siebie dwie jednakowe małe kulki i.","elektrostatyka/na-poziomej-plycie-umieszczono-zadanie-9",5,"Średnie","Czerwiec 2024"],
+    ["Trzy punktowe, ujemne ładunki elektryczne:, i umieszczono nieruchomo w próżni w wierzchołkach kwadratu…","elektrostatyka/trzy-punktowe-ujemne-ladunki-zadanie-7",3,"Trudne","Maj 2024"],
+    ["Elektron został rozpędzony w polu elektrycznym (w próżni) od punktu A do punktu B.","elektrostatyka/elektron-zostal-rozpedzony-w-zadanie-11",4,"Średnie","Maj 2024"],
+    ["Elektron został rozpędzony w jednorodnym polu elektrycznym (w próżni) od punktu A do punktu B.","elektrostatyka/elektron-zostal-rozpedzony-w-zadanie-12",3,"Średnie","Maj 2024"],
+    ["Cylindryczną nieprzewodzącą rurkę ustawiono pionowo.","elektrostatyka/cylindryczna-nieprzewodzaca-rurke-ustawiono-zadanie-11",5,"Trudne","Maj 2023"],
+    ["Kilkanaście lat po tym, jak J.J.","elektrostatyka/kilkanascie-lat-po-tym-zadanie-11",8,"Trudne","Maj 2021"],
+    ["Spektrometr masy to urządzenie pozwalające wyznaczyć stosunek m do q masy m jonu do ładunku elektrycznego q…","elektrostatyka/spektrometr-masy-to-urzadzenie-zadanie-13",7,"Średnie","Lipiec 2020"],
+    ["Trzy punktowe ładunki elektryczne dodatnie umieszczono w wierzchołkach trójkąta równobocznego o długości boku.","elektrostatyka/trzy-punktowe-ladunki-elektryczne-zadanie-5",3,"Średnie","Czerwiec 2020"],
+    ["Metalową kulkę o promieniu naładowano ładunkiem elektrycznym.","elektrostatyka/metalowa-kulke-o-promieniu-zadanie-7-a",1,"Łatwe","Kwiecień 2020"],
+    ["Drobina o ujemnym ładunku elektrycznym wpada w obszar pola elektrycznego pomiędzy płytkami tak, że jej wektor…","elektrostatyka/drobina-o-ujemnym-ladunku-zadanie-10",4,"Średnie","Czerwiec 2019"],
+    ["Metalową kulkę o promieniu R naładowano ładunkiem elektrycznym.","elektrostatyka/metalowa-kulke-o-promieniu-zadanie-7",1,"Łatwe","Czerwiec 2018"],
+    ["Metalową kulkę naładowano ładunkiem elektrycznym.","elektrostatyka/metalowa-kulke-naladowano-ladunkiem-zadanie-4",2,"Łatwe","Maj 2018"],
+    ["Dwie kulki 1 i 2 zawieszono na nitkach zaczepionych w jednym punkcie O (patrz rysunek A).","elektrostatyka/dwie-kulki-1-i-zadanie-8",3,"Średnie","Maj 2017"],
+    ["Naładowana przewodząca kula wytwarza pole elektrostatyczne.","elektrostatyka/naladowana-przewodzaca-kula-wytwarza-zadanie-12",2,"Średnie","Czerwiec 2016"],
+    ["Dipol elektryczny to układ dwóch różnoimiennych ładunków o tej samej wartości bezwzględnej, umieszczonych w…","elektrostatyka/dipol-elektryczny-to-uklad-zadanie-11",9,"Średnie","Maj 2016"],
+    ["Elektron wpadł z prędkością \\vec{v} 0$ w obszar między naładowanymi okładkami kondensatora, tak jak…","elektrostatyka/elektron-wpadl-z-predkoscia-zadanie-9",1,"Łatwe","Maj 2015"],
+    ["Z prostokątnych płytek aluminiowych i kartek papieru (będącego dobrym izolatorem) zbudowano dwa kondensatory…","elektrostatyka/z-prostokatnych-plytek-aluminiowych-zadanie-10",2,"Średnie","Maj 2015"],
+  ]],
+  ["Prąd elektryczny",[
+    ["Uczniowie budowali różne obwody elektryczne, w których jako źródło napięcia wykorzystali baterię o sile…","prad-elektryczny/uczniowie-budowali-rozne-obwody-zadanie-9",4,"Trudne","Czerwiec 2025"],
+    ["Uczniowie wykonali doświadczenie, w którym wyznaczali siłę elektromotoryczną baterii oraz jej opór wewnętrzny.","prad-elektryczny/uczniowie-wykonali-doswiadczenie-w-zadanie-10",6,"Średnie","Czerwiec 2024"],
+    ["Do źródła stałego napięcia podłączono trzy identyczne oporniki:, oraz amperomierz A – w taki sposób, jak…","prad-elektryczny/do-zrodla-stalego-napiecia-zadanie-8",6,"Średnie","Maj 2024"],
+    ["Do produkcji włókien tradycyjnych żarówek wykorzystywano bardzo cienkie druty wolframowe.","prad-elektryczny/do-produkcji-wlokien-tradycyjnych-zadanie-9",7,"Trudne","Maj 2023"],
+    ["Na rysunku przedstawiono schemat obwodu elektrycznego pewnego źródła światła zasilanego baterią.","prad-elektryczny/na-rysunku-przedstawiono-schemat-zadanie-7",6,"Średnie","Grudzień 2022"],
+    ["Prądnica wytwarza napięcie przemienne, którego zależność od czasu dana jest wzorem: Do zacisków prądnicy…","prad-elektryczny/pradnica-wytwarza-napiecie-przemienne-zadanie-9",3,"Średnie","Maj 2022"],
+    ["W celu wyznaczenia oporu wewnętrznego baterii o sile elektromotorycznej zbudowano obwód zasilany tą baterią.","prad-elektryczny/w-celu-wyznaczenia-oporu-zadanie-9",5,"Średnie","Czerwiec 2021"],
+    ["Dwie identyczne diody D1, D2 oraz dwa oporniki o oporach, podłączono do zacisków A i B prądnicy.","prad-elektryczny/dwie-identyczne-diody-d1-zadanie-7",7,"Trudne","Maj 2021"],
+    ["Cztery oporniki, każdy o jednakowej wartości oporu elektrycznego, połączono w obwód i podłączono do źródła…","prad-elektryczny/cztery-oporniki-kazdy-o-zadanie-9",4,"Trudne","Lipiec 2020"],
+    ["Ładowarka do telefonu uległa uszkodzeniu i nie pracuje w sposób ciągły, lecz działa z przerwami.","prad-elektryczny/ladowarka-do-telefonu-ulegla-zadanie-11",6,"Średnie","Lipiec 2020"],
+    ["Cztery oporniki o jednakowym oporze elektrycznym połączono w obwód, który następnie podłączono do źródła…","prad-elektryczny/cztery-oporniki-o-jednakowym-zadanie-11",2,"Średnie","Czerwiec 2020"],
+    ["Dwa takie same ogniwa oraz trzy identyczne oporniki połączono w obwód elektryczny, którego schemat…","prad-elektryczny/dwa-takie-same-ogniwa-zadanie-14-a",2,"Łatwe","Kwiecień 2020"],
+    ["Przez opornik płynie prąd przemienny o natężeniu zmieniającym się w czasie tak, jak to przedstawiono na…","prad-elektryczny/przez-opornik-plynie-prad-zadanie-15",5,"Średnie","Kwiecień 2020"],
+    ["Dwa oporniki i połączono szeregowo i dołączono do zasilacza o regulowanym napięciu (rys.","prad-elektryczny/dwa-oporniki-i-polaczono-zadanie-12",3,"Średnie","Maj 2019"],
+    ["Dwa takie same ogniwa oraz trzy identyczne oporniki połączono w obwód elektryczny, którego schemat…","prad-elektryczny/dwa-takie-same-ogniwa-zadanie-14",2,"Łatwe","Czerwiec 2018"],
+    ["Do pomiaru siły elektromotorycznej (SEM) i oporu wewnętrznego baterii zastosowano woltomierz i zestaw 8…","prad-elektryczny/do-pomiaru-sily-elektromotorycznej-zadanie-11",7,"Trudne","Maj 2018"],
+    ["Uczniowie przeprowadzili doświadczenie, w którym badali zależność natężenia prądu płynącego przez żarówkę od…","prad-elektryczny/uczniowie-przeprowadzili-doswiadczenie-w-zadanie-9",5,"Średnie","Czerwiec 2017"],
+    ["Poniżej przedstawiono wykres pokazujący, jak zmieniał się stopień naładowania baterii o pojemności 1200 mAh…","prad-elektryczny/ponizej-przedstawiono-wykres-pokazujacy-zadanie-16",2,"Średnie","Maj 2017"],
+    ["Do źródła napięcia dołączono trzy jednakowe żarówki oraz amperomierz.","prad-elektryczny/do-zrodla-napiecia-dolaczono-zadanie-13",3,"Średnie","Czerwiec 2016"],
+    ["Termistor jest opornikiem półprzewodnikowym, którego opór zależy od temperatury.","prad-elektryczny/termistor-jest-opornikiem-polprzewodnikowym-zadanie-15",7,"Średnie","Maj 2016"],
+    ["Generator prądu przemiennego wytwarza napięcie skuteczne przy częstotliwości.","prad-elektryczny/generator-pradu-przemiennego-wytwarza-zadanie-17",1,"Łatwe","Maj 2016"],
+    ["W obwodzie przedstawionym na rysunku napięcie baterii wynosi 12 V.","prad-elektryczny/w-obwodzie-przedstawionym-na-zadanie-5",5,"Średnie","Czerwiec 2015"],
+  ]],
+  ["Magnetyzm",[
+    ["Na rysunku poniżej przedstawiono dwie wybrane linie pola magnetycznego wytwarzanego przez długi,…","magnetyzm-i-indukcja/na-rysunku-ponizej-przedstawiono-zadanie-9",3,"Łatwe","Maj 2025"],
+    ["Proton poruszał się w próżni, w polu magnetycznym po torze, który składał się z półokręgów AF, FB, BE, EC, CD.","magnetyzm-i-indukcja/proton-poruszal-sie-w-zadanie-8",7,"Trudne","Maj 2023"],
+    ["Proton poruszał się w próżni, w polu magnetycznym po torze, który składał się z półokręgów.","magnetyzm-i-indukcja/proton-poruszal-sie-w-zadanie-8-a",7,"Trudne","Maj 2023"],
+    ["Cząsteczka o dodatnim ładunku elektrycznym może poruszać się po torze kołowym w centralnym polu elektrycznym…","magnetyzm-i-indukcja/czasteczka-o-dodatnim-ladunku-zadanie-8",7,"Średnie","Czerwiec 2022"],
+    ["Na dwóch przewodzących sztywnych drutach wisi poziomo miedziany pręt o masie i długości.","magnetyzm-i-indukcja/na-dwoch-przewodzacych-sztywnych-zadanie-10",5,"Trudne","Czerwiec 2021"],
+    ["Dwa długie prostoliniowe przewodniki miedziane umieszczono równolegle do siebie w odległości.","magnetyzm-i-indukcja/dwa-dlugie-prostoliniowe-przewodniki-zadanie-10",5,"Średnie","Lipiec 2020"],
+    ["Proton (p) i elektron (e) poruszają się w próżni w sąsiedztwie dwóch równoległych, prostoliniowych, długich i…","magnetyzm-i-indukcja/proton-p-i-elektron-zadanie-6",3,"Średnie","Czerwiec 2019"],
+    ["m napięciem. Rozpędzone jony uzyskują pewną prędkość, z którą opuszczają obszar pola elektrycznego i wpadają…","magnetyzm-i-indukcja/m-napieciem-rozpedzone-jony-zadanie-10",5,"Trudne","Maj 2019"],
+    ["W pobliżu magnesu podkowiastego porusza się cząstka o dodatnim ładunku elektrycznym.","magnetyzm-i-indukcja/w-poblizu-magnesu-podkowiastego-zadanie-3",2,"Średnie","Maj 2018"],
+    ["W pewnych eksperymentach fizycy mają do dyspozycji strumień cząstek o tym samym ładunku i tym samym kierunku…","magnetyzm-i-indukcja/w-pewnych-eksperymentach-fizycy-zadanie-10",8,"Średnie","Czerwiec 2017"],
+    ["Wiązka protonów o prędkościach jednakowych co do kierunku, ale różnych co do wartości wchodzi w obszar…","magnetyzm-i-indukcja/wiazka-protonow-o-predkosciach-zadanie-4",8,"Trudne","Czerwiec 2015"],
+    ["Mamy do dyspozycji silne magnesy w kształcie walca.","magnetyzm-i-indukcja/mamy-do-dyspozycji-silne-zadanie-12",8,"Trudne","Maj 2015"],
+  ]],
+  ["Elektromagnetyzm",[
+    ["Prostokątna ramka ABCD prądnicy obraca się w jednorodnym polu magnetycznym ze stałą prędkością kątową.","magnetyzm-i-indukcja/prostokatna-ramka-abcd-pradnicy-zadanie-7",8,"Średnie","Grudzień 2024"],
+    ["Dwa miedziane pręty ułożono równolegle w płaszczyźnie poziomej.","magnetyzm-i-indukcja/dwa-miedziane-prety-ulozono-zadanie-6",7,"Trudne","Czerwiec 2023"],
+    ["Dwa miedziane pręty umieszczono równolegle w płaszczyźnie poziomej.","magnetyzm-i-indukcja/dwa-miedziane-prety-umieszczono-zadanie-6",7,"Trudne","Maj 2021"],
+    ["Lekki, aluminiowy pierścień zawieszono na nitce w pobliżu zwojnicy.","magnetyzm-i-indukcja/lekki-aluminiowy-pierscien-zawieszono-zadanie-6",3,"Trudne","Czerwiec 2020"],
+    ["Uzwojenie pierwotne pewnego transformatora ma 1500 zwojów, a uzwojenie wtórne liczy 120 zwojów.","magnetyzm-i-indukcja/uzwojenie-pierwotne-pewnego-transformatora-zadanie-8",8,"Średnie","Czerwiec 2019"],
+    ["Przez opornik płynie prąd przemienny o natężeniu zmieniającym się w czasie tak, jak to przedstawiono na…","magnetyzm-i-indukcja/przez-opornik-plynie-prad-zadanie-11",4,"Średnie","Czerwiec 2017"],
+    ["Prostokątną ramkę z drutu o wymiarach 5 cm × 10 cm umieszczono w jednorodnym polu magnetycznym o indukcji 0,2…","magnetyzm-i-indukcja/prostokatna-ramke-z-drutu-zadanie-4",3,"Średnie","Maj 2017"],
+    ["Na rysunku poniżej zaznaczono bieguny magnetyczne zwojnicy, gdy płynie przez nią prąd (tzn.","magnetyzm-i-indukcja/na-rysunku-ponizej-zaznaczono-zadanie-15",6,"Średnie","Maj 2017"],
+    ["Dwie zwojnice I i II nawinięto na wspólny stalowy rdzeń.","magnetyzm-i-indukcja/dwie-zwojnice-i-i-zadanie-5",2,"Łatwe","Czerwiec 2016"],
+  ]],
+  ["Optyka",[
+    ["Pryzmat wykonany z pewnego rodzaju szkła jest umieszczony w powietrzu.","fale-elektromagnetyczne-i-optyka/pryzmat-wykonany-z-pewnego-zadanie-11",6,"Średnie","Czerwiec 2025"],
+    ["Za pomocą cienkiej soczewki szklanej S umieszczonej w powietrzu uzyskano ostry obraz przedmiotu AB.","fale-elektromagnetyczne-i-optyka/za-pomoca-cienkiej-soczewki-zadanie-8",5,"Średnie","Maj 2025"],
+    ["Wiązka niespolaryzowanego światła o natężeniu I pada prostopadle na polaryzator liniowy.","fale-elektromagnetyczne-i-optyka/wiazka-niespolaryzowanego-swiatla-o-zadanie-10",3,"Średnie","Maj 2025"],
+    ["Dwie jednakowe cienkie soczewki skupiające i ustawiono na ławie wzdłuż wspólnej osi optycznej.","fale-elektromagnetyczne-i-optyka/dwie-jednakowe-cienkie-soczewki-zadanie-8",4,"Średnie","Grudzień 2024"],
+    ["Świecącą strzałkę ustawiano w różnych położeniach na osi optycznej cienkiej soczewki skupiającej.","fale-elektromagnetyczne-i-optyka/swiecaca-strzalke-ustawiano-w-zadanie-8",7,"Średnie","Czerwiec 2024"],
+    ["Układ dwóch soczewek umieszczonych na wspólnej osi optycznej można wykorzystać do zmiany szerokości…","fale-elektromagnetyczne-i-optyka/uklad-dwoch-soczewek-umieszczonych-zadanie-10",4,"Trudne","Maj 2024"],
+    ["Układ dwóch soczewek umieszczonych na wspólnej osi optycznej można wykorzystać do zmiany szerokości…","fale-elektromagnetyczne-i-optyka/uklad-dwoch-soczewek-umieszczonych-zadanie-11",4,"Średnie","Maj 2024"],
+    ["Soczewka skupiająca może być wykorzystana do otrzymania prostego (nie – odwróconego) i powiększonego obrazu…","fale-elektromagnetyczne-i-optyka/soczewka-skupiajaca-moze-byc-zadanie-8",5,"Średnie","Czerwiec 2023"],
+    ["Sonda kosmiczna oddala się od Ziemi z prędkością wzdłuż prostej przechodzącej przez środek Ziemi.","fale-elektromagnetyczne-i-optyka/sonda-kosmiczna-oddala-sie-zadanie-5",5,"Średnie","Maj 2023"],
+    ["Promień światła monochromatycznego biegnie w powietrzu i pada na brzeg szklanego krążka w punkcie A.","fale-elektromagnetyczne-i-optyka/promien-swiatla-monochromatycznego-biegnie-zadanie-10",6,"Trudne","Maj 2023"],
+    ["Na ławie optycznej ustawiono świecący przedmiot o końcach w punktach i, cienką soczewkę skupiającą oraz ekran.","fale-elektromagnetyczne-i-optyka/na-lawie-optycznej-ustawiono-zadanie-9",5,"Średnie","Grudzień 2022"],
+    ["W pewnym doświadczeniu uzyskano za pomocą szklanej dwuwypukłej soczewki, prosty obraz przedmiotu.","fale-elektromagnetyczne-i-optyka/w-pewnym-doswiadczeniu-uzyskano-zadanie-9",8,"Średnie","Czerwiec 2022"],
+    ["Na ławie optycznej ustawiono przedmiot, cienką soczewkę skupiającą oraz ekran.","fale-elektromagnetyczne-i-optyka/na-lawie-optycznej-ustawiono-zadanie-10",6,"Trudne","Maj 2022"],
+    ["Świecący przedmiot w kształcie strzałki o początku w punkcie i końcu w punkcie umieszczono przed zwierciadłem…","fale-elektromagnetyczne-i-optyka/swiecacy-przedmiot-w-ksztalcie-zadanie-11",3,"Średnie","Czerwiec 2021"],
+    ["Uczniowie badali własności cienkich soczewek skupiających.","fale-elektromagnetyczne-i-optyka/uczniowie-badali-wlasnosci-cienkich-zadanie-9",4,"Średnie","Maj 2021"],
+    ["Wykonano dwa doświadczenia z użyciem cienkiej soczewki skupiającej.","fale-elektromagnetyczne-i-optyka/wykonano-dwa-doswiadczenia-z-zadanie-8",4,"Średnie","Lipiec 2020"],
+    ["Bezwzględny współczynnik załamania światła w ośrodku materialnym zależy w ogólności od częstotliwości…","fale-elektromagnetyczne-i-optyka/bezwzgledny-wspolczynnik-zalamania-swiatla-zadanie-9",7,"Średnie","Czerwiec 2020"],
+    ["Promień światła czerwonego o długości fali równej biegnie w próżni i przechodzi do szkła.","fale-elektromagnetyczne-i-optyka/promien-swiatla-czerwonego-o-zadanie-12-a",5,"Średnie","Kwiecień 2020"],
+    ["Uczniowie postanowili wyznaczyć współczynnik załamania światła w szkle, a następnie obliczyć wartość…","fale-elektromagnetyczne-i-optyka/uczniowie-postanowili-wyznaczyc-wspolczynnik-zadanie-5",9,"Średnie","Czerwiec 2019"],
+    ["Rozważamy soczewkę dwuwklęsłą (zobacz rys.","fale-elektromagnetyczne-i-optyka/rozwazamy-soczewke-dwuwklesla-zobacz-zadanie-8",4,"Średnie","Maj 2019"],
+    ["Promień światła czerwonego o długości fali równej 628 nm biegnie w próżni i przechodzi do szkła.","fale-elektromagnetyczne-i-optyka/promien-swiatla-czerwonego-o-zadanie-12",3,"Łatwe","Czerwiec 2018"],
+    ["Wiązka światła monochromatycznego pada w kierunku pionowym z powietrza na kuliste zagłębienie wydrążone w…","fale-elektromagnetyczne-i-optyka/wiazka-swiatla-monochromatycznego-pada-zadanie-12",3,"Średnie","Maj 2018"],
+    ["Promień światła emitowanego przez punktowe źródło Z biegnie w powietrzu, a następnie pada na powierzchnię…","fale-elektromagnetyczne-i-optyka/promien-swiatla-emitowanego-przez-zadanie-3",2,"Łatwe","Czerwiec 2017"],
+    ["Przeszkodę oświetlono jednocześnie dwoma punktowymi źródłami światła (znajdującymi się po lewej stronie…","fale-elektromagnetyczne-i-optyka/przeszkode-oswietlono-jednoczesnie-dwoma-zadanie-9",2,"Średnie","Maj 2017"],
+    ["Interferometr to bardzo precyzyjne urządzenie, które wykorzystuje efekt interferencji światła/aDo mierzenia…","fale-elektromagnetyczne-i-optyka/interferometr-to-bardzo-precyzyjne-zadanie-12",4,"Średnie","Maj 2017"],
+    ["Uczniowie użyli soczewki skupiającej i otrzymali na ekranie ostry obraz świeczki.","fale-elektromagnetyczne-i-optyka/uczniowie-uzyli-soczewki-skupiajacej-zadanie-13",3,"Średnie","Maj 2017"],
+    ["Obrazem przedmiotu w kształcie odcinka utworzonym za pomocą soczewki jest również odcinek.","fale-elektromagnetyczne-i-optyka/obrazem-przedmiotu-w-ksztalcie-zadanie-10",6,"Średnie","Czerwiec 2016"],
+    ["Uczniowie postanowili wyznaczyć doświadczalnie współczynnik załamania światła dla materiału galaretki…","fale-elektromagnetyczne-i-optyka/uczniowie-postanowili-wyznaczyc-doswiadczalnie-zadanie-11",6,"Trudne","Czerwiec 2016"],
+    ["Na dwa sklejone ze sobą pryzmaty I i II skierowano promień światła laserowego.","fale-elektromagnetyczne-i-optyka/na-dwa-sklejone-ze-zadanie-13",4,"Trudne","Maj 2016"],
+    ["Na rysunku poniżej przedstawiono schematycznie kuliste źródło światła (Z), piłkę tenisową (T) i ścianę (S).","fale-elektromagnetyczne-i-optyka/na-rysunku-ponizej-przedstawiono-zadanie-14",1,"Łatwe","Maj 2016"],
+    ["W celu wyznaczenia ogniskowej soczewki skupiającej uczniowie wykorzystali ławę optyczną, na której ustawili…","fale-elektromagnetyczne-i-optyka/w-celu-wyznaczenia-ogniskowej-zadanie-10",6,"Średnie","Czerwiec 2015"],
+    ["Ogniskową układu dwóch cienkich i przylegających do siebie soczewek można obliczyć ze wzoru: gdzie i są…","fale-elektromagnetyczne-i-optyka/ogniskowa-ukladu-dwoch-cienkich-zadanie-13",4,"Trudne","Maj 2015"],
+    ["Laser, siatkę dyfrakcyjną oraz ekran umieszczono w ustalonych wzajemnych odległościach (rysunek obok).","fale-elektromagnetyczne-i-optyka/laser-siatke-dyfrakcyjna-oraz-zadanie-14",1,"Średnie","Maj 2015"],
+  ]],
+  ["Fizyka atomowa",[
+    ["Rozważamy przejścia elektronu pomiędzy stanami (poziomami) energetycznymi w atomie wodoru.","fizyka-atomowa-i-jadrowa/rozwazamy-przejscia-elektronu-pomiedzy-zadanie-12",4,"Średnie","Maj 2025"],
+    ["Gdy elektron w atomie przechodzi ze stanu energetycznego o numerze i energii do stanu energetycznego o…","fizyka-atomowa-i-jadrowa/gdy-elektron-w-atomie-zadanie-10",6,"Średnie","Grudzień 2024"],
+    ["W początkowo spoczywającym atomie wodoru, w wyniku przejścia elektronu z poziomu energetycznego na poziom…","fizyka-atomowa-i-jadrowa/w-poczatkowo-spoczywajacym-atomie-zadanie-10",6,"Trudne","Czerwiec 2023"],
+    ["W zamkniętym pojemniku znajduje się gaz, który jest mieszaniną wodoru i helu.","fizyka-atomowa-i-jadrowa/w-zamknietym-pojemniku-znajduje-zadanie-12",5,"Trudne","Maj 2022"],
+    ["Rozważamy elektron w atomie wodoru znajdujący się początkowo na poziomie energetycznym o numerze.","fizyka-atomowa-i-jadrowa/rozwazamy-elektron-w-atomie-zadanie-10",4,"Średnie","Maj 2021"],
+    ["Wiązka elektronów jest przyśpieszana w lampie rentgenowskiej napięciem.","fizyka-atomowa-i-jadrowa/wiazka-elektronow-jest-przyspieszana-zadanie-10",4,"Średnie","Czerwiec 2020"],
+    ["Emisja fotonu przez atom wodoru następuje wtedy, gdy elektron przechodzi z poziomu energetycznego na niższy…","fizyka-atomowa-i-jadrowa/emisja-fotonu-przez-atom-zadanie-14",1,"Średnie","Czerwiec 2020"],
+    ["Gdy metalowa płytka jest oświetlana światłem monochromatycznym o ustalonej długości fali, takiej, że energia…","fizyka-atomowa-i-jadrowa/gdy-metalowa-plytka-jest-zadanie-17",1,"Łatwe","Kwiecień 2020"],
+    ["Na schematycznym rysunku obok zaznaczono trzy poziomy energetyczne atomu wodoru, przejścia elektronu pomiędzy…","fizyka-atomowa-i-jadrowa/na-schematycznym-rysunku-obok-zadanie-11",3,"Średnie","Czerwiec 2019"],
+    ["Rozważamy przejścia elektronu pomiędzy wybranymi poziomami energetycznymi w pewnym atomie.","fizyka-atomowa-i-jadrowa/rozwazamy-przejscia-elektronu-pomiedzy-zadanie-9",3,"Trudne","Maj 2019"],
+    ["Gdy metalowa płytka jest oświetlana światłem monochromatycznym o ustalonej długości fali, takiej, że energia…","fizyka-atomowa-i-jadrowa/gdy-metalowa-plytka-jest-zadanie-16",1,"Łatwe","Czerwiec 2018"],
+    ["W pewnym doświadczeniu strumień cząstek (jąder helu) skierowano prostopadle na cienką folię ze złota,…","fizyka-atomowa-i-jadrowa/w-pewnym-doswiadczeniu-strumien-zadanie-14",6,"Trudne","Maj 2018"],
+    ["Źródło światła Z1 emituje światło czerwone, a źródło światła Z2 – zielone.","fizyka-atomowa-i-jadrowa/zrodlo-swiatla-z1-emituje-zadanie-15",1,"Łatwe","Maj 2018"],
+    ["Dwie wiązki elektronów skierowano prostopadle na dwa jednakowe ekrany: i.","fizyka-atomowa-i-jadrowa/dwie-wiazki-elektronow-skierowano-zadanie-17",1,"Średnie","Maj 2018"],
+    ["Prędkość elektronów padających na anodę (antykatodę) laboratoryjnej lampy rentgenowskiej ma wartość 3.2·10⁷…","fizyka-atomowa-i-jadrowa/predkosc-elektronow-padajacych-na-zadanie-7",8,"Średnie","Czerwiec 2017"],
+    ["Historia zaczyna się od pewnego dość młodego, bo ledwie dobiegającego czterdziestki pana.","fizyka-atomowa-i-jadrowa/historia-zaczyna-sie-od-zadanie-18",5,"Średnie","Maj 2017"],
+    ["Poniżej przedstawiono uproszczone wykresy zależności natężenia prądu płynącego przez fotokomórkę próżniową od…","fizyka-atomowa-i-jadrowa/ponizej-przedstawiono-uproszczone-wykresy-zadanie-15",7,"Trudne","Czerwiec 2016"],
+    ["Dziś fizycy mikroświata posługują się tzw.","fizyka-atomowa-i-jadrowa/dzis-fizycy-mikroswiata-posluguja-zadanie-17",7,"Średnie","Czerwiec 2016"],
+    ["Katodę fotokomórki oświetlono światłem, którego długość fali jest równa.","fizyka-atomowa-i-jadrowa/katode-fotokomorki-oswietlono-swiatlem-zadanie-16",6,"Trudne","Maj 2015"],
+  ]],
+  ["Fizyka jądrowa i elementy fizyki relatywistycznej",[
+    ["Rozważamy próbkę pewnego promieniotwórczego izotopu pierwiastka X.","fizyka-atomowa-i-jadrowa/rozwazamy-probke-pewnego-promieniotworczego-zadanie-12",9,"Średnie","Czerwiec 2025"],
+    ["Izotop plutonu ulega rozpadowi promieniotwórczemu w wyniku przemiany.","fizyka-atomowa-i-jadrowa/izotop-plutonu-ulega-rozpadowi-zadanie-13",8,"Trudne","Maj 2025"],
+    ["Cykl protonowy to łańcuch reakcji termojądrowych zachodzących w gwiazdach.","fizyka-atomowa-i-jadrowa/cykl-protonowy-to-lancuch-zadanie-11",7,"Średnie","Grudzień 2024"],
+    ["Izotop węgla ulega rozpadowi promieniotwórczemu w wyniku przemiany.","fizyka-atomowa-i-jadrowa/izotop-wegla-ulega-rozpadowi-zadanie-11",8,"Średnie","Czerwiec 2024"],
+    ["Izotop fluoru ulega rozpadowi promieniotwórczemu w wyniku przemiany.","fizyka-atomowa-i-jadrowa/izotop-fluoru-ulega-rozpadowi-zadanie-12",6,"Średnie","Maj 2024"],
+    ["Wiązkę protonów przyśpieszono w polu elektrycznym napięciem kV od prędkości początkowej równej 0 do prędkości…","fizyka-atomowa-i-jadrowa/wiazke-protonow-przyspieszono-w-zadanie-11",6,"Średnie","Czerwiec 2023"],
+    ["Elektron o prędkości początkowej równej zero został rozpędzony w polu elektrycznym o napięciu do prędkości o…","fizyka-atomowa-i-jadrowa/elektron-o-predkosci-poczatkowej-zadanie-11",7,"Trudne","Maj 2023"],
+    ["Pierwiastek o nazwie kopernik, oznaczony symbolem Cn, ma liczbę atomową.","fizyka-atomowa-i-jadrowa/pierwiastek-o-nazwie-kopernik-zadanie-12",6,"Trudne","Maj 2023"],
+    ["Pierwiastek o nazwie kopernik, oznaczony symbolem, ma liczbę atomową.","fizyka-atomowa-i-jadrowa/pierwiastek-o-nazwie-kopernik-zadanie-12-a",6,"Trudne","Maj 2023"],
+    ["Elektron został rozpędzony w polu elektrycznym napięciem U = 6.00 × 10⁵ V, startując od prędkości początkowej…","fizyka-atomowa-i-jadrowa/elektron-zostal-rozpedzony-w-zadanie-10",3,"Trudne","Grudzień 2022"],
+    ["Na wykresie przedstawiono wartości energii wiązania przypadającej na jeden nukleon (oznaczonej jako ) dla…","fizyka-atomowa-i-jadrowa/na-wykresie-przedstawiono-wartosci-zadanie-11",8,"Trudne","Grudzień 2022"],
+    ["W tabeli poniżej podano masy jądra węgla, swobodnego neutronu oraz swobodnego protonu.","fizyka-atomowa-i-jadrowa/w-tabeli-ponizej-podano-zadanie-11",6,"Średnie","Czerwiec 2022"],
+    ["Izotop ołowiu emituje cząstki beta minus w wyniku rozpadu promieniotwórczego.","fizyka-atomowa-i-jadrowa/izotop-olowiu-emituje-czastki-zadanie-13",7,"Trudne","Maj 2022"],
+    ["Masa jądra izotopu litu jest równa.","fizyka-atomowa-i-jadrowa/masa-jadra-izotopu-litu-zadanie-13",3,"Średnie","Czerwiec 2021"],
+    ["Jądro izotopu toru ulega ciągowi przemian jądrowych i, w wyniku których powstaje jądro izotopu ołowiu.","fizyka-atomowa-i-jadrowa/jadro-izotopu-toru-ulega-zadanie-14",1,"Łatwe","Czerwiec 2021"],
+    ["Badano próbkę zawierającą jądra pewnego izotopu ulegające samorzutnej przemianie.","fizyka-atomowa-i-jadrowa/badano-probke-zawierajaca-jadra-zadanie-12",3,"Średnie","Czerwiec 2020"],
+    ["Do wytwarzania neutronów można wykorzystać próbkę zawierającą polon oraz beryl.","fizyka-atomowa-i-jadrowa/do-wytwarzania-neutronow-mozna-zadanie-15",1,"Średnie","Czerwiec 2020"],
+    ["Izotop promieniotwórczy bizmutu jest niestabilny i po dwóch rozpadach przemienia się w stabilny ołów.","fizyka-atomowa-i-jadrowa/izotop-promieniotworczy-bizmutu-jest-zadanie-16",2,"Średnie","Kwiecień 2020"],
+    ["Materiałem rozszczepialnym w reaktorach jądrowych jest izotop uranu.","fizyka-atomowa-i-jadrowa/materialem-rozszczepialnym-w-reaktorach-zadanie-12",4,"Trudne","Czerwiec 2019"],
+    ["Około 2 miliardów lat temu w złożach uranu w okolicach Oklo w Gabonie dochodziło do reakcji łańcuchowej…","fizyka-atomowa-i-jadrowa/okolo-2-miliardow-lat-zadanie-13",6,"Trudne","Maj 2019"],
+    ["Izotop promieniotwórczy bizmutu jest niestabilny i po dwóch rozpadach przemienia się w stabilny ołów.","fizyka-atomowa-i-jadrowa/izotop-promieniotworczy-bizmutu-jest-zadanie-15",1,"Łatwe","Czerwiec 2018"],
+    ["Jądro izotopu radu Ra ulega rozpadowi alfa z czasem połowicznego zaniku około 3,7 dnia, zgodnie ze schematem:…","fizyka-atomowa-i-jadrowa/jadro-izotopu-radu-ra-zadanie-17",6,"Trudne","Maj 2017"],
+    ["Polon ulega rozpadom promieniotwórczym, w wyniku których powstają kolejno izotopy ołowiu, bizmutu i ponownie…","fizyka-atomowa-i-jadrowa/polon-ulega-rozpadom-promieniotworczym-zadanie-8",2,"Łatwe","Czerwiec 2016"],
+    ["Radon jest radioaktywnym gazem szlachetnym.","fizyka-atomowa-i-jadrowa/radon-jest-radioaktywnym-gazem-zadanie-3",2,"Łatwe","Maj 2016"],
+    ["Na początku XX wieku naukowcy przeprowadzali liczne eksperymenty z zastosowaniem wiązek naładowanych cząstek…","fizyka-atomowa-i-jadrowa/na-poczatku-xx-wieku-zadanie-11",6,"Średnie","Czerwiec 2015"],
+    ["Polon jest źródłem promieniowania alfa, a czas połowicznego zaniku tego izotopu wynosi.","fizyka-atomowa-i-jadrowa/polon-jest-zrodlem-promieniowania-zadanie-15",2,"Średnie","Maj 2015"],
+  ]],
+];
+/* Zadania trzymamy w KODZIE, a nie w zapisanym stanie: 328 pozycji to ~87 KB, które szłyby
+   do localStorage i do chmury przy każdym zapisie. W materiale zostaje tylko lista działów
+   i licznik — linki dokładamy przy renderowaniu przez matsLinked(). */
+let matsFmCache=null;
+function matsFmBuild(){
+  if(matsFmCache)return matsFmCache;
+  const sections=[],tasks=[];
+  for(const[sec,items]of MATS_FM_ZADANIA){
+    sections.push({name:sec,count:items.length});
+    items.forEach(([name,slug,pkt,poz,ses])=>
+      tasks.push({name,url:"https://fizykamatura.pl/zadania/"+slug,pkt,poz,ses,section:sec}));
+  }
+  return matsFmCache={sections,tasks};
+}
+// zadania z linkami dla materiałów, które je mają (dziś tylko fizykamatura.pl); null dla reszty
+function matsLinked(m){return m&&m.source==="fizykamatura"?matsFmBuild().tasks:null}
+function matsSeedFmZadania(){
+  const list=matsList();
+  let m=list.find(x=>x.source==="fizykamatura");
+  if(!m){m={id:uid()};list.push(m);}
+  const b=matsFmBuild();
+  m.subject="Fizyka";m.name="Zadania maturalne CKE — fizykamatura.pl";m.source="fizykamatura";
+  m.link="https://fizykamatura.pl/zadania";
+  m.sections=b.sections;m.tasks=b.tasks.length;
+  if(!Array.isArray(m.done))m.done=[];
+}
+
 /* Kursy z Wielkiej Powtórki i „Zbiór Zadań Maturalnych" to prywatne materiały jednego
    użytkownika (kupione przez niego), więc wgrywają się WYŁĄCZNIE na jego koncie i dopiero
    wtedy, gdy wiadomo, kto jest zalogowany. Nowy użytkownik widzi pustą zakładkę Materiały.
@@ -3419,6 +3834,7 @@ function matsSeedForOwner(){
   let ch=false;
   if(!S.matura.wpMatsSeeded){matsSeedWP();S.matura.wpMatsSeeded=true;ch=true;}
   if(!S.matura.zbiorSeeded){matsSeedZbior();S.matura.zbiorSeeded=true;ch=true;}
+  if(!S.matura.fmSeeded){matsSeedFmZadania();S.matura.fmSeeded=true;ch=true;}
   if(ch){save();if($("#view-mats").classList.contains("active"))renderMats();}
 }
 
@@ -3567,6 +3983,7 @@ function renderMats(){
 }
 function matsItemHtml(m){
   const hasLessons=Array.isArray(m.lessons)&&m.lessons.length>0;
+  const linked=!hasLessons&&!!matsLinked(m);
   const secs=hasLessons?null:matsSecRanges(m);
   const t=hasLessons?m.lessons.length:(m.tasks||0),zr=matsDone(m).length;
   const[one,few,many]=matsUnit(m);
@@ -3580,7 +3997,8 @@ function matsItemHtml(m){
       /* materiał z działami ma liczbę zadań wyliczoną z sumy działów — ręczna edycja rozjechałaby
          zakresy numerów, więc zamiast pola pokazujemy samą liczbę */
       :secs?`
-      <span class="muted" style="flex:none">${t} ${matsPlural(t,one,few,many)} · ${secs.length} ${matsPlural(secs.length,"dział","działy","działów")}</span>`:`
+      <span class="muted" style="flex:none">${t} ${matsPlural(t,one,few,many)} · ${secs.length} ${matsPlural(secs.length,"dział","działy","działów")}</span>
+      ${m.link?`<a href="${esc(m.link)}" target="_blank" rel="noopener" class="btn ghost small" style="flex:none">Otwórz stronę ↗</a>`:""}`:`
       <div class="row" style="flex:none;flex-wrap:nowrap;gap:6px;width:auto">
         <input type="number" data-mtk="${m.id}" min="0" max="999" step="1" placeholder="—" style="width:80px" value="${m.tasks==null?"":m.tasks}">
         <span class="muted">zad.</span>
@@ -3598,7 +4016,7 @@ function matsItemHtml(m){
         <button class="btn ghost small" data-mall="${m.id}" data-v="1">Odhacz wszystkie</button>
         <button class="btn ghost small" data-mall="${m.id}" data-v="0">Wyczyść</button>
       </div>
-      <div class="${hasLessons?"mats-lessons":"mats-tasks"}" data-mgrid="${m.id}"></div>
+      <div class="${hasLessons||linked?"mats-lessons":"mats-tasks"}" data-mgrid="${m.id}"></div>
     </details>`:""}
   </div>`;
 }
@@ -3623,6 +4041,27 @@ function matsFillGrid(m){
     return;
   }
   if(!m.tasks)return;
+  /* Materiał z linkami (zadania ze strony) — wiersz na zadanie: numer w dziale, tytuł jako
+     odnośnik, punkty i sesja CKE. Kwadracik z samym numerem nie dałby się kliknąć w treść. */
+  const linked=matsLinked(m);
+  if(linked){
+    const rs2=matsSecRanges(m)||[];
+    let hh="";
+    rs2.forEach((r,i)=>{
+      let zr=0;for(let x=r.from;x<=r.to;x++)if(done.has(x))zr++;
+      hh+=`<div class="mats-lesson-sec">${i+1}. ${esc(r.name)} — ${zr}/${r.count}</div>`;
+      for(let x=r.from;x<=r.to;x++){
+        const z=linked[x-1];if(!z)continue;
+        hh+=`<div class="mats-lesson-row">
+          <input type="checkbox" data-mtask="${m.id}" data-n="${x}"${done.has(x)?" checked":""} aria-pressed="${done.has(x)}">
+          <a href="${esc(z.url)}" target="_blank" rel="noopener">${matsLocalNo(m,x)}. ${esc(z.name)}</a>
+          <span class="muted">${z.pkt} pkt · ${esc(z.ses)}</span>
+        </div>`;
+      }
+    });
+    g.innerHTML=hh;
+    return;
+  }
   const btn=n=>`<button type="button" data-mtask="${m.id}" data-n="${n}"${done.has(n)?' class="on"':""} aria-pressed="${done.has(n)}">${matsLocalNo(m,n)}</button>`;
   const rs=matsSecRanges(m);
   let h="";
