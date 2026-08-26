@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — egzekwowanie preferencji w Harmonogramie, build 68)_
+_Ostatnia aktualizacja: 2026-08-26 (sesja 16, cd. — zakładka Profil, build 69)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,33 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-26 (sesja 16, cd. — zakładka Profil: zdjęcie, nazwa, statystyki, build 69):**
+  Nowy widok `#view-profil` w grupie „Ustawienia" + `profil:renderProfil` w mapie rendererów.
+  - **Awatar jako data URI w `profiles.avatar`** (migracja `profiles_avatar`), nie w Storage:
+    klient skaluje zdjęcie kanwą do kwadratu 160×160 JPEG i zbija jakość w pętli, dopóki nie
+    zmieści się w 60 kB (typowo ~2 kB). Przy dwóch osobach osobny bucket z własnym RLS byłby
+    przerostem formy nad treścią, a kolumna jedzie razem z profilem, który i tak pobieramy.
+    Baza pilnuje granicy CHECKiem: `length(avatar) <= 61440 and avatar like 'data:image/%'`
+    — drugi warunek odcina wpisanie `javascript:` zamiast obrazka.
+  - RLS profili był już właściwy (update tylko własnego wiersza, select własny + znajomi),
+    więc awatar dziedziczy zabezpieczenia bez zmian w politykach.
+  - `profStats()` liczy wszystko z lokalnego stanu, więc zakładka działa też bez logowania
+    (blokują się wtedy tylko pola profilu): łączny czas nauki, czas w tym tygodniu, sesje
+    pomodoro (tylko `alive`), seria dni pod rząd, najdłuższa seria w historii, dni z nauką,
+    średnia produktywność i sen z 30 dni, data pierwszej sesji, postęp każdego materiału.
+  - Awatary pokazują się też w kartach punktowych Rywalizacji (`awatarHtml()` — zdjęcie albo
+    kółko z inicjałami), a `rywalLoad` dociąga kolumnę `avatar` dla siebie i znajomych.
+  - **Błąd znaleziony w testach:** `renderProfil()` bezwarunkowo nadpisywało pole nazwy, więc
+    wgranie zdjęcia (które przerysowuje widok) kasowało wpisany, jeszcze niezapisany tekst.
+    Teraz pole jest nadpisywane tylko wtedy, gdy jest puste albo równe ostatnio wyrenderowanej
+    nazwie (`profOstatniaNazwa`).
+  - Testy: 600×300 PNG → 160×160 JPEG, 2219 znaków, kadrowanie do kwadratu ✓; podgląd przed
+    zapisem, `profAvatarRoboczy` czyszczony po zapisie ✓; usunięcie zdjęcia wysyła
+    `avatar:null` ✓; nazwa przeżywa przerysowanie ✓; statystyki policzone ręcznie zgadzają się
+    co do minuty (405 min, seria 3, sen 7 h 30) ✓; awatar widoczny w karcie punktów, znajomy
+    bez zdjęcia dostaje inicjał ✓; baza odrzuca 70 kB i `javascript:`, nie pozwala podmienić
+    awatara znajomego, obcy nie widzi żadnego ✓; 16 zakładek bez błędów w konsoli ✓.
 
 - **2026-08-26 (sesja 16, cd. — generator Harmonogramu ignorował preferencje, build 68):**
   Zgłoszenie: przy preferencji „chcę się uczyć 3h45 dziennie, w piątki się nie uczę"
