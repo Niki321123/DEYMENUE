@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — reczne ukladanie planu i malowanie zakresem)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — reczne ukladanie planu, malowanie zakresem, publish po stronie Claude)_
 
 ## Czym jest projekt
 
@@ -32,6 +32,26 @@ WSZYSTKICH trzech miejsc na raz (build 15, sesja 4): przebudować i ręcznie
 rozesłać/zainstalować APK, przebudować `dist/` (`npm run package`) dla desktopa,
 i opublikować web. Dopiero od tego momentu automatyczne aktualizacje znów działają
 bez interwencji.
+
+### Publikowanie — robi je Claude, nie uzytkownik (ustalone 2026-08-27)
+
+**Zasada:** po kazdej zmianie w `DayMenu.html` (albo w czymkolwiek, co wchodzi do
+paczki) **Claude sam uruchamia `npm run publish`** i sam pilnuje `git push`. Uzytkownik
+nie ma dostawac komendy do recznego odpalenia — konczy sie to tym, ze publish rusza
+rownolegle z praca sesji i zgarnia niedokonczone zmiany. Do zrobienia w tej kolejnosci:
+
+1. skonczyc i **zweryfikowac** zmiane (skladnia + test w przegladarce),
+2. zaktualizowac `PROJECT_NOTES.md`,
+3. `npm run publish` (podbija build, kopiuje do `docs/`, commituje, pushuje),
+4. sprawdzic, ze push faktycznie przeszedl (`git status -sb` nie moze zostac "ahead"),
+   bo publish potrafi zostawic commit lokalnie, gdy push sie wywali.
+
+**Uwaga o rownoleglych sesjach:** `publish.js` robi `git add -u`, wiec commituje
+WSZYSTKIE zmodyfikowane sledzone pliki, nie tylko swoje. Gdy w tym samym katalogu
+pracuje druga sesja Claude, jej niedokonczone zmiany wejda do commita „build N".
+Zdarzylo sie w obie strony: build 84 zabral prace drugiej sesji (Librus), build 85
+zostal odpalony z zewnatrz i zabral prace tej sesji. Przed publish sprawdzac
+`git status --porcelain --untracked-files=no` i wiedziec, co sie publikuje.
 
 Backend: Supabase, projekt **`jkpwboekztpkfxivueql`** (⚠️ wcześniej sesja Claude była
 przez pomyłkę podłączona do innego projektu, `ohaeqozswszudejxtwcb` — zweryfikować
