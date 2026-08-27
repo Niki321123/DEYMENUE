@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — platny dostep + usuniete lokalne logowanie)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — sprzedaz na zywo dziala)_
 
 ## Czym jest projekt
 
@@ -494,6 +494,28 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-27 (sesja 16, cd. — SPRZEDAZ NA ZYWO DZIALA):** o 20:27 przeszla pierwsza
+  prawdziwa platnosc: konto kontakt.daymenu@gmail.com, 300 gr PLN, sesja `cs_live_...`,
+  dostep odblokowal sie sam. Caly lancuch potwierdzony na produkcji.
+  - Droga do tego prowadzila przez cztery bledy, kazdy inny:
+    1. `prod_...` wpisane w sekret `STRIPE_PRICE_ID` zamiast `price_...` — "No such price".
+    2. Metody platnosci wpisane na sztywno w kodzie (`payment_method_types` = card/blik/p24)
+       — "blik is invalid", bo BLIK nie byl jeszcze wlaczony na koncie. USUNIETE z kodu:
+       Checkout bierze teraz to, co wlaczone w panelu, wiec dokladanie metod nie wymaga
+       wdrozenia funkcji.
+    3. Konto live wymagalo weryfikacji tozsamosci; telefon nie wystarczyl ("Insufficient
+       records" — typowe u swiezo pelnoletnich), przeszlo dopiero na dokument.
+    4. Klucz idempotencji budowany z `user_id`+cena — Stripe odrzuca ten sam klucz uzyty
+       z INNYMI parametrami, wiec kazda zmiana konfiguracji psula platnosc na dobe.
+       Teraz klucz to `checkout-<user_id>-<odcisk SHA-256 z form.toString()>`: dwuklik
+       trafia w ten sam klucz, zmiana parametrow dostaje wlasny.
+  - Wniosek na przyszlosc: **konfiguracja Stripe nalezy do panelu, nie do kodu**. Cena,
+    metody platnosci i dane produktu sa dzis sterowane sekretem albo ustawieniem w Stripe.
+  - NADAL OTWARTE i wazne teraz, gdy plyna prawdziwe pieniadze:
+    regulamin + zgoda na natychmiastowy dostep (bez tego 14 dni na odstapienie),
+    egzekwowanie oplaty w RLS tabel rywalizacji (bramka chowa UI, nie chroni danych),
+    zwroty nie odbieraja dostepu (`charge.refunded` nieobslugiwane).
 
 - **2026-08-27 (sesja 16, cd. — usuniete lokalne logowanie haslem):** Zakladka Konto miala
   dwa rozne logowania obok siebie: konto w chmurze (Supabase) i stara karte „Wlacz
