@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — egzekwowanie preferencji harmonogramu, build 84)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — reczne ukladanie planu i malowanie zakresem)_
 
 ## Czym jest projekt
 
@@ -474,6 +474,30 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-27 (sesja 16, cd. — plan bez AI: pedzel „Przedmiot" i malowanie zakresem):**
+  Zgloszenie: harmonogram ma dac sie ustawiac takze bez generatora — dodajesz przedmioty
+  i sam wstawiasz je w godziny; potem: „zaznaczasz np. godzine 12 i przeciagasz do 17".
+  - **Pedzel „Przedmiot"** obok czterech dotychczasowych. Wybor przedmiotu w pasku
+    `#matSubjBar` (analogicznie do paska aktywnosci), kropka pedzla przyjmuje kolor
+    przedmiotu z `matTopicColor`. `matPaintSubject(d,h,toggle)`: drugi klik tym samym
+    przedmiotem zdejmuje blok, inny przedmiot podmienia (kasujac odhaczenie), godzina
+    „niedostepna"/szkolna otwiera sie przy okazji na „Dostepny" (warstwa base albo ovr —
+    wg checkboxa „tylko w tym tygodniu"), a wlasnej aktywnosci pedzel NIE rusza.
+  - **Wyczysc caly plan** — kasuje same rozstawione przedmioty, zostawiajac dostepnosc
+    godzin (dotychczasowe „Wyczysc" kasuje wszystko).
+  - **Malowanie zakresem** (`matZakresKomorki` = prostokat miedzy dwiema komorkami):
+    mysza przeciagniecie z podgladem (`.mat-cell.sel`), na dotyku **przytrzymanie 350 ms
+    jako kotwica + tapniecie drugiej komorki**. Swiadomie NIE ma `touch-action:none` na
+    siatce — zabralaby mozliwosc przewijania strony, a siatka zajmuje na telefonie
+    prawie caly ekran; ruch palca kasuje odliczanie przytrzymania (to przewijanie).
+    `matPoZakresie` zjada klikniecie konczace gest, zeby nie odhaczylo komorki.
+    Uchwyty `pointermove`/`pointerup`/`pointercancel` wisza na `document` (mysz potrafi
+    puscic przycisk poza siatka), a nie na komorkach, ktore `renderMatGrid` podmienia.
+  - Zweryfikowane w przegladarce: skladnia obu blokow `<script>`, toggle/podmiana/otwieranie
+    godziny, ochrona aktywnosci, przeciagniecie 12→17, prostokat na ukos 3 dni × 3 godziny,
+    szybki tap bez przytrzymania, kasowanie kotwicy przy ruchu palca, czyszczenie planu.
+  - Zmiany tylko w `DayMenu.html` (zrodlo) — czeka `npm run publish`.
 
 - **2026-08-27 (sesja 16, cd. — jeden przedmiot dziennie i odpoczynek po szkole, build 84):**
   Zgloszenie: z trzech preferencji („3h dziennie, jeden dzien na jeden przedmiot, godzine po

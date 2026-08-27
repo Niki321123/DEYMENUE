@@ -159,6 +159,8 @@ label.fld{display:block;font-size:var(--fs-1);font-weight:600;color:var(--text-2
 .mat-cell.act-busy{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
 .mat-cell.act-study{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
 .mat-cell.act.done{opacity:.5;text-decoration:line-through}
+.mat-grid{user-select:none}
+.mat-cell.sel{box-shadow:inset 0 0 0 2px var(--primary)}
 .mat-grid .hd.clk,.mat-grid .hr.clk{cursor:pointer;user-select:none}
 .mat-grid .hd.clk:hover,.mat-grid .hr.clk:hover{color:var(--primary)}
 /* książki: podpowiedzi + okładki */
@@ -497,7 +499,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 
 <!-- ============ NAUKA ============ -->
 <section class="view" id="view-matura">
-  <h1>Nauka</h1><p class="sub">Ustaw stały tygodniowy harmonogram i przedmioty, a AI ułoży plan nauki. Każdą zaplanowaną godzinę odhaczasz, gdy ją zrobisz.</p>
+  <h1>Nauka</h1><p class="sub">Ustaw stały tygodniowy harmonogram i przedmioty, a potem ułóż plan sam — pędzlem „Przedmiot” — albo zdaj się na generator. Każdą zaplanowaną godzinę odhaczasz, gdy ją zrobisz.</p>
   <div class="tabs" id="matTabs">
     <button data-mt="sched" class="on">Harmonogram</button>
     <button data-mt="subjects">Przedmioty</button>
@@ -570,13 +572,14 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
           <button class="btn ghost small" id="matGridClear">Wyczyść</button>
         </div>
       </div>
-      <p class="muted" style="margin-bottom:var(--sp-3)">Wybierz tryb i zaznacz godziny — ten sam harmonogram obowiązuje co tydzień. Klik nagłówka dnia maluje cały dzień, klik godziny po lewej — cały wiersz. Po „Generuj plan” w zielonych okienkach pojawią się przedmioty; <strong>kliknij okienko, aby odhaczyć zrobioną godzinę</strong>, a podwójny klik uruchamia pomodoro.</p>
+      <p class="muted" style="margin-bottom:var(--sp-3)">Wybierz tryb i zaznacz godziny — ten sam harmonogram obowiązuje co tydzień. Klik nagłówka dnia maluje cały dzień, klik godziny po lewej — cały wiersz. Większy kawałek zamalujesz jednym gestem: <strong>przeciągnij myszą</strong> np. od 12:00 do 17:00, a na telefonie <strong>przytrzymaj palcem pierwszą godzinę i dotknij ostatniej</strong>. Przedmioty w zielonych okienkach rozstawisz sam pędzlem „Przedmiot” albo jednym kliknięciem „Generuj plan”; <strong>kliknij okienko, aby odhaczyć zrobioną godzinę</strong>, a podwójny klik uruchamia pomodoro.</p>
       <div class="row" style="margin-bottom:var(--sp-3)">
         <div class="mastery-pick" id="matBrush">
           <button data-b="avail" class="on"><span class="brush-dot" style="background:var(--good)"></span>Dostępny</button>
           <button data-b="school"><span class="brush-dot" style="background:var(--primary)"></span>W szkole</button>
           <button data-b="act"><span class="brush-dot" style="background:var(--accent)"></span>Moja aktywność</button>
           <button data-b="unavail"><span class="brush-dot" style="background:var(--text-3)"></span>Niedostępny</button>
+          <button data-b="subj"><span class="brush-dot" id="matSubjDot" style="background:var(--text-3)"></span>Przedmiot</button>
         </div>
         <label class="row" style="width:auto;flex:none;gap:6px;align-items:center">
           <input type="checkbox" id="matOneWeek" style="width:auto;min-height:0">
@@ -597,6 +600,13 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
           <button class="btn" id="matActAdd" style="flex:none">Dodaj</button>
         </div>
         <p class="muted" style="margin-top:var(--sp-2)">Wybierz aktywność i maluj nią po siatce. „Zajęte” blokuje godzinę tak jak „Niedostępny”, ale z podpisem — AI wie, czym jest i tam nie zaplanuje nauki. „Nauka” odhaczasz pędzlem „Dostępny” i wlicza się do statystyk.</p>
+      </div>
+      <div id="matSubjBar" hidden style="margin-bottom:var(--sp-3)">
+        <div class="row">
+          <select id="matSubjPick" style="flex:none;width:auto"></select>
+          <button class="btn ghost small" id="matPlanClear" style="flex:none">Wyczyść cały plan</button>
+        </div>
+        <p class="muted" style="margin-top:var(--sp-2)">Ręczne układanie planu, bez generatora: wybierz przedmiot i klikaj godziny w siatce — wstawi się w nie ta nauka. Klik tym samym przedmiotem drugi raz zdejmuje go z godziny, klik nagłówka dnia albo godziny wypełnia całą kolumnę lub wiersz, a przeciągnięcie (na telefonie: przytrzymanie i drugie dotknięcie) wstawia przedmiot w cały zakres naraz. Godzina niedostępna lub szkolna zmieni się przy okazji na „Dostępny”; własnych aktywności ten pędzel nie rusza.</p>
       </div>
       <div>
         <label class="fld">Preferencje dla AI (opcjonalnie)</label>
@@ -1124,7 +1134,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=84;
+const DM_BUILD=85;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1704,11 +1714,23 @@ function matEntityName(id){
 let matBrush="avail";
 let matCellTimer=null;
 let matActSel=null;   // która aktywność jest „na pędzlu"
+let matSubjSel=null;  // który przedmiot jest „na pędzlu" przy ręcznym układaniu planu
+/* Malowanie zakresem. Myszą: przeciągnięcie od komórki do komórki. Palcem NIE przechwytujemy
+   przeciągnięcia — touch-action:none na siatce zabrałby możliwość przewijania strony, a siatka
+   zajmuje na telefonie prawie cały ekran. Dlatego na dotyku zakres zaczyna PRZYTRZYMANIE
+   (kotwica), a kończy zwykłe tapnięcie drugiej komórki. */
+let matSel=null;        // trwające przeciąganie myszą: {d0,g0,d1,g1,ruch}
+let matKotwica=null;    // początek zakresu wybrany przytrzymaniem na dotyku: {d,g}
+let matHold=null;       // {timer,x,y} — odliczanie przytrzymania
+let matPoZakresie=false;// zjada kliknięcie kończące gest, żeby nie odhaczyło komórki
 $$("#matBrush button").forEach(b=>b.onclick=()=>{
   matBrush=b.dataset.b;
   $$("#matBrush button").forEach(x=>x.classList.toggle("on",x===b));
   $("#matActBar").hidden=matBrush!=="act";
+  $("#matSubjBar").hidden=matBrush!=="subj";
+  matKotwica=null;matPodswietlZakres();   // zmiana pędzla przerywa zaczęty zakres
   if(matBrush==="act")matFillActPick();
+  if(matBrush==="subj")matFillSubjPick();
 });
 function matFillActPick(){
   const list=actList(),sel=$("#matActPick");
@@ -1721,6 +1743,27 @@ function matFillActPick(){
   $("#matActDel").disabled=!list.length;
 }
 $("#matActPick").onchange=()=>{matActSel=$("#matActPick").value||null};
+// kropka przy pędzlu pokazuje kolor wybranego przedmiotu — ten sam, którym podpisana jest siatka
+function matSubjDot(){$("#matSubjDot").style.background=matSubjSel?matTopicColor(matSubjSel):"var(--text-3)"}
+function matFillSubjPick(){
+  const list=S.matura.topics,sel=$("#matSubjPick");
+  sel.innerHTML=list.length
+    ? list.map(t=>`<option value="${esc(t.id)}">${esc(t.name)}</option>`).join("")
+    : `<option value="">— brak przedmiotów, dodaj je w zakładce „Przedmioty” —</option>`;
+  if(!list.some(t=>t.id===matSubjSel))matSubjSel=list.length?list[0].id:null;
+  if(matSubjSel)sel.value=matSubjSel;
+  sel.disabled=!list.length;
+  matSubjDot();
+}
+$("#matSubjPick").onchange=()=>{matSubjSel=$("#matSubjPick").value||null;matSubjDot()};
+// czyści SAM plan (rozstawione przedmioty), zostawiając dostępność godzin — inaczej niż „Wyczyść”
+$("#matPlanClear").onclick=()=>{
+  if(!S.matura.plan.length)return toast("Plan jest już pusty");
+  if(!confirm("Usunąć wszystkie rozstawione przedmioty? Harmonogram dostępności zostaje."))return;
+  S.matura.plan.forEach(matUnmarkDone);
+  S.matura.plan=[];
+  save();renderMatSched();toast("Plan wyczyszczony");
+};
 $("#matActAdd").onclick=()=>{
   const name=$("#matActName").value.trim();
   if(!name)return toast("Podaj nazwę aktywności");
@@ -1776,6 +1819,59 @@ function matPaint(d,h){
   }
   matRecompute();
 }
+/* Ręczne wstawienie przedmiotu w godzinę — plan układany bez generatora.
+   Zwraca komunikat o przeszkodzie albo null, gdy się udało.
+   Godzinę „niedostępną"/szkolną przy okazji otwiera na „Dostępny", bo taki jest oczywisty
+   zamiar kliknięcia; własnej aktywności nie rusza — użytkownik wpisał ją świadomie. */
+function matPaintSubject(d,h,toggle){
+  if(!matSubjSel)return "Najpierw dodaj przedmiot w zakładce „Przedmioty”.";
+  const k=matKey(d,h);
+  if(actOf(S.matura.grid[k]))return "Ta godzina to Twoja aktywność — zamaluj ją najpierw innym pędzlem.";
+  const blk=S.matura.plan.find(b=>b.day===d&&b.hour===h);
+  if(blk&&blk.topicId===matSubjSel&&toggle){   // drugi klik tym samym przedmiotem = zdejmij
+    matUnmarkDone(blk);
+    S.matura.plan=S.matura.plan.filter(b=>b!==blk);
+    return null;
+  }
+  if(S.matura.grid[k]!=="avail"){
+    if($("#matOneWeek").checked)matOvr().cells[k]="avail";
+    else{S.matura.base[k]="avail";delete matOvr().cells[k];}
+    matRecompute();
+  }
+  if(blk){matUnmarkDone(blk);blk.topicId=matSubjSel;}   // podmiana przedmiotu kasuje odhaczenie
+  else S.matura.plan.push({day:d,hour:h,topicId:matSubjSel});
+  return null;
+}
+/* Maluje wskazane komórki bieżącym pędzlem. Pędzel „Przedmiot" wstawia BEZ przełączania,
+   żeby jeden gest wypełnił cały zakres zamiast zdejmować to, co już w nim stoi. */
+function matMalujZakres(komorki){
+  let err=null;
+  for(const[d,h]of komorki){
+    if(matBrush==="subj"){const e=matPaintSubject(d,h,false);if(e)err=e}
+    else matPaint(d,h);
+  }
+  if(err)toast(err);
+  save();renderMatSched();
+}
+// prostokąt między dwiema komórkami — przeciągnięcie w pionie daje zakres godzin,
+// w poziomie zakres dni, na ukos jedno i drugie naraz
+function matZakresKomorki(d0,g0,d1,g1){
+  const dA=Math.min(d0,d1),dB=Math.max(d0,d1),gA=Math.min(g0,g1),gB=Math.max(g0,g1);
+  const out=[];
+  for(let d=dA;d<=dB;d++)for(const g of MAT_HOURS)if(g>=gA&&g<=gB)out.push([d,g]);
+  return out;
+}
+function matPodswietlZakres(){
+  const on=new Set();
+  if(matSel)matZakresKomorki(matSel.d0,matSel.g0,matSel.d1,matSel.g1).forEach(([d,g])=>on.add(d+"_"+g));
+  if(matKotwica)on.add(matKotwica.d+"_"+matKotwica.g);
+  $$("#matGrid [data-gd]").forEach(c=>c.classList.toggle("sel",on.has(c.dataset.gd+"_"+c.dataset.gh)));
+}
+function matKomorkaPod(x,y){
+  const el=document.elementFromPoint(x,y);
+  const c=el&&el.closest?el.closest("#matGrid [data-gd]"):null;
+  return c?{d:+c.dataset.gd,g:+c.dataset.gh}:null;
+}
 function matCellToggleDone(d,h){
   const blk=S.matura.plan.find(b=>b.day===d&&b.hour===h);
   if(!blk)return;
@@ -1827,7 +1923,30 @@ function renderMatGrid(){
   $("#matGrid").innerHTML=html;
   $$("#matGrid [data-gd]").forEach(c=>{
     const d=+c.dataset.gd,h=+c.dataset.gh;
+    c.onpointerdown=e=>{
+      if(e.button)return;                            // tylko lewy przycisk myszy
+      if(e.pointerType==="mouse"||e.pointerType==="pen"){
+        e.preventDefault();                          // bez tego przeciąganie zaznacza tekst
+        matSel={d0:d,g0:h,d1:d,g1:h,ruch:false};matKotwica=null;
+      }else{
+        matHold={x:e.clientX,y:e.clientY,timer:setTimeout(()=>{
+          matHold=null;matSel=null;matKotwica={d,g:h};matPoZakresie=true;
+          matPodswietlZakres();toast("Początek zakresu — dotknij drugiej godziny");
+        },350)};
+      }
+    };
     c.onclick=()=>{
+      if(matPoZakresie){matPoZakresie=false;return}   // to kliknięcie zamyka gest, nie jest nowe
+      if(matKotwica){                                 // dotyk: druga komórka domyka zakres
+        const k=matKotwica;matKotwica=null;
+        matMalujZakres(matZakresKomorki(k.d,k.g,d,h));
+        return;
+      }
+      if(matBrush==="subj"){
+        const err=matPaintSubject(d,h,true);
+        if(err)toast(err);else{save();renderMatSched()}
+        return;
+      }
       const st=S.matura.grid[matKey(d,h)];
       const act=actOf(st);
       // pędzlem „Dostępny" klik w komórkę własnej nauki = odhaczenie, nie przemalowanie
@@ -1846,9 +1965,34 @@ function renderMatGrid(){
       if(blk&&S.matura.grid[matKey(d,h)]==="avail"&&S.matura.topics.some(t=>t.id===blk.topicId))matStartPomo(blk);
     };
   });
-  $$("#matGrid [data-col]").forEach(c=>c.onclick=()=>{const d=+c.dataset.col;for(const h of MAT_HOURS)matPaint(d,h);save();renderMatSched()});
-  $$("#matGrid [data-row]").forEach(c=>c.onclick=()=>{const h=+c.dataset.row;for(let d=0;d<7;d++)matPaint(d,h);save();renderMatSched()});
+  // klik nagłówka to ten sam zakres, tylko od razu cała kolumna albo cały wiersz
+  $$("#matGrid [data-col]").forEach(c=>c.onclick=()=>{const d=+c.dataset.col;matMalujZakres(MAT_HOURS.map(h=>[d,h]))});
+  $$("#matGrid [data-row]").forEach(c=>c.onclick=()=>{const h=+c.dataset.row;matMalujZakres([0,1,2,3,4,5,6].map(d=>[d,h]))});
+  matPodswietlZakres();
 }
+/* Śledzenie gestu wisi na dokumencie, bo mysz potrafi wyjechać poza siatkę,
+   a renderMatGrid podmienia same komórki — te uchwyty zakładamy raz. */
+document.addEventListener("pointermove",e=>{
+  if(matHold&&(Math.abs(e.clientX-matHold.x)>12||Math.abs(e.clientY-matHold.y)>12)){
+    clearTimeout(matHold.timer);matHold=null;      // palec jedzie = przewijanie, nie zaznaczanie
+  }
+  if(!matSel)return;
+  const p=matKomorkaPod(e.clientX,e.clientY);
+  if(!p||(p.d===matSel.d1&&p.g===matSel.g1))return;
+  matSel.d1=p.d;matSel.g1=p.g;matSel.ruch=true;matPodswietlZakres();
+});
+document.addEventListener("pointerup",()=>{
+  if(matHold){clearTimeout(matHold.timer);matHold=null}
+  if(!matSel)return;
+  const s=matSel;matSel=null;
+  if(!s.ruch){matPodswietlZakres();return}          // klik bez przeciągnięcia obsłuży onclick
+  matPoZakresie=true;
+  matMalujZakres(matZakresKomorki(s.d0,s.g0,s.d1,s.g1));
+});
+document.addEventListener("pointercancel",()=>{
+  if(matHold){clearTimeout(matHold.timer);matHold=null}
+  matSel=null;matPodswietlZakres();
+});
 function renderMatPlanProgress(){
   const wk=weekId(),plan=S.matura.plan;
   const total=plan.length,done=plan.filter(b=>b.doneWeek===wk).length;
@@ -1892,6 +2036,7 @@ function renderMatSubjects(){
     t.percent=Math.max(0,Math.min(100,Math.round(+inp.value||0)));save();renderMatSubjects();
   });
   matFillPomoTopicPick();
+  matFillSubjPick();
 }
 $("#matTopicAdd").onclick=()=>{
   const n=$("#matTopicName").value.trim();
