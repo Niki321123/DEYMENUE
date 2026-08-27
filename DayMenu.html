@@ -1120,7 +1120,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=88;
+const DM_BUILD=89;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -5152,7 +5152,8 @@ let payOczekuje=false;      // wrocilismy ze Stripe i czekamy, az webhook dopisz
 function payKartaHtml(){
   return `<h2 style="margin-bottom:2px">Ta część wymaga odblokowania</h2>
     <p class="muted" style="margin-bottom:var(--sp-3)">Jednorazowa opłata ${PAY_CENA} odblokowuje na stałe:
-      Sprawdziany, Frekwencję i oceny, wykresy w Analizie czasu oraz Rywalizację.
+      Sprawdziany, Frekwencję i oceny, wykresy w Analizie czasu, Rywalizację
+      oraz podsumowania tygodnia, miesiąca i roku.
       Reszta aplikacji — nauka, harmonogram, pomodoro, las, nawyki, sen, cele — zostaje darmowa.</p>
     <button class="btn accent" data-pay-buy>Odblokuj za ${PAY_CENA}</button>
     <p class="muted" data-pay-status style="margin:var(--sp-3) 0 0"></p>`;
@@ -6064,10 +6065,17 @@ function wrapOznaczWidziane(okres){
 }
 /* Wołane po starcie i po dociągnięciu danych rywalizacji — plansza pojedynku bez nich
    byłaby pusta. Flaga pilnuje, żeby w jednym uruchomieniu pokazać to najwyżej raz. */
-function wrapSprawdzAuto(){
+/* Recap jest funkcja platna. Czekamy na sprawdzenie oplaty ZANIM zdecydujemy, bo funkcja
+   odpala sie 1,8 s po starcie i bez tego zdazylaby pokazac podsumowanie nieoplaconemu
+   uzytkownikowi, u ktorego zapytanie o dostep jeszcze nie wrocilo.
+   Okresow NIE oznaczamy jako widziane, gdy dostepu brak — po wykupieniu recap ma sie pokazac,
+   a nie przepasc bezpowrotnie. */
+async function wrapSprawdzAuto(){
   if(wrapSprawdzone||!$("#wrapTlo").hidden)return;
   const okresy=wrapNalezne();
   if(!okresy.length)return;
+  await sprawdzOplate();
+  if(!oplacone)return;
   wrapSprawdzone=true;
   okresy.forEach(wrapOznaczWidziane);
   // zapamiętujemy, co dziś poleciało — żeby dało się to odtworzyć po przypadkowym zamknięciu
@@ -6208,13 +6216,14 @@ function profStats(){
 function renderRecapOdtworz(){
   const o=S.wrapOstatni;
   const dzis=!!(o&&o.data===dsLok(new Date())&&Array.isArray(o.okresy)&&o.okresy.length);
-  $("#profRecap").hidden=!dzis;
+  $("#profRecap").hidden=!dzis||!oplacone;
   if(!dzis)return;
   const nazwy=o.okresy.map(x=>({tydz:"tygodnia",mies:"miesiąca",rok:"roku szkolnego"}[x]||x));
   const lista=nazwy.length>1?nazwy.slice(0,-1).join(", ")+" i "+nazwy[nazwy.length-1]:nazwy[0];
   $("#profRecapTytul").textContent="Podsumowanie "+lista;
 }
 $("#profRecapBtn").onclick=()=>{
+  if(!oplacone)return;
   const o=S.wrapOstatni;
   if(o&&o.data===dsLok(new Date())&&Array.isArray(o.okresy)&&o.okresy.length)wrapPokaz(o.okresy);
 };
