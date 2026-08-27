@@ -67,9 +67,14 @@ Deno.serve(async (req: Request) => {
     return new Response("Zle JSON", { status: 400 });
   }
 
-  // Interesuje nas tylko oplacony checkout. Reszta typow ma dostac 200,
-  // inaczej Stripe uzna endpoint za zepsuty i zacznie ponawiac w kolko.
-  if (zdarzenie?.type !== "checkout.session.completed") {
+  // Karta, BLIK i P24 potwierdzaja platnosc od razu, wiec normalnie wystarcza
+  // "completed". Metody z opoznionym potwierdzeniem (np. przelew SEPA) przysylaja
+  // "completed" ze statusem unpaid, a dopiero pozniej "async_payment_succeeded" —
+  // obslugujemy oba, zeby wlaczenie takiej metody w przyszlosci nie zaczelo po cichu
+  // gubic oplaconych dostepow. Reszta typow dostaje 200, inaczej Stripe uzna endpoint
+  // za zepsuty i bedzie ponawiac w kolko.
+  const OBSLUGIWANE = ["checkout.session.completed", "checkout.session.async_payment_succeeded"];
+  if (!OBSLUGIWANE.includes(zdarzenie?.type)) {
     return new Response(JSON.stringify({ pominieto: zdarzenie?.type }), { status: 200 });
   }
 
