@@ -14,6 +14,9 @@ const m = html.match(/const DM_BUILD=(\d+);/);
 if (!m) { console.error("Nie znaleziono DM_BUILD w DayMenu.html"); process.exit(1); }
 const build = parseInt(m[1], 10) + 1;
 html = html.replace(/const DM_BUILD=\d+;/, `const DM_BUILD=${build};`);
+// Manifest ma wlasny cache (max-age=600), a nazwa i ikona instalowanej aplikacji sa z niego
+// czytane. Bez podbicia ?v= przegladarka po zmianie manifestu nadal proponuje stara nazwe.
+html = html.replace(/manifest\.webmanifest\?v=\d+/, `manifest.webmanifest?v=${build}`);
 fs.writeFileSync(htmlPath, html);
 console.log("Build: " + build);
 
