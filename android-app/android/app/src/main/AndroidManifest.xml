@@ -50,6 +50,11 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- RECORD_AUDIO i MODIFY_AUDIO_SETTINGS usuniete: pochodzily z domyslnej szablonowej
+         konfiguracji Capacitora, a aplikacja z mikrofonu nie korzysta. W kodzie natywnym nie ma
+         AudioRecord/MediaRecorder/AudioManager, w warstwie webowej nie ma getUserMedia ani
+         MediaRecorder. Jedyne uzycie dzwieku to AudioContext (gong pomodoro), ktore GENERUJE
+         dzwiek i zadnego uprawnienia nie wymaga. RECORD_AUDIO dokladal tez implikowana funkcje
+         android.hardware.microphone. Gdyby kiedys doszlo nagrywanie, trzeba je dopisac z powrotem
+         i poprosic o zgode w czasie dzialania (Capacitor Permissions API). -->
 </manifest>
