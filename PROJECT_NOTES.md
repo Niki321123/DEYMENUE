@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — AI wylaczone, platny dostep przez Stripe)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — platny dostep wdrozony na produkcji)_
 
 ## Czym jest projekt
 
@@ -494,6 +494,26 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-27 (sesja 16, cd. — platny dostep WDROZONY):** Migracja wykonana na
+  `jkpwboekztpkfxivueql`: tabela `entitlements` + RLS (select tylko wlasnego wiersza),
+  10 istniejacych kont dostalo `source='grandfather'`. Wdrozone dwie Edge Functions:
+  `create-checkout` (verify_jwt=true) i `stripe-webhook` (verify_jwt=false).
+  Uzytkownik ustawil sekrety STRIPE_SECRET_KEY i STRIPE_WEBHOOK_SECRET oraz endpoint
+  webhooka w piaskownicy Stripe „Zagloba" (zdarzenia checkout.session.completed
+  i checkout.session.async_payment_succeeded).
+  - Smoke-test wdrozonego webhooka: POST bez podpisu -> 400 „Zly podpis" (a nie 500,
+    czyli sekret jest ustawiony), GET -> 405, `create-checkout` bez tokenu uzytkownika
+    -> 401 (czyli klucz Stripe tez jest — inaczej byloby 500).
+  - **Bramka jest od tej chwili AKTYWNA**: tabela istnieje, wiec `sprawdzOplate()`
+    przestaje trafiac na 404 i zaczyna realnie blokowac. Dzisiejszych uzytkownikow to
+    nie dotyczy (wszyscy grandfathered), ale kazde NOWE konto zobaczy paywall.
+  - Uwaga przy podawaniu adresu webhooka: uzytkownik wkleil najpierw
+    `ohaeqozswszudejxtwcb` (stary, bledny projekt z ostrzezenia wyzej). Poprawny ref
+    to `jkpwboekztpkfxivueql` — platnosci pod zlym adresem przechodzilyby, a dostep
+    nigdy by sie nie wlaczal.
+  - Nie zrobione: test end-to-end platnosci (wymaga klikniecia przez Checkout),
+    egzekwowanie oplaty w RLS tabel rywalizacji, obsluga zwrotow (`charge.refunded`).
 
 - **2026-08-27 (sesja 16, cd. — AI wylaczone, platny dostep przez Stripe):**
   Decyzja uzytkownika: AI znika z aplikacji (kod zostaje „w razie czego"), a platne maja byc
