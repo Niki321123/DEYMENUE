@@ -1,7 +1,7 @@
 # Day Menu — opis aplikacji
 
 _Dokument opisuje, co aplikacja robi i jak się z niej korzysta. Bez kodu i szczegółów
-technicznych — te są w `PROJECT_NOTES.md`. Stan na build 69 (26 sierpnia 2026)._
+technicznych. Stan na build 69 (26 sierpnia 2026)._
 
 ---
 

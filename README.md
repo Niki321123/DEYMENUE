@@ -11,8 +11,6 @@ aktualizują się same.
 
 - **Pełny opis funkcji:** [OPIS_APLIKACJI.md](OPIS_APLIKACJI.md)
 - **Polityka prywatności:** [PRIVACY.md](PRIVACY.md)
-- **Zabezpieczenia bazy danych:** [SUPABASE_RLS.md](SUPABASE_RLS.md)
-- **Historia zmian i notatki techniczne:** [PROJECT_NOTES.md](PROJECT_NOTES.md)
 
 ## Wersja przeglądarkowa
 

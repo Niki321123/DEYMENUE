@@ -13,3 +13,12 @@ android-app/android/build/
 keystore.properties
 *.jks
 *.keystore
+
+# Notatki i konfiguracja wylacznie na wlasny uzytek — zostaja na dysku,
+# nie trafiaja do publicznego repozytorium. PROJECT_NOTES.md zawiera prywatne
+# adresy e-mail i wewnetrzna historie decyzji.
+PROJECT_NOTES.md
+CLAUDE.md
+SUPABASE_RLS.md
+.mcp.json
+.claude/

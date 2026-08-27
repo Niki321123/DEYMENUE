@@ -50,7 +50,9 @@ fs.writeFileSync(path.join(site, "version.json"), `{"build":${build}}`);
 // (artefakty zle wklejonych komend w terminalu, np. `'email')`), a to publiczne repo.
 // Dodajemy tylko sledzone zmiany + konkretne katalogi z ewentualnymi nowymi plikami.
 run("git add -u");
-run("git add DayMenu.html publish.js build-android.js package.json PROJECT_NOTES.md docs supabase android-app");
+// PROJECT_NOTES.md celowo poza lista: notatki sa lokalne i ignorowane przez gita,
+// a "git add" na ignorowanym pliku przerwalby publikacje bledem.
+run("git add DayMenu.html publish.js build-android.js package.json docs supabase android-app");
 run(`git commit -m "build ${build}"`);
 run("git push");
 console.log(`\nOpublikowano build ${build} - aplikacje zaktualizuja sie same przy uruchomieniu.`);
