@@ -115,6 +115,10 @@ Deno.serve(async (req: Request) => {
       stripe_session_id: s.id,
       amount_minor: s.amount_total ?? null,
       currency: s.currency ?? null,
+      // dowod zgody na natychmiastowe udostepnienie tresci cyfrowej: bez niego kupujacy
+      // zachowuje 14 dni na odstapienie mimo dostarczonego produktu
+      zgoda_at: s.metadata?.zgoda_at ?? null,
+      regulamin_wersja: s.metadata?.regulamin ?? null,
     }),
   });
 

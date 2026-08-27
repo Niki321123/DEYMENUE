@@ -1096,12 +1096,15 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 <!-- ============ KONTO ============ -->
 <section class="view" id="view-account">
   <h1>Konto i logowanie</h1>
-  <p class="sub">Konto w chmurze synchronizuje dane między komputerem a telefonem. Dodatkowo możesz włączyć lokalną blokadę hasłem przy uruchamianiu.</p>
+  <p class="sub">Konto w chmurze synchronizuje dane między komputerem a telefonem. Tutaj też wpisujesz kod promocyjny i znajdziesz regulamin.</p>
   <div id="accBox"></div>
   <div class="card">
-    <h2 style="margin-bottom:2px">Prywatność</h2>
-    <p class="muted" style="margin-bottom:var(--sp-3)">Jakie dane trafiają do chmury, komu są przekazywane i jak poprosić o ich usunięcie.</p>
-    <a class="btn ghost small" href="https://github.com/Niki321123/DEYMENUE/blob/main/PRIVACY.md" target="_blank" rel="noopener" style="flex:none">Polityka prywatności ↗</a>
+    <h2 style="margin-bottom:2px">Dokumenty</h2>
+    <p class="muted" style="margin-bottom:var(--sp-3)">Zasady zakupu i zwrotów oraz to, jakie dane trafiają do chmury, komu są przekazywane i jak poprosić o ich usunięcie.</p>
+    <div class="row" style="gap:var(--sp-2)">
+      <a class="btn ghost small" href="https://github.com/Niki321123/DEYMENUE/blob/main/REGULAMIN.md" target="_blank" rel="noopener" style="flex:none">Regulamin ↗</a>
+      <a class="btn ghost small" href="https://github.com/Niki321123/DEYMENUE/blob/main/PRIVACY.md" target="_blank" rel="noopener" style="flex:none">Polityka prywatności ↗</a>
+    </div>
   </div>
 </section>
 
@@ -1120,7 +1123,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=90;
+const DM_BUILD=91;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -5250,13 +5253,26 @@ const PAY_WIDOKI={exams:{caly:true},frekwencja:{caly:true},rywal:{caly:true},tim
 let oplacone=true;          // do czasu pierwszego sprawdzenia nic nie chowamy
 let payOczekuje=false;      // wrocilismy ze Stripe i czekamy, az webhook dopisze wiersz
 
+const PAY_REGULAMIN="https://github.com/Niki321123/DEYMENUE/blob/main/REGULAMIN.md";
+const PAY_PRYWATNOSC="https://github.com/Niki321123/DEYMENUE/blob/main/PRIVACY.md";
+/* Zgoda na natychmiastowe udostepnienie tresci cyfrowej. Bez niej kupujacy zachowuje
+   14 dni na odstapienie od umowy MIMO ze dostal produkt — wiec przycisk platnosci jest
+   nieaktywny, dopoki jej nie zaznaczy. Ten sam warunek sprawdza funkcja serwerowa;
+   checkbox to wygoda i dowod, nie zabezpieczenie. */
 function payKartaHtml(){
   return `<h2 style="margin-bottom:2px">Ta część wymaga odblokowania</h2>
     <p class="muted" style="margin-bottom:var(--sp-3)">Jednorazowa opłata ${PAY_CENA} odblokowuje na stałe:
       Sprawdziany, Frekwencję i oceny, wykresy w Analizie czasu, Rywalizację
       oraz podsumowania tygodnia, miesiąca i roku.
       Reszta aplikacji — nauka, harmonogram, pomodoro, las, nawyki, sen, cele — zostaje darmowa.</p>
-    <button class="btn accent" data-pay-buy>Odblokuj za ${PAY_CENA}</button>
+    <label class="row" style="gap:8px;align-items:flex-start;margin-bottom:var(--sp-3);width:auto">
+      <input type="checkbox" data-pay-zgoda style="width:auto;min-height:0;margin-top:3px">
+      <span class="muted">Żądam natychmiastowego udostępnienia płatnych funkcji, przed upływem
+        terminu na odstąpienie od umowy, i przyjmuję do wiadomości, że tracę prawo odstąpienia.
+        Akceptuję <a href="${PAY_REGULAMIN}" target="_blank" rel="noopener">regulamin</a>
+        i <a href="${PAY_PRYWATNOSC}" target="_blank" rel="noopener">politykę prywatności</a>.</span>
+    </label>
+    <button class="btn accent" data-pay-buy disabled>Odblokuj za ${PAY_CENA}</button>
     <p class="muted" data-pay-status style="margin:var(--sp-3) 0 0"></p>`;
 }
 /* Przenosi zawartosc platnych widokow pod jeden przelacznik. Robimy to w JS, a nie w HTML,
@@ -5285,6 +5301,14 @@ function payPrzygotuj(){
     const b=e.target.closest("[data-pay-buy]");
     if(b)payKup(b);
   });
+  // zgoda i przycisk sa w tej samej karcie — szukamy przycisku obok checkboxa
+  document.addEventListener("change",e=>{
+    const z=e.target.closest("[data-pay-zgoda]");
+    if(!z)return;
+    const karta=z.closest("[data-paid-card]");
+    const btn=karta&&karta.querySelector("[data-pay-buy]");
+    if(btn)btn.disabled=!z.checked;
+  });
 }
 function applyPayGating(){
   document.querySelectorAll("[data-paid-wrap],[data-paid-only]").forEach(el=>{el.hidden=!oplacone});
@@ -5306,14 +5330,18 @@ async function sprawdzOplate(){
   applyPayGating();
 }
 async function payKup(btn){
-  const st=btn.parentElement.querySelector("[data-pay-status]");
+  const karta=btn.closest("[data-paid-card]")||btn.parentElement;
+  const st=karta.querySelector("[data-pay-status]");
   const pisz=t=>{if(st)st.textContent=t};
+  const zgoda=karta.querySelector("[data-pay-zgoda]");
+  if(!zgoda||!zgoda.checked)return pisz("Zaznacz zgodę, żeby przejść do płatności.");
   const tok=await sbToken().catch(()=>null);
   if(!tok)return pisz("Najpierw załóż konto albo zaloguj się w zakładce Konto — bez konta nie ma gdzie zapisać dostępu.");
   btn.disabled=true;pisz("Otwieram płatność…");
   try{
     const r=await fetch(SB_URL+"/functions/v1/create-checkout",
-      {method:"POST",headers:{apikey:SB_KEY,Authorization:"Bearer "+tok}});
+      {method:"POST",headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json"},
+       body:JSON.stringify({zgoda:true})});
     const j=await r.json().catch(()=>({}));
     if(j.juzOplacone){await sprawdzOplate();pisz("");toast("Dostęp już aktywny ✓");return}
     if(!r.ok||!j.url)throw new Error(j.error||("Błąd płatności ("+r.status+")"));

@@ -27,6 +27,9 @@ const KWOTA_GROSZE = 300;
 const WALUTA = "pln";
 // tekst widoczny dla klienta na stronie platnosci — jedyny w tym pliku z polskimi znakami
 const NAZWA_PRODUKTU = "Day Menu — pełny dostęp";
+// Wersja regulaminu obowiazujaca dla nowych zakupow. Podbijamy przy kazdej zmianie tresci,
+// bo dla juz zawartych umow liczy sie brzmienie z dnia zakupu.
+const REGULAMIN_WERSJA = "1.0";
 
 /* Metod platnosci celowo NIE wpisujemy tutaj. Podanie ich na sztywno konczy sie bledem
    "The payment method type provided: blik is invalid", gdy dana metoda nie jest jeszcze
@@ -63,7 +66,16 @@ Deno.serve(async (req: Request) => {
   const user = await uRes.json();
   if (!user?.id) return json({ error: "Nieprawidlowy token" }, 401);
 
-  // 2. Juz zaplacil? Nie wystawiaj drugiej platnosci.
+  /* 2. Zgoda konsumencka. Bez niej NIE tworzymy platnosci — to jedyny warunek pozwalajacy
+        dostarczyc tresc cyfrowa od reki i nie zostawic kupujacemu 14 dni na odstapienie.
+        Sprawdzamy na serwerze, bo checkbox w przegladarce da sie ominac. */
+  const body = await req.json().catch(() => ({}));
+  if (body?.zgoda !== true) {
+    return json({ error: "Wymagana zgoda na natychmiastowe udostepnienie dostepu" }, 400);
+  }
+  const zgodaAt = new Date().toISOString();
+
+  // 3. Juz zaplacil? Nie wystawiaj drugiej platnosci.
   const eRes = await fetch(
     `${SUPABASE_URL}/rest/v1/entitlements?select=user_id&user_id=eq.${user.id}`,
     { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
@@ -73,7 +85,7 @@ Deno.serve(async (req: Request) => {
     if (Array.isArray(rows) && rows.length) return json({ juzOplacone: true });
   }
 
-  // 3. Sesja Checkout. Stripe przyjmuje wylacznie form-urlencoded.
+  // 4. Sesja Checkout. Stripe przyjmuje wylacznie form-urlencoded.
   const form = new URLSearchParams();
   form.set("mode", "payment");
   form.set("client_reference_id", user.id);
@@ -92,6 +104,10 @@ Deno.serve(async (req: Request) => {
   // metadata dubluje client_reference_id — webhook czyta jedno albo drugie,
   // zaleznie od tego, ktore pole Stripe przysle w danym typie zdarzenia
   form.set("metadata[user_id]", user.id);
+  // metadata wraca w webhooku — dowod zgody zostaje zapisany przy samej platnosci
+  // w Stripe, niezaleznie od naszej bazy
+  form.set("metadata[zgoda_at]", zgodaAt);
+  form.set("metadata[regulamin]", REGULAMIN_WERSJA);
 
   /* Klucz idempotencji liczymy z TRESCI zadania, a nie z samego user_id.
      Stripe odrzuca ten sam klucz uzyty z innymi parametrami ("Keys for idempotent requests
@@ -99,7 +115,11 @@ Deno.serve(async (req: Request) => {
      sie przy kazdej zmianie konfiguracji — ceny, metod platnosci, adresu powrotu.
      Odcisk z form.toString() daje jedno i drugie: dwuklik w ta sama platnosc trafia
      w ten sam klucz, a kazda realna zmiana parametrow dostaje wlasny. */
-  const suma = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(form.toString()));
+  // Znacznik czasu zgody jest inny przy KAZDYM kliknieciu, wiec musi wypasc z odcisku —
+  // inaczej podwojne klikniecie tworzyloby dwie sesje platnosci zamiast jednej.
+  const doOdcisku = new URLSearchParams(form);
+  doOdcisku.delete("metadata[zgoda_at]");
+  const suma = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(doOdcisku.toString()));
   const odcisk = [...new Uint8Array(suma)].slice(0, 12)
     .map((b) => b.toString(16).padStart(2, "0")).join("");
 

@@ -2,9 +2,11 @@
 
 _Ostatnia aktualizacja: 27 sierpnia 2026_
 
-Day Menu to prywatna aplikacja do planowania nauki, rozwijana niekomercyjnie
-i udostępniana jako plik APK. Nie ma reklam, nie ma śledzenia analitycznego, nie
-sprzedajemy ani nie udostępniamy danych nikomu w celach marketingowych.
+Day Menu to aplikacja do planowania nauki, dostępna w przeglądarce, na Windows
+i na Androida. Większość funkcji jest bezpłatna, a część wymaga jednorazowej opłaty
+(szczegóły w [Regulaminie](REGULAMIN.md)). Nie ma reklam, nie ma śledzenia
+analitycznego, nie sprzedajemy ani nie udostępniamy danych nikomu w celach
+marketingowych.
 
 **Kontakt w sprawach danych osobowych:** kontakt.daymenu@gmail.com
 
@@ -61,15 +63,21 @@ podłączaj konta.
 | Odbiorca | Co dostaje | Po co |
 |---|---|---|
 | **Supabase** (Supabase Inc.) | wszystkie dane konta i aplikacji | hosting bazy danych i obsługa logowania |
-| **Anthropic** (Claude) | fragmenty planu nauki: przedmioty, nazwy tematów i lekcji, długość sesji, wpisany temat dnia | układanie harmonogramu i dziennego planu nauki |
+| **Stripe** (Stripe Payments Europe, Ltd.) | adres e-mail, kwota, dane płatności wprowadzone na ich stronie | obsługa płatności za pełny dostęp |
+| **Anthropic** (Claude) | fragmenty planu nauki: przedmioty, nazwy tematów i lekcji, długość sesji, wpisany temat dnia | układanie harmonogramu — **funkcje AI są obecnie wyłączone i nic nie jest wysyłane** |
 | **Librus** (Librus sp. z o.o.) | login i hasło do Synergii | logowanie w Twoim imieniu w celu pobrania planu i frekwencji |
 | **Google Books API**, **Open Library** | wyszukiwana fraza (tytuł, autor) | wyszukiwanie książek w zakładce z listą lektur |
 | **GitHub** (GitHub Pages) | adres IP w logach serwera | sprawdzanie dostępności aktualizacji i pobieranie nowej wersji |
 
-Do Anthropic **nie trafiają**: Twój e-mail, nazwa, zdjęcie, dane z Librusa, treść czatu
-ze znajomym ani zapisy snu i nawyków. Zapytania do AI wysyłane są przez nasz serwer, więc
-klucz do modelu nie znajduje się w aplikacji. Funkcje AI są dodatkowo dostępne tylko dla
-kont z osobno przyznanym dostępem.
+Funkcje AI zostały wyłączone w sierpniu 2026 — aplikacja nie wysyła dziś niczego
+do Anthropic. Gdy działały, **nie trafiały** tam: Twój e-mail, nazwa, zdjęcie, dane
+z Librusa, treść czatu ze znajomym ani zapisy snu i nawyków.
+
+**Danych karty płatniczej ani kodu BLIK nigdy nie widzimy.** Wprowadzasz je na stronie
+Stripe, który jest odrębnym administratorem tych danych. Do nas wraca wyłącznie
+informacja, że płatność się powiodła, jej kwota oraz identyfikator transakcji.
+Zapisujemy też datę udzielenia zgody na natychmiastowe udostępnienie płatnych funkcji —
+jest ona dowodem w razie sporu o zwrot.
 
 Część usług przetwarza dane poza Europejskim Obszarem Gospodarczym (Supabase, Anthropic,
 GitHub, Google). Odbywa się to na podstawie standardowych klauzul umownych tych dostawców.

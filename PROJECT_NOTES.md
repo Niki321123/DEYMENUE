@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — sprzedaz na zywo + kody promocyjne)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — regulamin i zgoda konsumencka)_
 
 ## Czym jest projekt
 
@@ -494,6 +494,34 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-27 (sesja 16, cd. — regulamin i zgoda konsumencka):** przy sprzedazy konsumentom
+  brakowalo dwoch rzeczy, przez ktore kazdy kupujacy mial 14 dni na odstapienie MIMO
+  dostarczonego produktu.
+  - **`REGULAMIN.md`** (wersja 1.0): kto sprzedaje, co jest platne, jak dochodzi do zakupu,
+    prawo odstapienia wraz z wyjatkiem dla tresci cyfrowych, reklamacje, wymagania techniczne.
+    **Do uzupelnienia przez uzytkownika: adres do korespondencji** — swiadomie zostawiony
+    jako placeholder, bo to jego dane osobowe i publikacja jest jego decyzja.
+  - **Zgoda przed platnoscia:** checkbox z formula o natychmiastowym udostepnieniu i utracie
+    prawa odstapienia + linki do regulaminu i polityki. Przycisk platnosci startuje jako
+    `disabled` i odblokowuje sie dopiero po zaznaczeniu.
+  - **Egzekwowanie na serwerze:** `create-checkout` odrzuca zadanie bez `{"zgoda":true}`
+    (400). Checkbox to wygoda i dowod, nie zabezpieczenie — da sie go ominac z konsoli.
+  - **Dowod zgody** trafia w dwa miejsca: `metadata[zgoda_at]`/`metadata[regulamin]` w sesji
+    Stripe (zapis przy samej platnosci, poza nasza baza) oraz kolumny `zgoda_at`
+    i `regulamin_wersja` w `entitlements`, przepisywane przez webhook.
+  - **Pulapka, ktora sam sobie zrobilem:** znacznik czasu zgody wchodzil do odcisku
+    idempotencji, wiec kazde klikniecie dawalo inny klucz i dwuklik tworzylby dwie sesje
+    platnosci. `metadata[zgoda_at]` jest teraz usuwane z danych do odcisku.
+  - **PRIVACY.md zaktualizowane:** znikl nieprawdziwy juz zapis o projekcie "rozwijanym
+    niekomercyjnie", doszedl Stripe jako odbiorca danych, a przy Anthropic dopisane, ze
+    funkcje AI sa wylaczone i nic tam nie leci.
+  - Zweryfikowane w przegladarce: przycisk startuje nieaktywny, klik bez zgody daje
+    komunikat zamiast platnosci, zaznaczenie odblokowuje, odznaczenie blokuje ponownie,
+    oba linki do dokumentow obecne.
+  - **NIE jestem prawnikiem.** Regulamin to solidny szkic oparty na standardowych
+    wymaganiach ustawy o prawach konsumenta, ale przed powazna sprzedaza warto dac go
+    do przejrzenia komus z uprawnieniami.
 
 - **2026-08-27 (sesja 16, cd. — kody promocyjne):** jednorazowe kody na darmowy pelny dostep.
   Generuje je WYLACZNIE konto z tabeli `app_admins` (na razie mikolaj.sledziewski@gmail.com),
