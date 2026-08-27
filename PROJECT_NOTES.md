@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — mobilne menu boczne, build 80)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — puste konto dla nowego uzytkownika, build 82)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,33 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-27 (sesja 16, cd. — nowe konto naprawde puste, build 82):**
+  Wymaganie: konto zalozone na stronie ma byc calkowicie puste. Weryfikacja pokazala, ze
+  w wiekszosci juz tak bylo — `defaults` nie zawiera zadnych danych startowych, materialy
+  sa bramkowane mailem wlasciciela (`matsSeedForOwner`), a `firstSync` konczy sie PRZED
+  `startCloudPolling`, wiec `statsBackfill` nie zdazy wyslac cudzych statystyk.
+  - **Znaleziony realny wyciek.** `load()` robilo `Object.assign({},defaults,d)` — kopia
+    tylko pierwszego poziomu. Przy braku klucza w zapisanych danych (swieza przegladarka)
+    `S.matura`, `S.forest`, `S.habits`, `S.sleep` byly TA SAMA referencja co w `defaults`.
+    Kazdy dopisany rekord trwale zanieczyszczal wzorzec, a `resetLocalData()` — ktory ten
+    wzorzec klonuje — oddawal te dane nowemu uzytkownikowi i wypychal do jego chmury.
+    W tescie po zalogowaniu nowego konta zostawala 1 sesja nauki i szla do chmury.
+    Kod znal ten problem tylko czesciowo: byla recznie zerowana `S.materialy`, ale
+    pozostale galezie juz nie.
+  - Poprawka: `kopiaDefaults()` klonujaca wzorzec, uzywana w `load()` i `resetLocalData()`.
+  - **Pulapka przy poprawce (zlapana w tescie):** pierwsza wersja jako `const kopiaDefaults=`
+    wywalila cala aplikacje. `load()` jest wolane w linii `let S=load()`, czyli przed
+    definicja — `const` wpada w TDZ, a poniewaz `load()` ma `try/catch`, blad z `try`
+    przechodzil do `catch`, ktory wolal to samo i rzucal ponownie. Efekt: `S is not defined`
+    i martwa apka. Musi byc deklaracja funkcyjna. Dopisane do notatki pamieci o TDZ.
+  - Dodane `przerysujAktywny()` wolane po `resetLocalData()` i `applyCloud()` — dotad
+    otwarta zakladka pokazywala dane poprzedniego konta az do recznego przelaczenia widoku.
+  - Testy: swieza przegladarka = zero materialow, sesji, drzew, snu, nawykow, celow,
+    przedmiotow i wpisow w harmonogramie ✓; `matsSeedForOwner` dla obcego maila nie dodaje
+    nic ✓; nowe konto w przegladarce pelnej danych poprzednika = wszystko wyzerowane,
+    do chmury ida same zera, `defaults` nietkniety ✓; otwarta zakladka Materialy
+    przerysowuje sie na pusty stan ✓.
 
 - **2026-08-27 (sesja 16, cd. — mobilna nawigacja jako panel boczny, build 80):**
   Poziomy pasek pigułek na telefonie zastąpiony wysuwanym panelem — na wąskim ekranie
