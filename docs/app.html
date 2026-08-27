@@ -1120,7 +1120,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=89;
+const DM_BUILD=90;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -4820,9 +4820,110 @@ $("#habAdd").onclick=()=>{
    a lokalnego nie dalo sie odzyskac. Jedynym logowaniem jest konto w chmurze.
    `S.account` zostaje w stanie WYLACZNIE jako zrodlo imienia na pulpicie: nikt go juz
    nie zaklada haslem, ale uzupelnia je zapis nazwy w zakladce Profil. */
-function renderAccount(){
-  $("#accBox").innerHTML=cloudCard();
+/* ---- kody promocyjne ----
+   Wpisac kod moze kazdy zalogowany. Generowac tylko admin — i to sprawdzenie jest
+   PODWOJNE: tutaj decyduje o pokazaniu karty (wygoda), a naprawde egzekwuje je funkcja
+   serwerowa `promo` na podstawie tabeli app_admins. Ukrycie przycisku niczego nie chroni,
+   bo zadanie da sie wyslac z konsoli. */
+let promoAdmin=false;
+async function sprawdzAdmin(){
+  promoAdmin=false;
+  if(!sbSession)return;
+  try{
+    const tok=await sbToken();
+    if(!tok)return;
+    // RLS oddaje wylacznie wlasny wiersz: jest = jestem adminem
+    const r=await fetch(`${SB_URL}/rest/v1/app_admins?select=user_id`,
+      {headers:{apikey:SB_KEY,Authorization:"Bearer "+tok}});
+    if(r.ok){const w=await r.json();promoAdmin=Array.isArray(w)&&w.length>0;}
+  }catch(e){/* brak sieci — zostaje false, czyli bez karty generowania */}
+}
+function promoKartaWpisz(){
+  if(!sbSession)return "";
+  if(oplacone)return `<div class="card"><h2>Kod promocyjny</h2>
+    <p class="muted">Masz już pełny dostęp — kodu nie trzeba wpisywać.</p></div>`;
+  return `<div class="card"><h2>Kod promocyjny</h2>
+    <p class="muted" style="margin-bottom:var(--sp-3)">Dostałeś kod na darmowy pełny dostęp? Wpisz go tutaj.</p>
+    <div class="row">
+      <input type="text" id="promoKod" class="field" placeholder="DM-XXXX-XXXX" autocomplete="off" spellcheck="false" style="text-transform:uppercase">
+      <button class="btn" id="promoUzyj" style="flex:none">Aktywuj</button>
+    </div>
+    <p class="muted" id="promoMsg" style="margin:var(--sp-3) 0 0"></p></div>`;
+}
+function promoKartaGeneruj(){
+  if(!promoAdmin)return "";
+  return `<div class="card"><h2>Generowanie kodów</h2>
+    <p class="muted" style="margin-bottom:var(--sp-3)">Każdy kod działa raz i daje pełny dostęp za darmo. Widzisz tę kartę, bo Twoje konto jest na liście administratorów.</p>
+    <div class="row">
+      <input type="number" id="promoIle" min="1" max="20" step="1" value="1" style="width:90px" title="Ile kodów wygenerować">
+      <input type="text" id="promoNote" class="field" placeholder="Dla kogo (opcjonalnie) — np. Julo, konkurs na IG">
+      <button class="btn accent" id="promoGeneruj" style="flex:none">Wygeneruj</button>
+    </div>
+    <p class="muted" id="promoGenMsg" style="margin:var(--sp-3) 0 0"></p>
+    <div id="promoLista" style="margin-top:var(--sp-3)"></div></div>`;
+}
+async function promoOdswiezListe(){
+  const el=$("#promoLista");if(!el||!promoAdmin)return;
+  try{
+    const tok=await sbToken();if(!tok)return;
+    const r=await fetch(`${SB_URL}/rest/v1/promo_codes?select=code,note,used_at,created_at&order=created_at.desc&limit=50`,
+      {headers:{apikey:SB_KEY,Authorization:"Bearer "+tok}});
+    if(!r.ok)return;
+    const kody=await r.json();
+    if(!Array.isArray(kody)||!kody.length){el.innerHTML='<p class="muted">Nie wygenerowałeś jeszcze żadnego kodu.</p>';return}
+    const wolne=kody.filter(k=>!k.used_at).length;
+    el.innerHTML=`<p class="muted" style="margin-bottom:var(--sp-2)">Niewykorzystane: <strong>${wolne}</strong> z ${kody.length}</p>`+
+      kody.map(k=>`<div class="row" style="justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+        <code style="font-size:var(--fs-2);letter-spacing:.5px">${esc(k.code)}</code>
+        <span class="muted">${k.note?esc(k.note)+" • ":""}${k.used_at?"wykorzystany "+new Date(k.used_at).toLocaleDateString("pl-PL"):"wolny"}</span>
+      </div>`).join("");
+  }catch(e){/* lista jest wygodą, nie funkcją krytyczną */}
+}
+function wirujPromo(){
+  const b=$("#promoUzyj");
+  if(b)b.onclick=async()=>{
+    const msg=$("#promoMsg"),kod=$("#promoKod").value.trim().toUpperCase();
+    if(!kod)return msg.textContent="Wpisz kod.";
+    b.disabled=true;msg.textContent="Sprawdzam…";
+    try{
+      const tok=await sbToken();if(!tok)throw new Error("Zaloguj się najpierw.");
+      const r=await fetch(SB_URL+"/functions/v1/promo",{method:"POST",
+        headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json"},
+        body:JSON.stringify({akcja:"uzyj",kod})});
+      const j=await r.json().catch(()=>({}));
+      if(j.juzOplacone){msg.textContent="To konto ma już pełny dostęp.";await sprawdzOplate();return}
+      if(!r.ok)throw new Error(j.error||("Błąd ("+r.status+")"));
+      msg.textContent="";
+      await sprawdzOplate();
+      toast("Pełny dostęp odblokowany ✓");
+      renderAccount();
+    }catch(e){msg.textContent=e.message}
+    finally{b.disabled=false}
+  };
+  const g=$("#promoGeneruj");
+  if(g)g.onclick=async()=>{
+    const msg=$("#promoGenMsg");
+    g.disabled=true;msg.textContent="Generuję…";
+    try{
+      const tok=await sbToken();if(!tok)throw new Error("Zaloguj się najpierw.");
+      const r=await fetch(SB_URL+"/functions/v1/promo",{method:"POST",
+        headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json"},
+        body:JSON.stringify({akcja:"generuj",ile:+$("#promoIle").value||1,note:$("#promoNote").value.trim()})});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(j.error||("Błąd ("+r.status+")"));
+      msg.textContent=(j.kody||[]).length===1?"Gotowe: "+j.kody[0]:"Wygenerowano "+(j.kody||[]).length+" kodów.";
+      $("#promoNote").value="";
+      promoOdswiezListe();
+    }catch(e){msg.textContent=e.message}
+    finally{g.disabled=false}
+  };
+}
+async function renderAccount(){
+  await sprawdzAdmin();
+  $("#accBox").innerHTML=cloudCard()+promoKartaWpisz()+promoKartaGeneruj();
   wireCloud();
+  wirujPromo();
+  promoOdswiezListe();
 }
 
 /* ================= KONTO W CHMURZE (Supabase) — synchronizacja PC <-> telefon ================= */

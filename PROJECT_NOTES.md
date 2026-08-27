@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — sprzedaz na zywo dziala)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — sprzedaz na zywo + kody promocyjne)_
 
 ## Czym jest projekt
 
@@ -494,6 +494,26 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-27 (sesja 16, cd. — kody promocyjne):** jednorazowe kody na darmowy pelny dostep.
+  Generuje je WYLACZNIE konto z tabeli `app_admins` (na razie mikolaj.sledziewski@gmail.com),
+  wpisac kod moze kazdy zalogowany w zakladce Konto.
+  - Tabele: `app_admins` (RLS: czytasz tylko wlasny wiersz, czyli "czy ja jestem adminem"
+    bez ujawniania listy) i `promo_codes` (RLS: tworca czyta swoje kody; ZERO praw zapisu
+    z klienta — inaczej dalo by sie wygenerowac sobie kod POST-em z konsoli).
+  - Edge Function `promo` (verify_jwt=true), dwie akcje: `generuj` (sprawdza app_admins na
+    service_role, po user_id z TOKENU) i `uzyj`. Kod ma postac DM-XXXX-XXXX z alfabetu bez
+    znakow mylacych sie przy przepisywaniu (0/O, 1/I/L, 5/S, 8/B).
+  - **Wyscig przy realizacji** rozwiazany jednym UPDATE z warunkiem `used_by is null`
+    (PATCH `?code=eq.X&used_by=is.null` + return=representation). Pusta odpowiedz = kod
+    zajety albo nie istnieje. Czytanie-a-potem-zapis dalo by dostep dwóm osobom naraz.
+  - Gdy przyznanie dostepu padnie PO oznaczeniu kodu, kod jest zwalniany z powrotem —
+    inaczej przepadalby bez efektu.
+  - Sprawdzenie "czy admin" jest podwojne: w kliencie decyduje o pokazaniu karty (wygoda),
+    egzekwuje je funkcja serwerowa. Ukrycie przycisku niczego nie chroni.
+  - Zweryfikowane: cztery warianty widocznosci kart (niezalogowany / zwykly bez dostepu /
+    zwykly z dostepem / admin), pusty kod daje komunikat, a POST z samym kluczem anon
+    zwraca "Nieprawidlowy token" i NIE tworzy kodow (w bazie zostalo 0).
 
 - **2026-08-27 (sesja 16, cd. — SPRZEDAZ NA ZYWO DZIALA):** o 20:27 przeszla pierwsza
   prawdziwa platnosc: konto kontakt.daymenu@gmail.com, 300 gr PLN, sesja `cs_live_...`,
