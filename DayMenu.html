@@ -159,6 +159,9 @@ label.fld{display:block;font-size:var(--fs-1);font-weight:600;color:var(--text-2
 .mat-cell.act-busy{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
 .mat-cell.act-study{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
 .mat-cell.act.done{opacity:.5;text-decoration:line-through}
+/* Trzeci raz w tym pliku: samo [hidden] przegrywa z wlasna regula display elementu.
+   Bramka platnosci chowa cale sekcje, wiec musi miec twarda regule. */
+[data-paid-wrap][hidden],[data-paid-only][hidden],[data-paid-card][hidden]{display:none}
 .mat-grid{user-select:none}
 .mat-cell.sel{box-shadow:inset 0 0 0 2px var(--primary)}
 .mat-grid .hd.clk,.mat-grid .hr.clk{cursor:pointer;user-select:none}
@@ -568,7 +571,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
       <div class="row" style="justify-content:space-between;margin-bottom:var(--sp-3)">
         <h2 style="margin:0">Harmonogram tygodnia</h2>
         <div class="row" style="gap:var(--sp-2);width:auto">
-          <button class="btn accent" id="matGen">✨ Generuj plan</button>
+          <button class="btn accent" id="matGen">Ułóż plan automatycznie</button>
           <button class="btn ghost small" id="matGridClear">Wyczyść</button>
         </div>
       </div>
@@ -599,7 +602,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
           </select>
           <button class="btn" id="matActAdd" style="flex:none">Dodaj</button>
         </div>
-        <p class="muted" style="margin-top:var(--sp-2)">Wybierz aktywność i maluj nią po siatce. „Zajęte” blokuje godzinę tak jak „Niedostępny”, ale z podpisem — AI wie, czym jest i tam nie zaplanuje nauki. „Nauka” odhaczasz pędzlem „Dostępny” i wlicza się do statystyk.</p>
+        <p class="muted" style="margin-top:var(--sp-2)">Wybierz aktywność i maluj nią po siatce. „Zajęte” blokuje godzinę tak jak „Niedostępny”, ale z podpisem — automat wie, czym jest, i tam nie zaplanuje nauki. „Nauka” odhaczasz pędzlem „Dostępny” i wlicza się do statystyk.</p>
       </div>
       <div id="matSubjBar" hidden style="margin-bottom:var(--sp-3)">
         <div class="row">
@@ -608,7 +611,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
         </div>
         <p class="muted" style="margin-top:var(--sp-2)">Ręczne układanie planu, bez generatora: wybierz przedmiot i klikaj godziny w siatce — wstawi się w nie ta nauka. Klik tym samym przedmiotem drugi raz zdejmuje go z godziny, klik nagłówka dnia albo godziny wypełnia całą kolumnę lub wiersz, a przeciągnięcie (na telefonie: przytrzymanie i drugie dotknięcie) wstawia przedmiot w cały zakres naraz. Godzina niedostępna lub szkolna zmieni się przy okazji na „Dostępny”; własnych aktywności ten pędzel nie rusza.</p>
       </div>
-      <div>
+      <div data-ai-only hidden>
         <label class="fld">Preferencje dla AI (opcjonalnie)</label>
         <input type="text" id="matPrefs" placeholder="Np. w piątki się nie uczę, matematykę wolę rano, max 2h dziennie…">
       </div>
@@ -952,7 +955,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 <!-- ============ TIME ANALYSIS ============ -->
 <section class="view" id="view-time">
   <h1>Analiza czasu</h1><p class="sub">Wszystkie wskaźniki na jednym wykresie giełdowym — zaznacz, które linie chcesz widzieć, osobno lub nałożone na siebie.</p>
-  <div class="card">
+  <div class="card" data-paid-only>
     <div class="row" style="justify-content:space-between;align-items:center">
       <h2 style="margin:0">Wykres</h2>
       <div class="tabs" id="chartTabs" style="margin:0">
@@ -965,7 +968,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     <div class="chart-legend" id="chartLegend" style="margin:var(--sp-3) 0 var(--sp-2)"></div>
     <div id="mainChart"></div>
     <div class="row" style="margin-top:var(--sp-3)">
-      <button class="btn small ghost" id="chartAiBtn">✨ Analiza AI</button>
+      <button class="btn small ghost" id="chartAiBtn" data-ai-only hidden>✨ Analiza AI</button>
     </div>
     <div class="ai-note" id="chartAiNote" hidden></div>
   </div>
@@ -977,7 +980,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   <div class="grid3" id="timeStats"></div>
   <div class="card" style="margin-top:var(--sp-4)"><h2>Według kategorii</h2><div id="timeByCat"></div></div>
   <div class="card"><h2>Według dni (ostatnie 7)</h2><div id="timeByDay"></div></div>
-  <div class="card"><h2>Sen a nauka</h2>
+  <div class="card" data-paid-only><h2>Sen a nauka</h2>
     <div id="corrInsights" style="margin-bottom:var(--sp-3)"></div>
     <div id="corrChart"></div>
   </div>
@@ -1134,7 +1137,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=85;
+const DM_BUILD=86;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1347,6 +1350,8 @@ function show(v){
   // doświeżamy go przy każdym wejściu w zakładkę korzystającą z AI, żeby nowo
   // nadany dostęp pojawił się bez konieczności wylogowania.
   if((v==="books"||v==="matura"||v==="wymagania")&&typeof checkAiAccess==="function")checkAiAccess().then(()=>renderers[v]&&renderers[v]());
+  // dostep bywa kupiony w trakcie dzialania apki — odswiezamy przy kazdym wejsciu
+  if(PAY_WIDOKI[v]&&typeof sprawdzOplate==="function")sprawdzOplate();
   renderers[v]&&renderers[v]();
   $("#main").scrollTop=0;
 }
@@ -5218,10 +5223,120 @@ async function cloudAutoPull(){
   matsSeedForOwner();  // po pobraniu z chmury: właściciel dostaje swoje kursy, inni nie
   statsMaybePush();    // dzienne liczby dla znajomych — wysyłka tylko przy realnej zmianie
 }
+/* ================= PLATNY DOSTEP =================
+   Jednorazowa oplata odblokowuje: Sprawdziany, Frekwencje i oceny, wykresy w Analizie
+   czasu oraz Rywalizacje. Zrodlem prawdy jest wiersz w tabeli `entitlements` — pisze do niej
+   WYLACZNIE webhook Stripe (service_role), klient moze go tylko przeczytac.
+
+   Bramka jest kosmetyczna: chowa interfejs, nie chroni danych. Dane rywalizacji siedza
+   w Supabase pod RLS i ktos uparty odczyta je zapytaniem z konsoli. Zeby to domknac,
+   trzeba dopisac warunek oplaty do polityk RLS tamtych tabel — osobny krok.
+
+   Zasada bezpieczenstwa dla uzytkownika, nie dla nas: w kazdej watpliwosci ODBLOKOWUJEMY.
+   Brak tabeli, blad serwera, brak sieci, brak logowania — wszystko to zostawia dostep
+   otwarty. Lepiej nie wziac 3 zl niz zablokowac aplikacje komus, kto zaplacil. */
+const PAY_CENA="3 zł";
+const PAY_WIDOKI={exams:{caly:true},frekwencja:{caly:true},rywal:{caly:true},time:{caly:false}};
+let oplacone=true;          // do czasu pierwszego sprawdzenia nic nie chowamy
+let payOczekuje=false;      // wrocilismy ze Stripe i czekamy, az webhook dopisze wiersz
+
+function payKartaHtml(){
+  return `<h2 style="margin-bottom:2px">Ta część wymaga odblokowania</h2>
+    <p class="muted" style="margin-bottom:var(--sp-3)">Jednorazowa opłata ${PAY_CENA} odblokowuje na stałe:
+      Sprawdziany, Frekwencję i oceny, wykresy w Analizie czasu oraz Rywalizację.
+      Reszta aplikacji — nauka, harmonogram, pomodoro, las, nawyki, sen, cele — zostaje darmowa.</p>
+    <button class="btn accent" data-pay-buy>Odblokuj za ${PAY_CENA}</button>
+    <p class="muted" data-pay-status style="margin:var(--sp-3) 0 0"></p>`;
+}
+/* Przenosi zawartosc platnych widokow pod jeden przelacznik. Robimy to w JS, a nie w HTML,
+   zeby nie oznaczac recznie kilkunastu kart — i zeby karty dodane pozniej tez byly objete. */
+function payPrzygotuj(){
+  for(const[v,cfg]of Object.entries(PAY_WIDOKI)){
+    const sek=document.getElementById("view-"+v);
+    if(!sek||sek.querySelector("[data-pay-buy]"))continue;
+    const karta=document.createElement("div");
+    karta.className="card";karta.setAttribute("data-paid-card","");karta.hidden=true;
+    karta.innerHTML=payKartaHtml();
+    if(cfg.caly){
+      const wrap=document.createElement("div");
+      wrap.setAttribute("data-paid-wrap","");
+      // naglowek i podtytul zostaja widoczne — inaczej zablokowana zakladka byla by pusta
+      [...sek.children].filter(el=>el.tagName!=="H1"&&!el.classList.contains("sub"))
+        .forEach(el=>wrap.appendChild(el));
+      sek.appendChild(karta);sek.appendChild(wrap);
+    }else{
+      // tu platne sa pojedyncze karty (data-paid-only), wiec dokladamy tylko komunikat
+      const pierwsza=sek.querySelector("[data-paid-only]");
+      if(pierwsza)sek.insertBefore(karta,pierwsza);else sek.appendChild(karta);
+    }
+  }
+  document.addEventListener("click",e=>{
+    const b=e.target.closest("[data-pay-buy]");
+    if(b)payKup(b);
+  });
+}
+function applyPayGating(){
+  document.querySelectorAll("[data-paid-wrap],[data-paid-only]").forEach(el=>{el.hidden=!oplacone});
+  document.querySelectorAll("[data-paid-card]").forEach(el=>{el.hidden=oplacone});
+}
+async function sprawdzOplate(){
+  oplacone=true;
+  if(sbSession){
+    try{
+      const tok=await sbToken();
+      if(tok){
+        const r=await fetch(`${SB_URL}/rest/v1/entitlements?select=user_id`,
+          {headers:{apikey:SB_KEY,Authorization:"Bearer "+tok}});
+        // 404 = tabeli jeszcze nie ma (platnosc niewdrozona) → nie blokujemy nikogo
+        if(r.ok){const rows=await r.json();oplacone=Array.isArray(rows)&&rows.length>0;}
+      }
+    }catch(e){/* brak sieci — zostawiamy odblokowane */}
+  }
+  applyPayGating();
+}
+async function payKup(btn){
+  const st=btn.parentElement.querySelector("[data-pay-status]");
+  const pisz=t=>{if(st)st.textContent=t};
+  const tok=await sbToken().catch(()=>null);
+  if(!tok)return pisz("Najpierw załóż konto albo zaloguj się w zakładce Konto — bez konta nie ma gdzie zapisać dostępu.");
+  btn.disabled=true;pisz("Otwieram płatność…");
+  try{
+    const r=await fetch(SB_URL+"/functions/v1/create-checkout",
+      {method:"POST",headers:{apikey:SB_KEY,Authorization:"Bearer "+tok}});
+    const j=await r.json().catch(()=>({}));
+    if(j.juzOplacone){await sprawdzOplate();pisz("");toast("Dostęp już aktywny ✓");return}
+    if(!r.ok||!j.url)throw new Error(j.error||("Błąd płatności ("+r.status+")"));
+    payOczekuje=true;
+    // nowe okno, nie location.href: w Electronie i Capacitorze przejscie pod adres Stripe
+    // wyrzucilo by uzytkownika z aplikacji bez drogi powrotnej
+    const w=window.open(j.url,"_blank");
+    if(!w)location.href=j.url;
+    pisz("Dokończ płatność w otwartym oknie. Po powrocie dostęp włączy się sam.");
+  }catch(e){pisz("Błąd: "+e.message)}
+  finally{btn.disabled=false}
+}
+/* Webhook Stripe potrafi dojsc kilka sekund po powrocie uzytkownika, wiec po platnosci
+   dopytujemy przez chwile zamiast raz i koniec. */
+async function payDopytaj(){
+  for(let i=0;i<10&&payOczekuje;i++){
+    await sprawdzOplate();
+    if(oplacone){payOczekuje=false;toast("Dostęp odblokowany ✓");return}
+    await new Promise(r=>setTimeout(r,3000));
+  }
+  payOczekuje=false;
+}
+window.addEventListener("focus",()=>{if(payOczekuje)payDopytaj()});
+
 /* ---- dostęp do AI (allowlista maili w tabeli ai_access, egzekwowana też w funkcji
    serwerowej daymenu-ai) — wersja bez dostępu nie widzi funkcji AI i nie może ich wołać.
    Nowe funkcje AI: oznacz element atrybutem data-ai-only (auto-ukrywanie) i wołaj przez
    aiCall() (auto-blokada klienta + serwera). ---- */
+/* WYLACZNIK AI. Cala warstwa AI zostaje w kodzie (funkcja serwerowa daymenu-ai, prompty,
+   czat, zakladka Lekcja), ale przy AI_WLACZONE=false nie da sie jej uruchomic z interfejsu:
+   checkAiAccess zwraca od razu brak dostepu, wiec applyAiGating chowa KAZDY element
+   z data-ai-only, a aiCall rzuca NO_AI_ACCESS. Zeby wrocic do AI, wystarczy zmienic
+   te stala na true — nic wiecej. */
+const AI_WLACZONE=false;
 let aiAccess=false;
 function applyAiGating(){
   document.querySelectorAll("[data-ai-only]").forEach(el=>{el.hidden=!aiAccess});
@@ -5233,6 +5348,7 @@ function applyAiGating(){
 }
 async function checkAiAccess(){
   aiAccess=false;
+  if(!AI_WLACZONE){applyAiGating();return}
   if(sbSession){
     try{
       const tok=await sbToken();
@@ -6505,6 +6621,7 @@ function startCloudPolling(){
   cloudPollTimer=setInterval(cloudAutoPull,15000);
   startLibrusPolling();librusPollEvents();
   checkAiAccess();
+  sprawdzOplate();
   matsSeedForOwner();
   rywalLoad().then(()=>{
     if($("#view-rywal").classList.contains("active"))renderRywal();
@@ -6515,6 +6632,7 @@ function stopCloudPolling(){
   clearInterval(cloudPollTimer);cloudPollTimer=null;
   stopLibrusPolling();
   aiAccess=false;applyAiGating();
+  oplacone=true;applyPayGating();   // wylogowany widzi apke jak dotad, bramka go nie dotyczy
   // po wylogowaniu nie zostawiamy w pamięci ani profilu, ani cudzych statystyk
   rywalProfile=null;rywalFriends=[];rywalBets=[];shopItems=[];shopPurchases=[];
   chatMsgs=[];chatWith=null;chatLastSeen=null;chatStopPoll();
@@ -6524,6 +6642,9 @@ setTimeout(cloudAutoPull,2500);
 // niezalogowani też dostają podsumowanie — plansza pojedynku pokaże wtedy pusty stan
 setTimeout(wrapSprawdzAuto,1800);
 applyAiGating();               // domyślnie (przed potwierdzeniem dostępu) AI ukryte
+payPrzygotuj();sprawdzOplate();
+// powrot ze Stripe — webhook moze jeszcze nie zdazyc, wiec dopytujemy przez chwile
+if(new URLSearchParams(location.search).get("zaplacono")==="1"){payOczekuje=true;payDopytaj();}
 // Użytkownicy sprzed tej wersji nie mają jeszcze znacznika właściciela danych. Skoro są
 // zalogowani, dane na urządzeniu są ich — ustawiamy znacznik, żeby ochrona działała od razu,
 // bez czekania na kolejne logowanie.

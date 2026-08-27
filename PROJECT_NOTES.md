@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — reczne ukladanie planu, malowanie zakresem, publish po stronie Claude)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — AI wylaczone, platny dostep przez Stripe)_
 
 ## Czym jest projekt
 
@@ -91,7 +91,7 @@ Androidzie (Capacitor + AndroidManifest), czyli realnie więcej roboty niż SMTP
 **Decyzja: zostajemy przy e-mail+hasło z domyślnym SMTP Supabase, nie wracać do
 tematu OAuth/SMTP, chyba że user sam podniesie temat ponownie.**
 
-Uwaga: projekt **nie używa Stripe** — wcześniejszy wpis o funkcjach płatniczych
+Uwaga (nieaktualne od 2026-08-27, patrz wpis o platnym dostepie): projekt **nie używał Stripe** — wcześniejszy wpis o funkcjach płatniczych
 (`create-checkout-session`, `stripe-webhook` itd.) i `redeem-promo-code` był błędny
 (zgadywany na podstawie nazw, nie potwierdzony w kodzie) — w repo nie ma po nich
 żadnego śladu. Usunięto z listy zadań.
@@ -494,6 +494,42 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-27 (sesja 16, cd. — AI wylaczone, platny dostep przez Stripe):**
+  Decyzja uzytkownika: AI znika z aplikacji (kod zostaje „w razie czego"), a platne maja byc
+  cztery funkcje — Sprawdziany, Frekwencja i oceny, wykresy w Analizie czasu, Rywalizacja.
+  Model: **jednorazowa oplata 3 zl**.
+  - **Wylacznik AI:** `const AI_WLACZONE=false` obok `aiAccess`. `checkAiAccess()` konczy sie
+    od razu, wiec `applyAiGating()` chowa kazdy `data-ai-only`, a `aiCall` rzuca NO_AI_ACCESS.
+    Powrot do AI = zmiana tej jednej stalej na true. Dolozono `data-ai-only` na `#chartAiBtn`
+    i na pole „Preferencje dla AI"; „✨ Generuj plan" przemianowane na „Ulóz plan automatycznie"
+    (przycisk korzysta z lokalnego planera, nie z AI).
+  - **Baza:** `supabase/migrations/20260827_entitlements.sql` — tabela `entitlements`
+    (user_id pk, paid_at, source, amount_minor, currency, stripe_session_id unique) + RLS
+    tylko na SELECT wlasnego wiersza. Zapis wylacznie z webhooka na service_role.
+    Migracja **NIE jest jeszcze wykonana** — `apply_migration` zablokowal klasyfikator uprawnien.
+    Zawiera grandfathering wszystkich istniejacych kont (inaczej trwajaca rywalizacja Julo
+    z zakladem urwalaby sie w polowie); cofniecie: `delete ... where source='grandfather'`.
+  - **Edge Functions (napisane, NIE wdrozone):** `create-checkout` (verify_jwt=true, kwota
+    ustalana na serwerze, user_id z tokenu a nie z ciala zadania, metody card+blik+p24,
+    Idempotency-Key na user_id) oraz `stripe-webhook` (verify_jwt=false, wlasna weryfikacja
+    HMAC-SHA256 z naglowka Stripe-Signature, okno 5 min na replay, porownanie stalo-czasowe,
+    obsluga rotacji sekretu przez kilka `v1=`). Algorytm podpisu przetestowany osobno
+    na 10 przypadkach (poprawny, podmienione cialo, zly sekret, stary timestamp, smieci).
+  - **Klient:** `PAY_WIDOKI`, `payPrzygotuj()` przenosi zawartosc platnych widokow pod
+    `[data-paid-wrap]` w JS (zamiast oznaczac recznie kilkanascie kart), `applyPayGating()`,
+    `sprawdzOplate()`, `payKup()` (okno `window.open`, bo `location.href` wyrzucilby
+    uzytkownika z Electrona/Capacitora), `payDopytaj()` — po powrocie ze Stripe dopytuje
+    10x co 3 s, bo webhook potrafi sie spoznic. Naglowek i podtytul zakladki zostaja widoczne.
+  - **Zasada fail-open:** brak tabeli (404), blad serwera, brak sieci i brak zalogowania
+    zostawiaja dostep OTWARTY. Dzieki temu kod moze byc juz opublikowany, a bramka wlacza
+    sie sama dopiero po wykonaniu migracji. Lepiej nie wziac 3 zl niz zablokowac aplikacje
+    komus, kto zaplacil.
+  - **Czego bramka NIE robi:** dane rywalizacji siedza w Supabase pod RLS i uparty uzytkownik
+    odczyta je zapytaniem z konsoli. Domkniecie wymaga dopisania warunku oplaty do polityk
+    RLS tabel profiles/friendships/bets/stats_daily/shop_*/rywal_messages — osobny krok.
+  - Do zrobienia po stronie uzytkownika: konto Stripe, sekrety `STRIPE_SECRET_KEY`
+    i `STRIPE_WEBHOOK_SECRET` w Supabase, endpoint webhooka w Stripe, zgoda na migracje.
 
 - **2026-08-27 (sesja 16, cd. — plan bez AI: pedzel „Przedmiot" i malowanie zakresem):**
   Zgloszenie: harmonogram ma dac sie ustawiac takze bez generatora — dodajesz przedmioty
