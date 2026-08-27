@@ -512,7 +512,11 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
     `ohaeqozswszudejxtwcb` (stary, bledny projekt z ostrzezenia wyzej). Poprawny ref
     to `jkpwboekztpkfxivueql` — platnosci pod zlym adresem przechodzilyby, a dostep
     nigdy by sie nie wlaczal.
-  - Nie zrobione: test end-to-end platnosci (wymaga klikniecia przez Checkout),
+  - **Test end-to-end PRZESZEDL** (17:50): nowe konto kontakt.daymenu@gmail.com zobaczylo
+    paywall, zaplacilo karta testowa, webhook zapisal wiersz source=stripe, amount_minor=300,
+    currency=pln, sesja cs_test_... — dostep odblokowal sie sam. Caly lancuch potwierdzony
+    w bazie, nie tylko w interfejsie.
+  - Nie zrobione: przejscie na tryb live (podmiana obu sekretow + nowy endpoint webhooka),
     egzekwowanie oplaty w RLS tabel rywalizacji, obsluga zwrotow (`charge.refunded`).
 
 - **2026-08-27 (sesja 16, cd. — AI wylaczone, platny dostep przez Stripe):**
