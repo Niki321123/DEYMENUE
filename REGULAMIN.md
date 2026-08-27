@@ -15,7 +15,7 @@ Odpowiedź na wiadomość wysyłamy najpóźniej w ciągu 14 dni.
 ## 2. Czym jest Day Menu
 
 Day Menu to aplikacja do planowania nauki, dostępna w przeglądarce pod adresem
-<https://niki321123.github.io/DEYMENUE/>, a także jako program na Windows i aplikacja
+<https://daymenu.pl/>, a także jako program na Windows i aplikacja
 na Androida. Korzystanie z podstawowych funkcji jest **bezpłatne** i nie wymaga zakupu.
 
 ## 3. Co jest płatne

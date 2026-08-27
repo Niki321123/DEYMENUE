@@ -13,7 +13,7 @@
 const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const APP_URL = Deno.env.get("DAYMENU_APP_URL") ?? "https://niki321123.github.io/DEYMENUE/app.html";
+const APP_URL = Deno.env.get("DAYMENU_APP_URL") ?? "https://daymenu.pl/app.html";
 
 /* Cena moze pochodzic z dwoch zrodel:
    1. STRIPE_PRICE_ID — pozycja z katalogu Stripe. Wtedy kwota, nazwa, opis i obrazek

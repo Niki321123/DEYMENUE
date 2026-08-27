@@ -14,7 +14,7 @@ aktualizują się same.
 
 ## Wersja przeglądarkowa
 
-<https://niki321123.github.io/DEYMENUE/>
+<https://daymenu.pl/>
 
 Nie wymaga instalacji i aktualizuje się sama. Na telefonie można ją dodać do ekranu
 głównego i działa wtedy jak zwykła aplikacja.
@@ -26,8 +26,8 @@ jako build deweloperski podpisany domyślnym kluczem debug — wystarcza to do i
 własnych urządzeniach, ale nie daje żadnej gwarancji autorstwa. Jeśli nie znasz autora
 osobiście, korzystaj z wersji przeglądarkowej.
 
-Plik: <https://niki321123.github.io/DEYMENUE/DayMenu.apk>
-Suma kontrolna: <https://niki321123.github.io/DEYMENUE/DayMenu.apk.sha256>
+Plik: <https://daymenu.pl/DayMenu.apk>
+Suma kontrolna: <https://daymenu.pl/DayMenu.apk.sha256>
 
 Aplikacji nie ma w Google Play, więc telefon poprosi o **zezwolenie na instalację
 z nieznanych źródeł**. Zgoda dotyczy tylko tej przeglądarki lub menedżera plików, którym
