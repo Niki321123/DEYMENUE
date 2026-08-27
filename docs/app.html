@@ -4,8 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Day Menu — Twój osobisty panel</title>
+<meta name="theme-color" content="#2b3950">
+<link rel="manifest" href="/manifest.webmanifest">
+<!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
+     zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Day Menu">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%22-3%20-3%20106%20106%22%3E%3Crect%20x%3D%220%22%20y%3D%2211.7%22%20width%3D%22100%22%20height%3D%2288.3%22%20rx%3D%2213.5%22%20fill%3D%22%232b3950%22%2F%3E%3Crect%20x%3D%2219.2%22%20y%3D%22-2.5%22%20width%3D%2214.8%22%20height%3D%2229.7%22%20rx%3D%227.4%22%20fill%3D%22%23fff%22%2F%3E%3Crect%20x%3D%2266%22%20y%3D%22-2.5%22%20width%3D%2214.8%22%20height%3D%2229.7%22%20rx%3D%227.4%22%20fill%3D%22%23fff%22%2F%3E%3Crect%20x%3D%2221.7%22%20y%3D%220%22%20width%3D%229.8%22%20height%3D%2224.5%22%20rx%3D%224.9%22%20fill%3D%22%232b3950%22%2F%3E%3Crect%20x%3D%2268.5%22%20y%3D%220%22%20width%3D%229.8%22%20height%3D%2224.5%22%20rx%3D%224.9%22%20fill%3D%22%232b3950%22%2F%3E%3Crect%20x%3D%2211.5%22%20y%3D%2231.9%22%20width%3D%2277%22%20height%3D%2262.8%22%20rx%3D%227.5%22%20fill%3D%22%23fff%22%2F%3E%3Crect%20x%3D%2215.9%22%20y%3D%2244.9%22%20width%3D%2228.7%22%20height%3D%226%22%20rx%3D%223%22%20fill%3D%22%234a80d4%22%2F%3E%3Crect%20x%3D%2215.9%22%20y%3D%2260.8%22%20width%3D%2228.7%22%20height%3D%226%22%20rx%3D%223%22%20fill%3D%22%234a9d52%22%2F%3E%3Crect%20x%3D%2215.9%22%20y%3D%2275.7%22%20width%3D%2228.7%22%20height%3D%226%22%20rx%3D%223%22%20fill%3D%22%237069e6%22%2F%3E%3Cpath%20d%3D%22M51.1%2064.9%2064.1%2074.5%2082.6%2053.2%22%20fill%3D%22none%22%20stroke%3D%22%232b3950%22%20stroke-width%3D%227.2%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%22-3%20-3%20106%20106%22%3E%3Crect%20x%3D%220%22%20y%3D%2211.7%22%20width%3D%22100%22%20height%3D%2288.3%22%20rx%3D%2213.5%22%20fill%3D%22%232b3950%22%2F%3E%3Crect%20x%3D%2219.2%22%20y%3D%22-2.5%22%20width%3D%2214.8%22%20height%3D%2229.7%22%20rx%3D%227.4%22%20fill%3D%22%23fff%22%2F%3E%3Crect%20x%3D%2266%22%20y%3D%22-2.5%22%20width%3D%2214.8%22%20height%3D%2229.7%22%20rx%3D%227.4%22%20fill%3D%22%23fff%22%2F%3E%3Crect%20x%3D%2221.7%22%20y%3D%220%22%20width%3D%229.8%22%20height%3D%2224.5%22%20rx%3D%224.9%22%20fill%3D%22%232b3950%22%2F%3E%3Crect%20x%3D%2268.5%22%20y%3D%220%22%20width%3D%229.8%22%20height%3D%2224.5%22%20rx%3D%224.9%22%20fill%3D%22%232b3950%22%2F%3E%3Crect%20x%3D%2211.5%22%20y%3D%2231.9%22%20width%3D%2277%22%20height%3D%2262.8%22%20rx%3D%227.5%22%20fill%3D%22%23fff%22%2F%3E%3Crect%20x%3D%2215.9%22%20y%3D%2244.9%22%20width%3D%2228.7%22%20height%3D%226%22%20rx%3D%223%22%20fill%3D%22%234a80d4%22%2F%3E%3Crect%20x%3D%2215.9%22%20y%3D%2260.8%22%20width%3D%2228.7%22%20height%3D%226%22%20rx%3D%223%22%20fill%3D%22%234a9d52%22%2F%3E%3Crect%20x%3D%2215.9%22%20y%3D%2275.7%22%20width%3D%2228.7%22%20height%3D%226%22%20rx%3D%223%22%20fill%3D%22%237069e6%22%2F%3E%3Cpath%20d%3D%22M51.1%2064.9%2064.1%2074.5%2082.6%2053.2%22%20fill%3D%22none%22%20stroke%3D%22%232b3950%22%20stroke-width%3D%227.2%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E">
 <style>
 /* ===== TOKENS ===== */
 :root{
@@ -414,6 +421,18 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   <h1 id="dashHello">Cześć!</h1>
   <p class="sub" id="dashDate"></p>
   <div class="grid4" id="dashStats"></div>
+  <div class="card" id="dashInstal" hidden>
+    <div class="row" style="justify-content:space-between;align-items:flex-start;gap:var(--sp-3)">
+      <div style="flex:1;min-width:200px">
+        <h2 style="margin-bottom:2px">Dodaj Day Menu do ekranu głównego</h2>
+        <p class="muted" id="dashInstalOpis" style="margin:0"></p>
+      </div>
+      <div class="row" style="width:auto;flex:none;gap:var(--sp-2)">
+        <button class="btn accent" id="dashInstalBtn" style="flex:none" hidden>Zainstaluj</button>
+        <button class="icon-btn" id="dashInstalX" title="Nie pokazuj więcej">✕</button>
+      </div>
+    </div>
+  </div>
   <div style="margin-top:var(--sp-4)">
     <div class="card"><h2>Aktywne cele</h2><div id="dashGoals"></div></div>
   </div>
@@ -1123,8 +1142,13 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=94;
-const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
+const DM_BUILD=95;
+/* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
+   github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
+   przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
+   Cena tej zmiany: domena musi byc odnawiana. Jesli wygasnie, zainstalowane aplikacje
+   straca aktualizacje i nie da sie tego naprawic zdalnie — wlacz automatyczne odnowienie. */
+const DM_UPDATE_URL="https://daymenu.pl/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
   const IN_FRAME=(()=>{try{return window.top!==window}catch(e){return true}})();
@@ -1342,10 +1366,53 @@ function show(v){
   $("#main").scrollTop=0;
 }
 
+/* ---- dodanie do ekranu glownego ----
+   Android/Chrome: przegladarka zglasza beforeinstallprompt, wiec da sie zrobic realny
+   przycisk instalacji. iOS: Apple NIE udostepnia zadnego API instalacji, jedyna droga to
+   Udostepnij -> Dodaj do ekranu poczatkowego. Zamiast udawac przycisk, ktory nic nie zrobi,
+   pokazujemy tam instrukcje. Karta znika, gdy aplikacja juz dziala z ekranu glownego. */
+let instalPrompt=null;
+function jestZainstalowana(){
+  return window.matchMedia("(display-mode: standalone)").matches||window.navigator.standalone===true;
+}
+function czyIOS(){
+  const ua=navigator.userAgent;
+  // iPad z iPadOS podaje sie za Maca, stad dodatkowe sprawdzenie dotyku
+  return /iPad|iPhone|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1);
+}
+function renderInstal(){
+  const box=$("#dashInstal");if(!box)return;
+  const schowane=localStorage.getItem("dm_instal_ukryte")==="1";
+  const mobilny=czyIOS()||/Android/i.test(navigator.userAgent);
+  if(schowane||jestZainstalowana()||!mobilny||(!instalPrompt&&!czyIOS())){box.hidden=true;return}
+  box.hidden=false;
+  $("#dashInstalBtn").hidden=!instalPrompt;
+  $("#dashInstalOpis").textContent=instalPrompt
+    ? "Będzie otwierać się jak zwykła aplikacja, bez paska przeglądarki."
+    : "Otwórz menu Udostępnij na dole ekranu, wybierz „Do ekranu początkowego”, potem „Dodaj”. Aplikacja będzie działać bez paska przeglądarki.";
+}
+window.addEventListener("beforeinstallprompt",e=>{
+  e.preventDefault();          // bez tego Chrome pokaze wlasny baner zamiast naszej karty
+  instalPrompt=e;renderInstal();
+});
+window.addEventListener("appinstalled",()=>{instalPrompt=null;renderInstal()});
+$("#dashInstalBtn").onclick=async()=>{
+  if(!instalPrompt)return;
+  instalPrompt.prompt();
+  await instalPrompt.userChoice.catch(()=>{});
+  instalPrompt=null;           // zgloszenia da sie uzyc tylko raz
+  renderInstal();
+};
+$("#dashInstalX").onclick=()=>{
+  localStorage.setItem("dm_instal_ukryte","1");
+  renderInstal();
+};
+
 /* ================= DASHBOARD ================= */
 const MOODS=["Bardzo źle","Źle","Neutralnie","Dobrze","Świetnie"];
 const MOOD_COLORS=["var(--bad)","var(--accent)","var(--warn)","var(--primary)","var(--good)"];
 function renderDash(){
+  renderInstal();
   const h=new Date().getHours();
   $("#dashHello").textContent=(h<5?"Dobrej nocy":h<12?"Dzień dobry":h<18?"Cześć":"Dobry wieczór")+(S.account?", "+S.account.name:"")+"!";
   $("#dashDate").textContent=new Date().toLocaleDateString("pl-PL",{weekday:"long",day:"numeric",month:"long",year:"numeric"});

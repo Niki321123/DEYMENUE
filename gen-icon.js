@@ -132,6 +132,21 @@ app.whenReady().then(async () => {
     zapisz(path.join(res, "mipmap-" + g, "ic_launcher_foreground.png"), await rysuj(przod, 0.26, null, false));
   }
 
+  // ---- ikony aplikacji webowej (dodanie do ekranu glownego) ----
+  // iOS akceptuje dla apple-touch-icon WYLACZNIE PNG — ikona w SVG konczy sie tym,
+  // ze telefon pokazuje zrzut strony zamiast logo. Manifest Androida chce 192 i 512.
+  // Wariant "maskable" ma wieksze marginesy, bo system przycina go do wlasnego ksztaltu.
+  const pwa = [
+    ["icon-180.png", 180, 0.06, "#ffffff"],   // apple-touch-icon
+    ["icon-192.png", 192, 0.06, "#ffffff"],
+    ["icon-512.png", 512, 0.06, "#ffffff"],
+    ["icon-maskable-512.png", 512, 0.20, "#ffffff"],
+  ];
+  for (const [nazwa, rozmiar, pad, tlo] of pwa) {
+    zapisz(path.join(root, "docs", nazwa), await rysuj(rozmiar, pad, tlo, false));
+    console.log(`docs/${nazwa}`);
+  }
+
   // ---- logo z napisem (panele, sklepy) ----
   for (const S of [512, 1024]) {
     const buf = await w.webContents.executeJavaScript(`${DRAW_LOGO}(${S})`).then(png);
