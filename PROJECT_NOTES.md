@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — puste konto dla nowego uzytkownika, build 82)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — oceny z Librusa i średnia w zakładce Frekwencja, build 82)_
 
 ## Czym jest projekt
 
@@ -397,6 +397,32 @@ sprzed tej sesji, już nieużywany przez apkę, można zignorować/skasować.
       `wymagania-2027.slim.json` w blok `<script id="maturaReq">` w `DayMenu.html`.
       Identyfikatory wymagań (`mat.`/`geo.`/`fiz.`) są kluczami postępu użytkownika —
       **nie wolno ich zmieniać**, bo odhaczone tematy przestaną się wiązać z treścią.
+- [ ] **BLOKER całej integracji z Librusem: Librus nie przyjmuje połączeń z infrastruktury
+      Supabase.** Zmierzone 2026-08-27 z dwóch niezależnych miejsc w Supabase (Edge Function
+      i `pg_net` z Postgresa): każdy host `*.librus.pl` (`api.librus.pl`,
+      `synergia.librus.pl`, `portal.librus.pl`) wisi na **TCP/SSL handshake** aż do timeoutu
+      (15 s, zero odpowiedzi), a `https://example.com` z tej samej infrastruktury odpowiada
+      200 w ułamku sekundy. Z komputera użytkownika te same adresy odpowiadają normalnie
+      (302 / 403 w ~1 s). Efekt: `librus_accounts.last_sync_at` jest **nadal NULL**,
+      `librus_snapshot` jest **pusta** — plan lekcji, terminarz, frekwencja i oceny nie mają
+      skąd przyjść, mimo że cały kod (parsery + zapis + UI) jest gotowy i wdrożony.
+      Kod tego nie naprawi — trzeba zmienić miejsce, z którego leci zapytanie do Librusa:
+      - (a) pobieranie w **aplikacji desktopowej** (proces main Electrona ma dostęp do sieci
+        użytkownika i nie ma CORS) i wypychanie snapshotu do Supabase — najbliżej istniejącej
+        architektury, ale działa tylko gdy desktop jest uruchomiony,
+      - (b) własny **proxy/relay** na IP, którego Librus nie blokuje (VPS w PL, tunel z domu),
+        wołany przez Edge Function,
+      - (c) sprawdzić, czy Librus udostępnia oficjalne API dla ucznia/rodzica z tokenem
+        (wtedy inne hosty i inny reżim blokad).
+      Do decyzji użytkownika, bo każda opcja zmienia architekturę.
+- [ ] Gdy bloker wyżej zostanie rozwiązany: **zweryfikować parsery na żywych danych** —
+      `grades` (oceny) i `attendance_lessons`/`attendance_freq` (frekwencja) nie były jeszcze
+      ani razu sprawdzone na prawdziwym HTML-u Librusa. Diagnostyka jest przygotowana:
+      `librus_snapshot.grades_error` i `.attendance_error` trzymają powód osobno dla każdego
+      modułu, a zakładka Frekwencja pokazuje `grades_error` pod kartą „Średnia wg przedmiotu".
+- [ ] Rozważyć: gdy `librus_accounts.status` to timeout sieciowy, komunikat w zakładce Konto
+      („sprawdź, czy hasło do Librusa jest aktualne") wprowadza w błąd — to nie hasło,
+      a niedostępność Librusa z serwera.
 - [ ] Pre-istniejąca drobnica zauważona przy okazji (nie ruszana, bo poza zakresem):
       dwa elementy mają `id="sbMsg"` w zakładce Konto, a handler `#themeBtn` czyta
       `S.appearance.theme` bez zabezpieczenia na `null` (wywala się po imporcie danych
@@ -449,6 +475,51 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 
 ## Historia sesji (skrót)
 
+- **2026-08-27 (sesja 16, cd. — oceny z Librusa + średnia w zakładce Frekwencja):**
+  Na życzenie użytkownika („zbieraj też z librusa oceny i pokazuj średnią w zakładce
+  frekwencja obok frekwencji") dobudowano cały tor ocen — od scrapera po kafelek w UI.
+  - **Edge Function `librus-timetable` (wdrożone jako wersja 14):** nowa sekcja „oceny":
+    `GRADES_URL` = `synergia.librus.pl/przegladaj_oceny/uczen`, `parseGrades()` (tolerancyjny:
+    szuka linków z `title`, przedmiot bierze z pierwszej tekstowej komórki wiersza, wiersze
+    bez nazwy dziedziczą poprzedni przedmiot, kolumny ze średnimi Librusa łapie osobno jako
+    `avgCells`), `parseTooltip()` (tooltip `Etykieta: wartość` rozdzielony po `<br>`),
+    `gradeValue()` (plus = +0,5, minus = −0,25 — domyślna konfiguracja Librusa),
+    `semesterOf()` (semestr z **daty** oceny, bo kolumn „sem. I / sem. II" nie da się czytać
+    odpornie), `fetchGrades()` i `safeGrades()` (własny try/catch + własne pole błędu, jak
+    `safeExams`; pusta lista tam, gdzie wcześniej były oceny, nie kasuje snapshotu).
+  - **Migracja `librus_grades_columns`:** `librus_snapshot` +`grades`, `grades_subjects`,
+    `grades_fetched_at`, `grades_error`.
+  - **Rozjazd repo ↔ produkcja naprawiony:** lokalny `supabase/functions/librus-timetable/index.ts`
+    był z builda 34 (bez frekwencji, bez CORS, bez klucza crona z tabeli) — wdrożona była
+    wersja 12. Plik w repo doprowadzono do stanu produkcyjnego **i** dopiero na tym dobudowano
+    oceny, więc repo i prod są znów zgodne.
+  - **Odporność przebiegu (wymuszona przez pierwszy test):** plan lekcji już **nie blokuje**
+    reszty — jego błąd tylko odkłada plan na następny cron (`units` nietknięte), a oceny i
+    frekwencja lecą dalej. Doszły budżety czasowe: `REQ_TIMEOUT_MS` = 20 s na pojedyncze
+    zapytanie (`AbortSignal.timeout` w `hop()` — bez tego jedna wisząca podstrona zjadała
+    cały wall-clock funkcji, ~150 s, i nie zapisywaliśmy NICZEGO), `RUN_BUDGET_MS` = 95 s na
+    konto, `EXAMS_MIN_MS` = 35 s zapasu wymagane, żeby w ogóle ruszyć terminarz. Kolejność
+    odwrócona na: plan → oceny → frekwencja → **zapis** → terminarz → zapis, bo terminarz
+    (do 45 podstron) jest najdroższy; przerwany deadline'em oznacza listę jako `truncated`,
+    więc nie wysyła fałszywych „Odwołana zapowiedź".
+  - **Klient (`DayMenu.html`):** `librusApplyGrades(row)` (wzorowane na `librusApplyAttendance`),
+    `gradeSem()/gradeScope()/gradeAvg()/gradeColor()/gradeFmt()`, `renderFrekGrades()`;
+    zakładka to teraz **„Frekwencja i oceny"**: `#frekStatCards` z `grid3` → `grid4`, kafelek
+    **„Średnia ocen"** stoi **obok** „Frekwencji ogółem", a niżej karta „Średnia wg przedmiotu"
+    (średnia ważona + oceny jako plakietki z tooltipem kategoria/waga/data; w tooltipie średniej
+    także średnia policzona przez Librusa). Zapytanie o snapshot dociąga nowe kolumny.
+    Średnia liczona jest z **bieżącego semestru**, a poza semestrem (wakacje) — ze wszystkiego.
+  - **Odkryty bloker (opisany w zadaniach wyżej): Librus nie przyjmuje połączeń z Supabase** —
+    handshake TCP/SSL do `*.librus.pl` wisi do timeoutu z Edge Function **i** z `pg_net`,
+    podczas gdy `example.com` z tej samej infrastruktury odpowiada 200, a z komputera
+    użytkownika Librus odpowiada normalnie. Dlatego `librus_snapshot` jest pusta, a ocen nie
+    da się jeszcze zweryfikować na żywych danych — feature jest gotowy „na wejście danych".
+  - **Opublikowane jako build 82** — ale nie tą sesją: równolegle pracująca sesja (poprawka
+    „nowe konto naprawdę puste") uruchomiła `npm run publish`, a `publish.js` robi `git add -u`,
+    więc zabrał ze sobą także zmiany w `DayMenu.html` z tej sesji. Wniosek na przyszłość:
+    dwie sesje w tym samym repo + `publish.js` = publikacja cudzej niedokończonej pracy.
+    Sam Edge Function jest wdrożony niezależnie od publish (wersja 14), a
+    `supabase/functions/librus-timetable/index.ts` zostaje niezacommitowany.
 - **2026-08-27 (sesja 16, cd. — nowe konto naprawde puste, build 82):**
   Wymaganie: konto zalozone na stronie ma byc calkowicie puste. Weryfikacja pokazala, ze
   w wiekszosci juz tak bylo — `defaults` nie zawiera zadnych danych startowych, materialy

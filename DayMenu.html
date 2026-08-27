@@ -1124,7 +1124,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=82;
+const DM_BUILD=84;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1962,7 +1962,7 @@ function aiJson(text){
   if(a<0||b<=a)throw new Error("Nieprawidłowa odpowiedź AI");
   return JSON.parse(text.slice(a,b+1));
 }
-const MAT_AI_RULES=`Jesteś planerem nauki w aplikacji Day Menu. Dni tygodnia: 0=Pon, 1=Wt, 2=Śr, 3=Czw, 4=Pt, 5=Sob, 6=Nd. Godziny 6-22, każdy blok ("hour") to godzina ZEGAROWA rozpoczęcia — NIE 60 minut realnej nauki. Realna nauka w jednym bloku to sesja pomodoro, jej długość w minutach dostajesz jako "pomoWorkMin" w kontekście (reszta godziny to przerwa/margines). Gdy użytkownik podaje preferencję w godzinach/minutach realnej nauki (np. "chcę się uczyć 4h dziennie"), PRZELICZ to na liczbę bloków wzorem: liczba_blokow = round(pożądane_minuty / pomoWorkMin) — NIE zakładaj, że 1 blok = 1h realnej nauki. Harmonogram powtarza się co tydzień. Zasady planowania: planuj naukę WYŁĄCZNIE w godzinach dostępnych (slots); NIGDY w godzinach szkolnych (school) ani poza dostępnymi — w godzinach szkolnych użytkownik jest w szkole i może uczyć się dopiero po ich zakończeniu; przydzielaj każdemu przedmiotowi czas proporcjonalnie do jego procentu (np. 80% vs 20% = 4× więcej blokow dla pierwszego); rozkładaj każdy przedmiot na różne dni zamiast kumulować; rób przerwy między sesjami tego samego przedmiotu; bezwzględnie szanuj preferencje użytkownika, w tym przeliczenie godzin realnej nauki opisane wyżej. W kontekście dostajesz też "activities" — własne zajęcia użytkownika wpisane w harmonogram (nazwa + typ): "busy" to godziny zajęte czymś innym (trening, praca), a "study" to jego własna forma nauki. Traktuj JEDNE I DRUGIE jako niedostępne — NIGDY nie planuj nauki w tych godzinach i nie usuwaj ich. Możesz się do nich odwoływać po nazwie, gdy tłumaczysz swoje decyzje (np. „w środy masz trening, więc przeniosłem matematykę na czwartek"). ZANIM ułożysz plan, PRZETŁUMACZ preferencje użytkownika na liczby i zwróć je w polu "limity": {"blokowDziennie":<ile bloków dziennie albo null>,"typ":"cel"|"maks","dniWolne":[<numery dni 0-6, w które użytkownik NIE chce się uczyć>]}. "blokowDziennie" liczysz wzorem round(minuty_realnej_nauki / pomoWorkMin) — np. 3h45 przy pomoWorkMin=45 to round(225/45)=5. "typ" to "cel", gdy użytkownik mówi ile CHCE się uczyć, i "maks", gdy podaje górną granicę ("nie więcej niż", "max"). Gdy z preferencji nic takiego nie wynika, daj null i pustą listę. Te liczby są następnie egzekwowane przez aplikację, więc muszą być zgodne z tym, co układasz w "blocks". Odpowiadasz WYŁĄCZNIE poprawnym JSON, bez markdown i bez komentarzy.`;
+const MAT_AI_RULES=`Jesteś planerem nauki w aplikacji Day Menu. Dni tygodnia: 0=Pon, 1=Wt, 2=Śr, 3=Czw, 4=Pt, 5=Sob, 6=Nd. Godziny 6-22, każdy blok ("hour") to godzina ZEGAROWA rozpoczęcia — NIE 60 minut realnej nauki. Realna nauka w jednym bloku to sesja pomodoro, jej długość w minutach dostajesz jako "pomoWorkMin" w kontekście (reszta godziny to przerwa/margines). Gdy użytkownik podaje preferencję w godzinach/minutach realnej nauki (np. "chcę się uczyć 4h dziennie"), PRZELICZ to na liczbę bloków wzorem: liczba_blokow = round(pożądane_minuty / pomoWorkMin) — NIE zakładaj, że 1 blok = 1h realnej nauki. Harmonogram powtarza się co tydzień. Zasady planowania: planuj naukę WYŁĄCZNIE w godzinach dostępnych (slots); NIGDY w godzinach szkolnych (school) ani poza dostępnymi — w godzinach szkolnych użytkownik jest w szkole i może uczyć się dopiero po ich zakończeniu; przydzielaj każdemu przedmiotowi czas proporcjonalnie do jego procentu (np. 80% vs 20% = 4× więcej blokow dla pierwszego); rozkładaj każdy przedmiot na różne dni zamiast kumulować; rób przerwy między sesjami tego samego przedmiotu; bezwzględnie szanuj preferencje użytkownika, w tym przeliczenie godzin realnej nauki opisane wyżej. W kontekście dostajesz też "activities" — własne zajęcia użytkownika wpisane w harmonogram (nazwa + typ): "busy" to godziny zajęte czymś innym (trening, praca), a "study" to jego własna forma nauki. Traktuj JEDNE I DRUGIE jako niedostępne — NIGDY nie planuj nauki w tych godzinach i nie usuwaj ich. Możesz się do nich odwoływać po nazwie, gdy tłumaczysz swoje decyzje (np. „w środy masz trening, więc przeniosłem matematykę na czwartek"). ZANIM ułożysz plan, PRZETŁUMACZ preferencje użytkownika na liczby i zwróć je w polu "limity": {"blokowDziennie":<ile bloków dziennie albo null>,"typ":"cel"|"maks","dniWolne":[<numery dni 0-6, w które użytkownik NIE chce się uczyć>],"jedenPrzedmiotDziennie":<true, gdy użytkownik chce w jednym dniu uczyć się tylko jednego przedmiotu>,"odpoczynekPoSzkole":<ile godzin przerwy po ostatniej lekcji, 0 gdy nie prosi>}. "blokowDziennie" liczysz wzorem round(minuty_realnej_nauki / pomoWorkMin) — np. 3h45 przy pomoWorkMin=45 to round(225/45)=5. "typ" to "cel", gdy użytkownik mówi ile CHCE się uczyć, i "maks", gdy podaje górną granicę ("nie więcej niż", "max"). Gdy z preferencji nic takiego nie wynika, daj null i pustą listę. Te liczby są następnie egzekwowane przez aplikację, więc muszą być zgodne z tym, co układasz w "blocks": jeśli ustawisz "jedenPrzedmiotDziennie":true, w KAŻDYM dniu wszystkie bloki muszą mieć ten sam topicId (różne dni mogą mieć różne przedmioty, rozdziel je proporcjonalnie do procentów), a jeśli podasz "odpoczynekPoSzkole":N, w danym dniu NIE planuj nauki wcześniej niż N godzin po zakończeniu ostatniej lekcji. Odpowiadasz WYŁĄCZNIE poprawnym JSON, bez markdown i bez komentarzy.`;
 function matAiContext(){
   return {
     subjects:S.matura.topics.filter(t=>(t.percent||0)>0).map(t=>({id:t.id,nazwa:t.name,procent:t.percent})),
@@ -1991,11 +1991,49 @@ function matSanitizeBlocks(blocks){
 function matLimity(raw){
   const l=(raw&&typeof raw==="object")?raw:{};
   const na=Math.round(+l.blokowDziennie);
+  const odp=Math.round(+l.odpoczynekPoSzkole);
   return{
     blokowDziennie:(Number.isFinite(na)&&na>0&&na<=16)?na:null,
     typ:l.typ==="maks"?"maks":"cel",
-    dniWolne:[...new Set((Array.isArray(l.dniWolne)?l.dniWolne:[]).map(Number).filter(d=>d>=0&&d<=6))]
+    dniWolne:[...new Set((Array.isArray(l.dniWolne)?l.dniWolne:[]).map(Number).filter(d=>d>=0&&d<=6))],
+    jedenPrzedmiotDziennie:l.jedenPrzedmiotDziennie===true,
+    odpoczynekPoSzkole:(Number.isFinite(odp)&&odp>0&&odp<=6)?odp:0
   };
+}
+// ostatnia godzina oznaczona jako szkolna w danym dniu (null, gdy tego dnia nie ma szkoły)
+function matOstatniaSzkolna(dzien){
+  let ost=null;
+  for(const g of MAT_HOURS)if(S.matura.grid[matKey(dzien,g)]==="school")ost=g;
+  return ost;
+}
+/* Pierwsza godzina, w której WOLNO planować naukę po powrocie ze szkoły.
+   Blok szkolny o 13:00 trwa do 14:00, więc przy godzinie odpoczynku nauka może ruszyć
+   dopiero o 15:00 — stąd +1 za dojście do domu i +N za sam odpoczynek. */
+function matPierwszaPoOdpoczynku(dzien,odpoczynek){
+  const ost=matOstatniaSzkolna(dzien);
+  return ost==null?-Infinity:ost+1+odpoczynek;
+}
+/* Jeden przedmiot na dzień. Dni rozdzielamy między przedmioty proporcjonalnie do ich
+   procentów (metodą największych reszt), a konkretny dzień dostaje ten przedmiot, który
+   już w nim przeważa — dzięki temu plan modelu zmienia się w minimalnym stopniu. */
+function matJedenPrzedmiotNaDzien(blocks,subs){
+  const dni=[...new Set(blocks.map(b=>b.day))].sort((a,b)=>a-b);
+  if(!dni.length||subs.length<2)return blocks;
+  const suma=subs.reduce((a,t)=>a+(t.percent||0),0)||1;
+  const kw=subs.map(t=>{const d=(t.percent||0)/suma*dni.length;return{id:t.id,ile:Math.floor(d),reszta:d-Math.floor(d)}});
+  let brak=dni.length-kw.reduce((a,k)=>a+k.ile,0);
+  kw.slice().sort((a,b)=>b.reszta-a.reszta).forEach(k=>{if(brak>0){k.ile++;brak--}});
+  const pula={};kw.forEach(k=>pula[k.id]=k.ile);
+  const przydzial={};
+  for(const d of dni){
+    const wDniu={};
+    blocks.filter(b=>b.day===d).forEach(b=>{wDniu[b.topicId]=(wDniu[b.topicId]||0)+1});
+    const kand=Object.keys(pula).filter(id=>pula[id]>0);
+    if(!kand.length)break;
+    kand.sort((a,b)=>((wDniu[b]||0)-(wDniu[a]||0))||(pula[b]-pula[a]));
+    przydzial[d]=kand[0];pula[kand[0]]--;
+  }
+  return blocks.map(b=>przydzial[b.day]?Object.assign({},b,{topicId:przydzial[b.day]}):b);
 }
 // który przedmiot dołożyć: ten, który najbardziej odstaje od swojego procentu
 function matNastepnyPrzedmiot(blocks,subs,dzien,godzina){
@@ -2016,12 +2054,20 @@ function matNastepnyPrzedmiot(blocks,subs,dzien,godzina){
 }
 function matEgzekwujLimity(blocks,lim){
   const subs=S.matura.topics.filter(t=>(t.percent||0)>0);
-  const zmiany={wolneDni:0,przyciete:0,dolozone:0,brakMiejsca:0};
+  const zmiany={wolneDni:0,przyciete:0,dolozone:0,brakMiejsca:0,poSzkole:0,ujednolicone:0};
   let out=blocks.slice();
   if(lim.dniWolne.length){
     const przed=out.length;
     out=out.filter(b=>!lim.dniWolne.includes(b.day));
     zmiany.wolneDni=przed-out.length;
+  }
+  // odpoczynek po szkole — kasujemy bloki z okna tuż po ostatniej lekcji, ZANIM dobijemy
+  // liczbę sesji, żeby uzupełnianie trafiało już w dozwolone godziny
+  const wolnoOGodzinie=(d,g)=>!lim.odpoczynekPoSzkole||g>=matPierwszaPoOdpoczynku(d,lim.odpoczynekPoSzkole);
+  if(lim.odpoczynekPoSzkole){
+    const przed=out.length;
+    out=out.filter(b=>wolnoOGodzinie(b.day,b.hour));
+    zmiany.poSzkole=przed-out.length;
   }
   if(lim.blokowDziennie&&subs.length){
     const wolne=new Set(lim.dniWolne);
@@ -2034,7 +2080,7 @@ function matEgzekwujLimity(blocks,lim){
         zmiany.przyciete+=dnia.length-lim.blokowDziennie;
       }else if(dnia.length<lim.blokowDziennie&&lim.typ==="cel"){
         const zajete=new Set(dnia.map(b=>b.hour));
-        const wolneGodziny=MAT_HOURS.filter(g=>S.matura.grid[matKey(d,g)]==="avail"&&!zajete.has(g));
+        const wolneGodziny=MAT_HOURS.filter(g=>S.matura.grid[matKey(d,g)]==="avail"&&!zajete.has(g)&&wolnoOGodzinie(d,g));
         let brakuje=lim.blokowDziennie-dnia.length;
         for(const g of wolneGodziny){
           if(!brakuje)break;
@@ -2045,6 +2091,12 @@ function matEgzekwujLimity(blocks,lim){
       }
     }
   }
+  // ujednolicenie przedmiotu w dniu robimy NA KOŃCU, gdy liczba bloków jest już ustalona
+  if(lim.jedenPrzedmiotDziennie&&subs.length>1){
+    const przed=out.map(b=>b.topicId);
+    out=matJedenPrzedmiotNaDzien(out,subs);
+    zmiany.ujednolicone=out.filter((b,i)=>przed[i]!==b.topicId).length;
+  }
   out.sort((a,b)=>a.day-b.day||a.hour-b.hour);
   return{blocks:out,zmiany};
 }
@@ -2052,11 +2104,15 @@ function matOpisKorekt(lim,z){
   const cz=[];
   if(lim.blokowDziennie)cz.push(`${lim.blokowDziennie} ${matsPlural(lim.blokowDziennie,"sesja","sesje","sesji")} dziennie`);
   if(lim.dniWolne.length)cz.push("wolne: "+lim.dniWolne.map(d=>MAT_DAYS[d]).join(", "));
+  if(lim.jedenPrzedmiotDziennie)cz.push("jeden przedmiot dziennie");
+  if(lim.odpoczynekPoSzkole)cz.push(lim.odpoczynekPoSzkole+" h odpoczynku po szkole");
   const nagl=cz.length?"Zrozumiałem: "+cz.join(" · ")+". ":"";
   const p=[];
   if(z.wolneDni)p.push(`usunąłem ${z.wolneDni} ${matsPlural(z.wolneDni,"blok","bloki","bloków")} z dni wolnych`);
   if(z.przyciete)p.push(`przyciąłem ${z.przyciete} ponad limit`);
   if(z.dolozone)p.push(`dołożyłem ${z.dolozone} brakujących`);
+  if(z.poSzkole)p.push(`przesunąłem ${z.poSzkole} ${matsPlural(z.poSzkole,"blok","bloki","bloków")} z czasu odpoczynku`);
+  if(z.ujednolicone)p.push(`ujednoliciłem przedmiot w ${z.ujednolicone} ${matsPlural(z.ujednolicone,"bloku","blokach","blokach")}`);
   if(z.brakMiejsca)p.push(`${z.brakMiejsca} nie zmieściło się w wolnych godzinach — pomaluj więcej okienek na „Dostępny"`);
   return nagl+(p.length?"Poprawki: "+p.join(", ")+". ":"");
 }

@@ -3,10 +3,12 @@
 // Odtwarza flow biblioteki `librusapi` (github.com/ravensiris/librusapi) w Deno:
 // logowanie OAuth na api.librus.pl -> cookie DZIENNIKSID -> POST przegladaj_plan_lekcji.
 // Pythona uzyc sie nie da (Edge Runtime to Deno), wiec logika jest przepisana 1:1.
-// W tej samej sesji logowania pobieramy tez terminarz (sprawdziany, kartkowki itp.).
+// W tej samej sesji logowania pobieramy tez terminarz (sprawdziany, kartkowki itp.),
+// zrealizowane lekcje (frekwencja) i oceny (srednia wazona).
 //
 // Wywolywane co godzine przez pg_cron. Nigdy nie rzuca wyjatkiem na zewnatrz —
-// blad ladnie laduje w librus_snapshot.last_error / .exams_error i w logach.
+// blad ladnie laduje w librus_snapshot.last_error / .exams_error / .attendance_error /
+// .grades_error i w logach.
 
 import { DOMParser, type Element } from "https://deno.land/x/deno_dom@v0.1.45/deno-dom-wasm.ts";
 
@@ -20,6 +22,20 @@ const TIMETABLE_URL = "https://synergia.librus.pl/przegladaj_plan_lekcji";
 // Rate-limit: nie odpytujemy Librusa czesciej niz raz na godzine.
 // 59 min, a nie 60, zeby jitter crona nie gubil co drugiego przebiegu.
 const MIN_INTERVAL_MS = 59 * 60 * 1000;
+
+// Limit wall-clock Edge Function to ~150 s na CALY przebieg (wszystkie konta), a Librus
+// potrafi odpowiadac wolno albo wcale. Bez tych budzetow jedna zawieszona podstrona
+// zabija przebieg w polowie i nie zapisujemy NICZEGO.
+const REQ_TIMEOUT_MS = 20 * 1000;  // jedno zapytanie do Librusa
+const RUN_BUDGET_MS = 95 * 1000;   // caly przebieg jednego konta
+const EXAMS_MIN_MS = 35 * 1000;    // terminarz (do 45 podstron) startuje tylko z zapasem
+
+// CORS — bez tego przegladarka blokuje odpowiedz na POST z Authorization
+// (preflight OPTIONS bez naglowkow CORS = fetch() w kliencie rzuca "Blad sieci").
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-librus-key",
+};
 
 class LibrusError extends Error {
   constructor(msg: string, readonly kind: string) {
@@ -60,6 +76,8 @@ async function hop(jar: Jar, url: string, init: RequestInit = {}, max = 10): Pro
     const res = await fetch(target, {
       ...opts,
       redirect: "manual",
+      // Bez signal jedna wiszaca odpowiedz Librusa zjada caly wall-clock funkcji.
+      signal: AbortSignal.timeout(REQ_TIMEOUT_MS),
       headers: {
         "User-Agent": UA,
         ...(opts.headers ?? {}),
@@ -122,8 +140,8 @@ export interface Unit {
   info: string | null;
 }
 
-/** "YYYY-MM-DD_YYYY-MM-DD" — poniedzialek..niedziela tygodnia zawierajacego `ymd`. */
-function weekRange(ymd: string): string {
+/** Poniedzialek i niedziela (YYYY-MM-DD) tygodnia zawierajacego `ymd`. */
+function weekMonSun(ymd: string): { mon: string; sun: string } {
   const d = new Date(`${ymd}T00:00:00Z`);
   const mondayOffset = (d.getUTCDay() + 6) % 7;
   const mon = new Date(d);
@@ -131,7 +149,12 @@ function weekRange(ymd: string): string {
   const sun = new Date(mon);
   sun.setUTCDate(mon.getUTCDate() + 6);
   const fmt = (x: Date) => x.toISOString().slice(0, 10);
-  return `${fmt(mon)}_${fmt(sun)}`;
+  return { mon: fmt(mon), sun: fmt(sun) };
+}
+/** "YYYY-MM-DD_YYYY-MM-DD" — poniedzialek..niedziela tygodnia zawierajacego `ymd`. */
+function weekRange(ymd: string): string {
+  const { mon, sun } = weekMonSun(ymd);
+  return `${mon}_${sun}`;
 }
 
 function warsawToday(): string {
@@ -205,6 +228,321 @@ async function fetchTimetable(jar: Jar, week: string): Promise<Unit[]> {
   if (res.status === 401 || res.status === 403) throw sessionError("Librus odrzucil sesje");
   if (!res.ok) throw new LibrusError(`Librus zwrocil HTTP ${res.status}`, "http");
   return parseTimetable(await res.text());
+}
+
+/* ------------------- frekwencja: zrealizowane lekcje ------------------- */
+// Endpoint i uklad tabeli wg biblioteki referencyjnej librus-apix (zrealizowane_lekcje) —
+// ta sama strona co uczen widzi w Librusie jako "Zrealizowane lekcje": per-lekcja
+// przedmiot/nauczyciel/temat + symbol obecnosci (pusty = obecny, kod = wyjatek).
+// Jedna strona = do 15 lekcji, paginacja jak w terminarzu wielostronicowym.
+
+const COMPLETED_LESSONS_URL = "https://synergia.librus.pl/zrealizowane_lekcje";
+const MAX_COMPLETED_PAGES = 15; // bezpiecznik: 15 stron x 15 lekcji = 225, z naddatkiem na tydzien
+
+export interface CompletedLesson {
+  date: string;      // YYYY-MM-DD
+  weekday: string;
+  lessonNumber: number;
+  subject: string;
+  teacher: string;
+  topic: string;
+  attendance: string; // "" = obecny; kod (nb/u/sp/zw/...) = wyjatek
+}
+
+function normPolishDate(s: string): string {
+  const m = s.trim().match(/(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})/);
+  if (!m) return "";
+  return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+}
+
+function parseCompletedLessonsPage(html: string): { lessons: CompletedLesson[]; maxPage: number } {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  if (!doc) throw structureError("Nie udalo sie sparsowac strony zrealizowanych lekcji");
+
+  const h2 = doc.querySelector("h2");
+  if (h2 && /^brak dost[eę]pu$/i.test(h2.textContent.trim())) {
+    throw sessionError("Sesja Librusa wygasla lub token odrzucony (Brak dostępu)");
+  }
+
+  let maxPage = 1;
+  const pag = doc.querySelector("div.pagination > span");
+  if (pag) {
+    const m = pag.textContent.replace(/ /g, "").match(/z(\d+)/);
+    if (m) maxPage = parseInt(m[1], 10) || 1;
+  }
+
+  const rows = doc.querySelectorAll("table.decorated tbody tr");
+  // Brak tabeli/wierszy przy istniejacej stronie = zwyczajnie pusty tydzien (wakacje,
+  // ferie) — to nie jest bezpiecznik jak przy planie lekcji, bo tu nie nadpisujemy
+  // niczego bezpowrotnie, tylko doliczamy do licznika.
+  const lessons: CompletedLesson[] = [];
+  for (const node of rows) {
+    const tr = node as unknown as Element;
+    const dateCell = tr.querySelector('td[class="center small"]');
+    const weekdayCell = tr.querySelector("td.tiny");
+    const cells: string[] = [];
+    for (const c of tr.querySelectorAll("td")) {
+      const el = c as unknown as Element;
+      if (!el.getAttribute("class")) cells.push(el.textContent.trim());
+    }
+    if (cells.length < 5) continue; // nie wiersz danych (np. naglowek) — pomijamy
+    const [lessonNumberRaw, subjectTeacher, topic, , attendance] = cells;
+    const parts = subjectTeacher.split(",").map((s) => s.trim());
+    lessons.push({
+      date: normPolishDate(dateCell ? dateCell.textContent : ""),
+      weekday: weekdayCell ? weekdayCell.textContent.trim() : "",
+      lessonNumber: parseInt(lessonNumberRaw, 10) || 0,
+      subject: parts[0] || "",
+      teacher: parts.length > 1 ? parts.slice(1).join(", ") : parts[0] || "",
+      topic: topic || "",
+      attendance: (attendance || "").trim(),
+    });
+  }
+  return { lessons, maxPage };
+}
+
+async function fetchCompletedLessons(jar: Jar, dateFrom: string, dateTo: string, deadline = Infinity): Promise<CompletedLesson[]> {
+  const body = (page: number) => new URLSearchParams({
+    data1: dateFrom, data2: dateTo,
+    filtruj_id_przedmiotu: "-1",
+    numer_strony1001: String(page),
+    porcjowanie_pojemnik1001: "1001",
+  });
+  const res0 = await hop(jar, COMPLETED_LESSONS_URL, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: body(0),
+  });
+  if (res0.status === 401 || res0.status === 403) throw sessionError("Librus odrzucil sesje");
+  if (!res0.ok) throw new LibrusError(`Librus zwrocil HTTP ${res0.status}`, "http");
+  const first = parseCompletedLessonsPage(await res0.text());
+  const all = [...first.lessons];
+  const pages = Math.min(first.maxPage, MAX_COMPLETED_PAGES);
+  for (let p = 1; p < pages; p++) {
+    if (Date.now() > deadline) break; // reszta stron dojdzie w nastepnym cronie
+    const res = await hop(jar, COMPLETED_LESSONS_URL, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: body(p),
+    });
+    if (!res.ok) break;
+    all.push(...parseCompletedLessonsPage(await res.text()).lessons);
+  }
+  return all;
+}
+
+/** Dolicza NOWE (jeszcze nie widziane) lekcje do kumulatywnych licznikow per przedmiot.
+ *  Klucz "date|lessonNumber|subject" chroni przed powtornym zliczeniem tej samej lekcji
+ *  przy kazdym godzinnym cronie w trakcie tygodnia. */
+function accumulateAttendance(
+  lessons: CompletedLesson[],
+  prevFreq: Record<string, { present: number; absent: number; total: number }> | null,
+  prevSeenKeys: string[] | null,
+) {
+  const freq = prevFreq && typeof prevFreq === "object" ? { ...prevFreq } : {};
+  const seen = new Set(Array.isArray(prevSeenKeys) ? prevSeenKeys : []);
+  for (const l of lessons) {
+    if (!l.subject || !l.date) continue;
+    const k = `${l.date}|${l.lessonNumber}|${l.subject}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const bucket = freq[l.subject] || (freq[l.subject] = { present: 0, absent: 0, total: 0 });
+    bucket.total++;
+    if (l.attendance) bucket.absent++; else bucket.present++;
+  }
+  return { freq, seenKeys: [...seen] };
+}
+
+/** Jak safeExams — blad frekwencji nie moze przewrocic synchronizacji planu/terminarza. */
+async function safeAttendance(
+  jar: Jar,
+  weekDates: { mon: string; sun: string },
+  prevFreq: Record<string, { present: number; absent: number; total: number }> | null,
+  prevSeenKeys: string[] | null,
+  deadline = Infinity,
+) {
+  try {
+    const lessons = await fetchCompletedLessons(jar, weekDates.mon, weekDates.sun, deadline);
+    const { freq, seenKeys } = accumulateAttendance(lessons, prevFreq, prevSeenKeys);
+    return { lessons, freq, seenKeys, fetchedAt: new Date().toISOString(), error: null as string | null };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[librus] frekwencja: ${msg}`);
+    return {
+      lessons: [] as CompletedLesson[],
+      freq: prevFreq || {}, seenKeys: prevSeenKeys || [],
+      fetchedAt: null as string | null, error: msg.slice(0, 500),
+    };
+  }
+}
+
+/* ----------------------------- oceny (srednia) -----------------------------
+   Strona "Oceny" (przegladaj_oceny/uczen): tabela przedmiot -> komorki z ocenami,
+   gdzie kazda ocena to <a title="..."> z tooltipem "Kategoria: ... Waga: ... Data: ...".
+   Parser jest z zalozenia tolerancyjny — nie opiera sie na klasach CSS ani na
+   kolejnosci kolumn (Librus zmienia je czesciej niz sam uklad tabeli): szuka
+   linkow z tooltipem, a nazwe przedmiotu bierze z pierwszej tekstowej komorki
+   wiersza. Kolumny ze srednimi Librusa lapiemy osobno (avgCells) jako liczby. */
+
+const GRADES_URL = "https://synergia.librus.pl/przegladaj_oceny/uczen";
+
+export interface Grade {
+  subject: string;
+  raw: string;           // "4", "5+", "np"
+  value: number | null;  // 4, 5.5 — null dla ocen nienumerycznych (np, bz, +, -)
+  weight: number;        // waga z tooltipa, domyslnie 1
+  category: string;
+  date: string;          // YYYY-MM-DD albo ""
+  counts: boolean;       // "Licz do sredniej: tak"
+  semester: 1 | 2 | null;
+}
+export interface GradeSubject {
+  avgCells: string[];    // srednie policzone przez Librusa (sem I / sem II / roczna)
+}
+
+/** Ocena -> liczba, wg domyslnej konfiguracji Librusa: "+" = +0,5, "-" = -0,25.
+ *  Szkola moze miec inne wagi plusow, dlatego obok trzymamy tez srednie
+ *  wyliczone przez samego Librusa (GradeSubject.avgCells). */
+function gradeValue(raw: string): number | null {
+  const m = raw.trim().match(/^([1-6])\s*([+-])?$/);
+  if (!m) return null;
+  const base = Number(m[1]);
+  return m[2] === "+" ? base + 0.5 : m[2] === "-" ? base - 0.25 : base;
+}
+
+/** Tooltip oceny to HTML z <br> i wierszami "Etykieta: wartosc". */
+function parseTooltip(title: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const flat = title.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "");
+  for (const line of flat.split("\n")) {
+    const t = line.replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+    const i = t.indexOf(":");
+    if (i <= 0) continue;
+    const k = t.slice(0, i).trim().toLowerCase();
+    const v = t.slice(i + 1).trim();
+    if (k && v && !(k in out)) out[k] = v;
+  }
+  return out;
+}
+
+/** Semestr z daty oceny: wrzesien..styczen = I, luty..sierpien = II.
+ *  Kolumny sem. I / sem. II w HTML-u sa nie do odczytania w sposob odporny na
+ *  zmiany strony, a data w tooltipie jest. */
+function semesterOf(ymd: string): 1 | 2 | null {
+  const m = ymd.match(/^\d{4}-(\d{2})/);
+  if (!m) return null;
+  const mo = Number(m[1]);
+  return mo >= 9 || mo === 1 ? 1 : 2;
+}
+
+function parseGrades(html: string): { grades: Grade[]; subjects: Record<string, GradeSubject> } {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  if (!doc) throw structureError("Nie udalo sie sparsowac strony ocen");
+
+  const h2 = doc.querySelector("h2");
+  if (h2 && /^brak dost[eę]pu$/i.test(h2.textContent.trim())) {
+    throw sessionError("Sesja Librusa wygasla lub token odrzucony (Brak dostępu)");
+  }
+
+  const grades: Grade[] = [];
+  const subjects: Record<string, GradeSubject> = {};
+  let lastSubject = "";
+
+  for (const node of doc.querySelectorAll("table.decorated tr")) {
+    const tr = node as unknown as Element;
+    const tds = [...tr.querySelectorAll("td")] as unknown as Element[];
+    if (tds.length < 2) continue;
+
+    // Komorki z ocenami: te, ktore zawieraja link z tooltipem. Sprawdzamy atrybut
+    // recznie, bo selektor obecnosci atrybutu ("a[title]") to za duze zaufanie
+    // do silnika selektorow w deno_dom.
+    const gradeCells: Element[] = [];
+    const anchors: Element[] = [];
+    for (const td of tds) {
+      const found: Element[] = [];
+      for (const a of td.querySelectorAll("a")) {
+        const el = a as unknown as Element;
+        if (el.getAttribute("title")) found.push(el);
+      }
+      if (found.length) { gradeCells.push(td); anchors.push(...found); }
+    }
+
+    // Nazwa przedmiotu: pierwsza komorka z tekstem, ktora nie jest liczba porzadkowa
+    // ani komorka z ocenami. Wiersze-kontynuacje (puste) dziedzicza poprzedni przedmiot.
+    let subject = "";
+    const avgCells: string[] = [];
+    for (const td of tds) {
+      if (gradeCells.includes(td)) continue;
+      const t = td.textContent.replace(/\s+/g, " ").trim();
+      if (!t) continue;
+      if (/^\d+[.,]\d+$/.test(t)) { avgCells.push(t.replace(",", ".")); continue; } // srednia Librusa
+      if (/^\d+\.?$/.test(t)) continue;                                             // Lp.
+      if (!subject) subject = t;
+    }
+    if (!anchors.length) continue;
+    if (!subject) subject = lastSubject;
+    if (!subject) continue;
+    lastSubject = subject;
+
+    const sub = subjects[subject] || (subjects[subject] = { avgCells: [] });
+    for (const a of avgCells) if (!sub.avgCells.includes(a)) sub.avgCells.push(a);
+
+    for (const a of anchors) {
+      const raw = a.textContent.replace(/\s+/g, " ").trim();
+      if (!raw || raw.length > 4) continue; // linki nawigacyjne, nie oceny
+      const meta = parseTooltip(a.getAttribute("title") || "");
+      const get = (...needles: string[]) => {
+        for (const n of needles) for (const [k, v] of Object.entries(meta)) if (k.includes(n)) return v;
+        return "";
+      };
+      const weight = parseFloat((get("waga") || "1").replace(",", ".")) || 1;
+      const date = normDate(get("data", "dodano"));
+      const licz = get("licz do średniej", "licz do sredniej", "licz do");
+      grades.push({
+        subject,
+        raw,
+        value: gradeValue(raw),
+        weight,
+        category: get("kategoria", "rodzaj"),
+        date,
+        counts: licz ? /tak|1/i.test(licz) : true,
+        semester: semesterOf(date),
+      });
+    }
+  }
+  return { grades, subjects };
+}
+
+async function fetchGrades(jar: Jar) {
+  const res = await hop(jar, GRADES_URL);
+  if (res.status === 401 || res.status === 403) throw sessionError("Librus odrzucil sesje");
+  if (!res.ok) throw new LibrusError(`Librus zwrocil HTTP ${res.status}`, "http");
+  return parseGrades(await res.text());
+}
+
+/** Jak safeExams/safeAttendance — blad ocen nie moze przewrocic reszty synchronizacji.
+ *  Pusta lista tam, gdzie wczesniej byly oceny, traktujemy jak zmiane strony
+ *  (a nie jak wyczyszczenie dziennika) i zostawiamy poprzedni snapshot. */
+async function safeGrades(
+  jar: Jar,
+  prevGrades: Grade[],
+  prevSubjects: Record<string, GradeSubject> | null,
+  prevFetchedAt: string | null,
+) {
+  const keepPrev = (error: string | null) => ({
+    grades: prevGrades, subjects: prevSubjects || {}, fetchedAt: prevFetchedAt, error,
+  });
+  try {
+    const { grades, subjects } = await fetchGrades(jar);
+    if (!grades.length && prevGrades.length) {
+      return keepPrev("structure: brak ocen mimo wczesniej pobranych");
+    }
+    return { grades, subjects, fetchedAt: new Date().toISOString(), error: null as string | null };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[librus] oceny: ${msg}`);
+    return keepPrev(msg.slice(0, 500));
+  }
 }
 
 /* ------------------- terminarz: sprawdziany i kartkowki -------------------- */
@@ -309,9 +647,9 @@ async function fetchCalendarHtml(jar: Jar, year: number, month: number, current:
 }
 
 /** Zapowiedzi z biezacego i nastepnego miesiaca. `truncated` = trafilismy w limit
- *  stron szczegolow, wiec lista jest niepelna i nie wolno z niej wnioskowac o
- *  odwolanych sprawdzianach. */
-async function fetchExams(jar: Jar): Promise<{ exams: Exam[]; truncated: boolean }> {
+ *  stron szczegolow (albo w deadline), wiec lista jest niepelna i nie wolno z niej
+ *  wnioskowac o odwolanych sprawdzianach. */
+async function fetchExams(jar: Jar, deadline = Infinity): Promise<{ exams: Exam[]; truncated: boolean }> {
   const [y, m] = warsawToday().split("-").map(Number);
   const months: [number, number][] = [[y, m], m === 12 ? [y + 1, 1] : [y, m + 1]];
 
@@ -328,8 +666,12 @@ async function fetchExams(jar: Jar): Promise<{ exams: Exam[]; truncated: boolean
 
   const exams: Exam[] = [];
   let next = 0;
+  let ranOut = false;
   const worker = async () => {
     while (next < todo.length) {
+      // Po deadline konczymy i oznaczamy liste jako urwana (truncated), zeby nikomu
+      // nie wyslac "Odwolana zapowiedz" tylko dlatego, ze zabraklo czasu.
+      if (Date.now() > deadline) { ranOut = true; return; }
       const [id, path] = todo[next++];
       // Jedno niedostepne wydarzenie nie moze przerwac pobierania reszty.
       try { const e = await fetchEventDetail(jar, path, id); if (e) exams.push(e); } catch { /* ignore */ }
@@ -339,7 +681,7 @@ async function fetchExams(jar: Jar): Promise<{ exams: Exam[]; truncated: boolean
     Array.from({ length: Math.min(EVENT_CONCURRENCY, todo.length) }, worker),
   );
   exams.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
-  return { exams, truncated };
+  return { exams, truncated: truncated || ranOut };
 }
 
 /* ----------------------------------- diff ----------------------------------- */
@@ -521,12 +863,12 @@ async function accountError(userId: string, kind: string, message: string) {
 
 /** Pobiera zapowiedzi tak, zeby zaden blad terminarza nie przewrocil synchronizacji
  *  planu lekcji: przy awarii zostaje poprzednia lista, a powod laduje w exams_error. */
-async function safeExams(jar: Jar, prevExams: Exam[], prevFetchedAt: string | null) {
+async function safeExams(jar: Jar, prevExams: Exam[], prevFetchedAt: string | null, deadline = Infinity) {
   const keepPrev = (error: string | null) => ({
     exams: prevExams, fetchedAt: prevFetchedAt, error, messages: [] as string[],
   });
   try {
-    const { exams, truncated } = await fetchExams(jar);
+    const { exams, truncated } = await fetchExams(jar, deadline);
     // Pusty terminarz tam, gdzie wczesniej byly zapowiedzi, to raczej zmiana strony
     // niz skasowanie wszystkiego — ten sam bezpiecznik co przy planie lekcji.
     if (!exams.length && prevExams.length) {
@@ -553,41 +895,95 @@ async function processAccount(acc: { user_id: string; login: string; pass_cipher
   }
   const password = await decryptPass(acc.pass_cipher, acc.pass_iv);
   const week = weekRange(warsawToday());
+  const deadline = Date.now() + RUN_BUDGET_MS;
   const jar = await librusLogin(acc.login, password);
-  const units = await fetchTimetable(jar, week);
 
   const prev: Unit[] = snap && snap.week === week ? (snap.units ?? []) : [];
   const firstRun = !snap || snap.week !== week;
-  // Bezpiecznik: pusty plan tam, gdzie wczesniej byly lekcje = podejrzana zmiana strony.
-  if (units.length === 0 && prev.length > 0) {
-    await accountError(acc.user_id, "structure", "Pusty plan mimo wczesniejszych lekcji — snapshot nietkniety");
-    return { error: true };
+
+  // Plan lekcji potrafi byc chwilowo niedostepny (wakacje, "Brak dostępu" na stronie
+  // planu) — a to nie moze blokowac zbierania ocen i frekwencji, ktore siedza na
+  // innych stronach Librusa. Dlatego blad planu tylko odklada plan na nastepny cron:
+  // units zostaja nietkniete w snapshocie, reszta danych i tak sie zapisze.
+  let units: Unit[] | null = null;
+  let planError: string | null = null;
+  try {
+    units = await fetchTimetable(jar, week);
+    // Bezpiecznik: pusty plan tam, gdzie wczesniej byly lekcje = podejrzana zmiana strony.
+    if (units.length === 0 && prev.length > 0) {
+      planError = "Pusty plan mimo wczesniejszych lekcji — snapshot nietkniety";
+      units = null;
+    }
+  } catch (e) {
+    planError = e instanceof Error ? e.message : String(e);
   }
-  const messages = firstRun ? [] : diff(prev, units);
+  const messages: string[] = units && !firstRun ? diff(prev, units) : [];
 
-  // Zapowiedzi sprawdzianow — w tej samej sesji logowania. Awaria terminarza nie moze
-  // zepsuc planu lekcji, wiec wszystko laduje w osobnym try/catch i osobnym polu bledu.
-  const prevExams: Exam[] = Array.isArray(snap?.exams) ? snap.exams : [];
-  const exams = await safeExams(jar, prevExams, snap?.exams_fetched_at ?? null);
-  messages.push(...exams.messages);
+  // Oceny — tania strona (jedno zapytanie), wiec leci zaraz po planie. Wlasny try/catch
+  // i wlasne pole bledu (grades_error), jak przy terminarzu.
+  const gr = await safeGrades(
+    jar,
+    Array.isArray(snap?.grades) ? (snap.grades as Grade[]) : [],
+    (snap?.grades_subjects as Record<string, GradeSubject>) ?? null,
+    snap?.grades_fetched_at ?? null,
+  );
 
+  // Frekwencja (zrealizowane lekcje biezacego tygodnia) — kilka podstron, wiec z deadline.
+  const att = await safeAttendance(
+    jar, weekMonSun(warsawToday()),
+    (snap?.attendance_freq as Record<string, { present: number; absent: number; total: number }>) ?? null,
+    (snap?.attendance_seen_keys as string[]) ?? null,
+    deadline,
+  );
+
+  // Powiadomienia o planie wysylamy od razu — gdyby terminarz przekroczyl czas,
+  // nie chcemy ich zgubic razem z przebiegiem.
   await pushEvents(acc.user_id, messages);
+
+  // Zapis PRZED terminarzem: terminarz to do 45 podstron i najlatwiej na nim przekroczyc
+  // wall-clock funkcji. Gdy nas ubija, oceny i frekwencja sa juz w bazie.
   await saveSnapshot(acc.user_id, {
-    week, units, fetched_at: new Date().toISOString(), last_error: null, last_error_at: null,
+    attendance_lessons: att.lessons, attendance_freq: att.freq, attendance_seen_keys: att.seenKeys,
+    attendance_fetched_at: att.fetchedAt, attendance_error: att.error,
+    grades: gr.grades, grades_subjects: gr.subjects,
+    grades_fetched_at: gr.fetchedAt, grades_error: gr.error,
+    // Plan tylko wtedy, gdy sie udal — fetched_at trzyma rate-limit, wiec przy bledzie
+    // planu nie ruszamy go i nastepny cron probuje od nowa.
+    ...(units
+      ? { week, units, fetched_at: new Date().toISOString(), last_error: null, last_error_at: null }
+      : {}),
+  });
+
+  // Zapowiedzi sprawdzianow na koniec — i tylko jesli zostal sensowny zapas czasu.
+  const prevExams: Exam[] = Array.isArray(snap?.exams) ? snap.exams : [];
+  const exams = Date.now() + EXAMS_MIN_MS < deadline
+    ? await safeExams(jar, prevExams, snap?.exams_fetched_at ?? null, deadline)
+    : {
+      exams: prevExams, fetchedAt: snap?.exams_fetched_at ?? null,
+      error: "skipped: zabraklo czasu w tym przebiegu", messages: [] as string[],
+    };
+  await pushEvents(acc.user_id, exams.messages);
+  await saveSnapshot(acc.user_id, {
     exams: exams.exams, exams_fetched_at: exams.fetchedAt, exams_error: exams.error,
   });
+  if (planError) {
+    await accountError(acc.user_id, "plan", planError);
+    return { error: true };
+  }
   await fetch(`${SB_URL}/rest/v1/librus_accounts?user_id=eq.${acc.user_id}`, {
     method: "PATCH", headers: { ...svc, Prefer: "return=minimal" },
     body: JSON.stringify({ status: "ok", last_sync_at: new Date().toISOString(), last_error: null, last_error_at: null }),
   }).catch(() => {});
-  return { changed: messages.length };
+  return { changed: messages.length + exams.messages.length };
 }
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
   const ok = (body: Record<string, unknown>) =>
-    new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
+    new Response(JSON.stringify(body), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   const deny = (error: string, status: number) =>
-    new Response(JSON.stringify({ ok: false, error }), { status, headers: { "Content-Type": "application/json" } });
+    new Response(JSON.stringify({ ok: false, error }), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   const encReady = !!Deno.env.get("LIBRUS_ENC_KEY");
 
@@ -624,21 +1020,39 @@ Deno.serve(async (req) => {
 
     // Pierwsze pobranie od razu, zeby harmonogram wypelnil sie bez czekania na crona.
     try {
-      const week = weekRange(warsawToday());
-      const units = await fetchTimetable(jar, week);
-      const exams = await safeExams(jar, [], null); // pierwszy raz = bez powiadomien
+      const today = warsawToday();
+      const week = weekRange(today);
+      const deadline = Date.now() + RUN_BUDGET_MS;
+      let units: Unit[] = [];
+      try { units = await fetchTimetable(jar, week); } catch { /* plan dojdzie z cronem */ }
+      const gr = await safeGrades(jar, [], null, null);
+      const att = await safeAttendance(jar, weekMonSun(today), null, null, deadline); // pierwszy raz = od zera
+      const exams = await safeExams(jar, [], null, deadline); // pierwszy raz = bez powiadomien
       await saveSnapshot(userId, {
         week, units, fetched_at: new Date().toISOString(), last_error: null, last_error_at: null,
         exams: exams.exams, exams_fetched_at: exams.fetchedAt, exams_error: exams.error,
+        attendance_lessons: att.lessons, attendance_freq: att.freq, attendance_seen_keys: att.seenKeys,
+        attendance_fetched_at: att.fetchedAt, attendance_error: att.error,
+        grades: gr.grades, grades_subjects: gr.subjects,
+        grades_fetched_at: gr.fetchedAt, grades_error: gr.error,
       });
-      return ok({ ok: true, connected: true, units: units.length, exams: exams.exams.length });
+      return ok({ ok: true, connected: true, units: units.length, exams: exams.exams.length, attendance: att.lessons.length, grades: gr.grades.length });
     } catch {
       return ok({ ok: true, connected: true, units: 0, warn: "first_fetch_failed" });
     }
   }
 
-  /* ===== TRYB CRON: petla po wszystkich kontach (klucz w naglowku) ===== */
-  const cronKey = Deno.env.get("LIBRUS_CRON_KEY");
+  /* ===== TRYB CRON: petla po wszystkich kontach (klucz w naglowku) =====
+     Oczekiwany klucz czytamy z tabeli librus_cron_secret (RLS bez polityk =
+     tylko service_role) — to samo zrodlo, z ktorego pg_cron bierze naglowek
+     (zasiane z Vault), wiec nie ma jak sie rozjechac. Env LIBRUS_CRON_KEY
+     zostaje jako fallback, gdyby tabela byla pusta. */
+  let cronKey: string | null = null;
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/librus_cron_secret?select=key`, { headers: svc });
+    if (r.ok) cronKey = ((await r.json())[0]?.key as string | undefined) ?? null;
+  } catch { /* fallback nizej */ }
+  if (!cronKey) cronKey = Deno.env.get("LIBRUS_CRON_KEY") ?? null;
   if (!cronKey || !encReady) return deny("not_configured", 503);
   if (req.headers.get("x-librus-key") !== cronKey) return deny("unauthorized", 401);
   const force = new URL(req.url).searchParams.get("force") === "1";

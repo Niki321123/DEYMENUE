@@ -794,10 +794,16 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 
 <!-- ============ FREKWENCJA ============ -->
 <section class="view" id="view-frekwencja">
-  <h1>Frekwencja</h1>
-  <p class="sub">Obecności i nieobecności z Librusa — liczone automatycznie od dnia podłączenia konta, bez klikania. Historia sprzed podłączenia nie jest dostępna.</p>
+  <h1>Frekwencja i oceny</h1>
+  <p class="sub">Obecności, nieobecności i oceny z Librusa — pobierane automatycznie, bez klikania. Frekwencja liczy się od dnia podłączenia konta (historia sprzed podłączenia nie jest dostępna), oceny widać wszystkie, jakie są w dzienniku.</p>
 
-  <div class="grid3" id="frekStatCards"></div>
+  <div class="grid4" id="frekStatCards"></div>
+
+  <div class="card">
+    <h2>Średnia wg przedmiotu</h2>
+    <div id="frekGrades"></div>
+    <p class="muted" id="frekGradesHint" style="margin:var(--sp-3) 0 0"></p>
+  </div>
 
   <div class="card">
     <h2>Frekwencja wg przedmiotu</h2>
@@ -1096,6 +1102,11 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   <h1>Konto i logowanie</h1>
   <p class="sub">Konto w chmurze synchronizuje dane między komputerem a telefonem. Dodatkowo możesz włączyć lokalną blokadę hasłem przy uruchamianiu.</p>
   <div id="accBox"></div>
+  <div class="card">
+    <h2 style="margin-bottom:2px">Prywatność</h2>
+    <p class="muted" style="margin-bottom:var(--sp-3)">Jakie dane trafiają do chmury, komu są przekazywane i jak poprosić o ich usunięcie.</p>
+    <a class="btn ghost small" href="https://github.com/Niki321123/DEYMENUE/blob/main/PRIVACY.md" target="_blank" rel="noopener" style="flex:none">Polityka prywatności ↗</a>
+  </div>
 </section>
 
 </main>
@@ -1113,7 +1124,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=80;
+const DM_BUILD=84;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1180,7 +1191,16 @@ const KEY="daymenu_v1";
 const defaults={theme:"light",moods:[],goals:[],books:[],timelog:[],sleep:[],appearance:null,habits:[],account:null,lastCloudSync:null,forest:[],matura:{grid:{},topics:[],plan:[],sessions:[],pomo:{work:25,break:5},prefs:""},exams:{librus:[],fetchedAt:null,err:null,manual:[],retakes:{}},wymagania:{opanowane:{},notatki:{},ukryjFakultatywne:true,ostatnioOtwarty:"matematyka"},materialy:[]};
 let S=load();
 let sbSession=null; // zadeklarowane WCZEŚNIE — save()→cloudQueuePush() bywa wołane już przy starcie (matMigrate), zanim wykona się sekcja chmury
-function load(){try{const d=JSON.parse(localStorage.getItem(KEY));return Object.assign({},defaults,d||{})}catch(e){return {...defaults}}}
+/* Object.assign({},defaults,...) kopiuje TYLKO pierwszy poziom, wiec przy braku danego klucza
+   w zapisanych danych (np. swieza przegladarka bez "matura") S.matura stawal sie TA SAMA
+   referencja co defaults.matura. Kazdy dopisany wtedy rekord — sesja nauki, drzewo, nawyk —
+   trwale zanieczyszczal wzorzec. resetLocalData() klonuje defaults, wiec przy przelogowaniu na
+   inne konto oddawal te zanieczyszczone dane nowemu uzytkownikowi. Klonujemy wiec przy kazdym
+   odczycie: wzorzec zostaje nietkniety, a "puste konto" jest naprawde puste. */
+// deklaracja funkcyjna, NIE const: load() wola to juz w linii `let S=load()`, czyli zanim
+// wykona sie ta linia — const wpadlby w martwa strefe czasowa i aplikacja nie wstalaby wcale
+function kopiaDefaults(){return JSON.parse(JSON.stringify(defaults))}
+function load(){try{const d=JSON.parse(localStorage.getItem(KEY));return Object.assign(kopiaDefaults(),d||{})}catch(e){return kopiaDefaults()}}
 function save(){
   // Jeśli localStorage.setItem rzuci (np. przekroczony limit pamięci przeglądarki),
   // błąd wcześniej znikał w ciszy — przycisk "wyglądał" jakby nic nie robił. Teraz
@@ -1615,6 +1635,8 @@ function matMigrate(){
   if(!Array.isArray(m.attendanceLessons)){m.attendanceLessons=[];ch=true;}
   if(!m.attendanceFreq||typeof m.attendanceFreq!=="object"){m.attendanceFreq={};ch=true;}
   if(!Array.isArray(m.lessonSubjects)){m.lessonSubjects=[];ch=true;}
+  if(!Array.isArray(m.grades)){m.grades=[];ch=true;}                                   // oceny z Librusa
+  if(!m.gradesSubjects||typeof m.gradesSubjects!=="object"){m.gradesSubjects={};ch=true;} // srednie policzone przez Librusa
   // Dwie warstwy harmonogramu: base = stały szkielet (Librus + ręczny pędzel),
   // ovr = nadpisania z czatu AI ważne tylko w bieżącym tygodniu. `grid` jest wyliczane.
   if(!m.base){m.base={...(m.grid||{})};ch=true;}         // istniejąca siatka staje się bazą
@@ -1940,7 +1962,7 @@ function aiJson(text){
   if(a<0||b<=a)throw new Error("Nieprawidłowa odpowiedź AI");
   return JSON.parse(text.slice(a,b+1));
 }
-const MAT_AI_RULES=`Jesteś planerem nauki w aplikacji Day Menu. Dni tygodnia: 0=Pon, 1=Wt, 2=Śr, 3=Czw, 4=Pt, 5=Sob, 6=Nd. Godziny 6-22, każdy blok ("hour") to godzina ZEGAROWA rozpoczęcia — NIE 60 minut realnej nauki. Realna nauka w jednym bloku to sesja pomodoro, jej długość w minutach dostajesz jako "pomoWorkMin" w kontekście (reszta godziny to przerwa/margines). Gdy użytkownik podaje preferencję w godzinach/minutach realnej nauki (np. "chcę się uczyć 4h dziennie"), PRZELICZ to na liczbę bloków wzorem: liczba_blokow = round(pożądane_minuty / pomoWorkMin) — NIE zakładaj, że 1 blok = 1h realnej nauki. Harmonogram powtarza się co tydzień. Zasady planowania: planuj naukę WYŁĄCZNIE w godzinach dostępnych (slots); NIGDY w godzinach szkolnych (school) ani poza dostępnymi — w godzinach szkolnych użytkownik jest w szkole i może uczyć się dopiero po ich zakończeniu; przydzielaj każdemu przedmiotowi czas proporcjonalnie do jego procentu (np. 80% vs 20% = 4× więcej blokow dla pierwszego); rozkładaj każdy przedmiot na różne dni zamiast kumulować; rób przerwy między sesjami tego samego przedmiotu; bezwzględnie szanuj preferencje użytkownika, w tym przeliczenie godzin realnej nauki opisane wyżej. W kontekście dostajesz też "activities" — własne zajęcia użytkownika wpisane w harmonogram (nazwa + typ): "busy" to godziny zajęte czymś innym (trening, praca), a "study" to jego własna forma nauki. Traktuj JEDNE I DRUGIE jako niedostępne — NIGDY nie planuj nauki w tych godzinach i nie usuwaj ich. Możesz się do nich odwoływać po nazwie, gdy tłumaczysz swoje decyzje (np. „w środy masz trening, więc przeniosłem matematykę na czwartek"). ZANIM ułożysz plan, PRZETŁUMACZ preferencje użytkownika na liczby i zwróć je w polu "limity": {"blokowDziennie":<ile bloków dziennie albo null>,"typ":"cel"|"maks","dniWolne":[<numery dni 0-6, w które użytkownik NIE chce się uczyć>]}. "blokowDziennie" liczysz wzorem round(minuty_realnej_nauki / pomoWorkMin) — np. 3h45 przy pomoWorkMin=45 to round(225/45)=5. "typ" to "cel", gdy użytkownik mówi ile CHCE się uczyć, i "maks", gdy podaje górną granicę ("nie więcej niż", "max"). Gdy z preferencji nic takiego nie wynika, daj null i pustą listę. Te liczby są następnie egzekwowane przez aplikację, więc muszą być zgodne z tym, co układasz w "blocks". Odpowiadasz WYŁĄCZNIE poprawnym JSON, bez markdown i bez komentarzy.`;
+const MAT_AI_RULES=`Jesteś planerem nauki w aplikacji Day Menu. Dni tygodnia: 0=Pon, 1=Wt, 2=Śr, 3=Czw, 4=Pt, 5=Sob, 6=Nd. Godziny 6-22, każdy blok ("hour") to godzina ZEGAROWA rozpoczęcia — NIE 60 minut realnej nauki. Realna nauka w jednym bloku to sesja pomodoro, jej długość w minutach dostajesz jako "pomoWorkMin" w kontekście (reszta godziny to przerwa/margines). Gdy użytkownik podaje preferencję w godzinach/minutach realnej nauki (np. "chcę się uczyć 4h dziennie"), PRZELICZ to na liczbę bloków wzorem: liczba_blokow = round(pożądane_minuty / pomoWorkMin) — NIE zakładaj, że 1 blok = 1h realnej nauki. Harmonogram powtarza się co tydzień. Zasady planowania: planuj naukę WYŁĄCZNIE w godzinach dostępnych (slots); NIGDY w godzinach szkolnych (school) ani poza dostępnymi — w godzinach szkolnych użytkownik jest w szkole i może uczyć się dopiero po ich zakończeniu; przydzielaj każdemu przedmiotowi czas proporcjonalnie do jego procentu (np. 80% vs 20% = 4× więcej blokow dla pierwszego); rozkładaj każdy przedmiot na różne dni zamiast kumulować; rób przerwy między sesjami tego samego przedmiotu; bezwzględnie szanuj preferencje użytkownika, w tym przeliczenie godzin realnej nauki opisane wyżej. W kontekście dostajesz też "activities" — własne zajęcia użytkownika wpisane w harmonogram (nazwa + typ): "busy" to godziny zajęte czymś innym (trening, praca), a "study" to jego własna forma nauki. Traktuj JEDNE I DRUGIE jako niedostępne — NIGDY nie planuj nauki w tych godzinach i nie usuwaj ich. Możesz się do nich odwoływać po nazwie, gdy tłumaczysz swoje decyzje (np. „w środy masz trening, więc przeniosłem matematykę na czwartek"). ZANIM ułożysz plan, PRZETŁUMACZ preferencje użytkownika na liczby i zwróć je w polu "limity": {"blokowDziennie":<ile bloków dziennie albo null>,"typ":"cel"|"maks","dniWolne":[<numery dni 0-6, w które użytkownik NIE chce się uczyć>],"jedenPrzedmiotDziennie":<true, gdy użytkownik chce w jednym dniu uczyć się tylko jednego przedmiotu>,"odpoczynekPoSzkole":<ile godzin przerwy po ostatniej lekcji, 0 gdy nie prosi>}. "blokowDziennie" liczysz wzorem round(minuty_realnej_nauki / pomoWorkMin) — np. 3h45 przy pomoWorkMin=45 to round(225/45)=5. "typ" to "cel", gdy użytkownik mówi ile CHCE się uczyć, i "maks", gdy podaje górną granicę ("nie więcej niż", "max"). Gdy z preferencji nic takiego nie wynika, daj null i pustą listę. Te liczby są następnie egzekwowane przez aplikację, więc muszą być zgodne z tym, co układasz w "blocks": jeśli ustawisz "jedenPrzedmiotDziennie":true, w KAŻDYM dniu wszystkie bloki muszą mieć ten sam topicId (różne dni mogą mieć różne przedmioty, rozdziel je proporcjonalnie do procentów), a jeśli podasz "odpoczynekPoSzkole":N, w danym dniu NIE planuj nauki wcześniej niż N godzin po zakończeniu ostatniej lekcji. Odpowiadasz WYŁĄCZNIE poprawnym JSON, bez markdown i bez komentarzy.`;
 function matAiContext(){
   return {
     subjects:S.matura.topics.filter(t=>(t.percent||0)>0).map(t=>({id:t.id,nazwa:t.name,procent:t.percent})),
@@ -1969,11 +1991,49 @@ function matSanitizeBlocks(blocks){
 function matLimity(raw){
   const l=(raw&&typeof raw==="object")?raw:{};
   const na=Math.round(+l.blokowDziennie);
+  const odp=Math.round(+l.odpoczynekPoSzkole);
   return{
     blokowDziennie:(Number.isFinite(na)&&na>0&&na<=16)?na:null,
     typ:l.typ==="maks"?"maks":"cel",
-    dniWolne:[...new Set((Array.isArray(l.dniWolne)?l.dniWolne:[]).map(Number).filter(d=>d>=0&&d<=6))]
+    dniWolne:[...new Set((Array.isArray(l.dniWolne)?l.dniWolne:[]).map(Number).filter(d=>d>=0&&d<=6))],
+    jedenPrzedmiotDziennie:l.jedenPrzedmiotDziennie===true,
+    odpoczynekPoSzkole:(Number.isFinite(odp)&&odp>0&&odp<=6)?odp:0
   };
+}
+// ostatnia godzina oznaczona jako szkolna w danym dniu (null, gdy tego dnia nie ma szkoły)
+function matOstatniaSzkolna(dzien){
+  let ost=null;
+  for(const g of MAT_HOURS)if(S.matura.grid[matKey(dzien,g)]==="school")ost=g;
+  return ost;
+}
+/* Pierwsza godzina, w której WOLNO planować naukę po powrocie ze szkoły.
+   Blok szkolny o 13:00 trwa do 14:00, więc przy godzinie odpoczynku nauka może ruszyć
+   dopiero o 15:00 — stąd +1 za dojście do domu i +N za sam odpoczynek. */
+function matPierwszaPoOdpoczynku(dzien,odpoczynek){
+  const ost=matOstatniaSzkolna(dzien);
+  return ost==null?-Infinity:ost+1+odpoczynek;
+}
+/* Jeden przedmiot na dzień. Dni rozdzielamy między przedmioty proporcjonalnie do ich
+   procentów (metodą największych reszt), a konkretny dzień dostaje ten przedmiot, który
+   już w nim przeważa — dzięki temu plan modelu zmienia się w minimalnym stopniu. */
+function matJedenPrzedmiotNaDzien(blocks,subs){
+  const dni=[...new Set(blocks.map(b=>b.day))].sort((a,b)=>a-b);
+  if(!dni.length||subs.length<2)return blocks;
+  const suma=subs.reduce((a,t)=>a+(t.percent||0),0)||1;
+  const kw=subs.map(t=>{const d=(t.percent||0)/suma*dni.length;return{id:t.id,ile:Math.floor(d),reszta:d-Math.floor(d)}});
+  let brak=dni.length-kw.reduce((a,k)=>a+k.ile,0);
+  kw.slice().sort((a,b)=>b.reszta-a.reszta).forEach(k=>{if(brak>0){k.ile++;brak--}});
+  const pula={};kw.forEach(k=>pula[k.id]=k.ile);
+  const przydzial={};
+  for(const d of dni){
+    const wDniu={};
+    blocks.filter(b=>b.day===d).forEach(b=>{wDniu[b.topicId]=(wDniu[b.topicId]||0)+1});
+    const kand=Object.keys(pula).filter(id=>pula[id]>0);
+    if(!kand.length)break;
+    kand.sort((a,b)=>((wDniu[b]||0)-(wDniu[a]||0))||(pula[b]-pula[a]));
+    przydzial[d]=kand[0];pula[kand[0]]--;
+  }
+  return blocks.map(b=>przydzial[b.day]?Object.assign({},b,{topicId:przydzial[b.day]}):b);
 }
 // który przedmiot dołożyć: ten, który najbardziej odstaje od swojego procentu
 function matNastepnyPrzedmiot(blocks,subs,dzien,godzina){
@@ -1994,12 +2054,20 @@ function matNastepnyPrzedmiot(blocks,subs,dzien,godzina){
 }
 function matEgzekwujLimity(blocks,lim){
   const subs=S.matura.topics.filter(t=>(t.percent||0)>0);
-  const zmiany={wolneDni:0,przyciete:0,dolozone:0,brakMiejsca:0};
+  const zmiany={wolneDni:0,przyciete:0,dolozone:0,brakMiejsca:0,poSzkole:0,ujednolicone:0};
   let out=blocks.slice();
   if(lim.dniWolne.length){
     const przed=out.length;
     out=out.filter(b=>!lim.dniWolne.includes(b.day));
     zmiany.wolneDni=przed-out.length;
+  }
+  // odpoczynek po szkole — kasujemy bloki z okna tuż po ostatniej lekcji, ZANIM dobijemy
+  // liczbę sesji, żeby uzupełnianie trafiało już w dozwolone godziny
+  const wolnoOGodzinie=(d,g)=>!lim.odpoczynekPoSzkole||g>=matPierwszaPoOdpoczynku(d,lim.odpoczynekPoSzkole);
+  if(lim.odpoczynekPoSzkole){
+    const przed=out.length;
+    out=out.filter(b=>wolnoOGodzinie(b.day,b.hour));
+    zmiany.poSzkole=przed-out.length;
   }
   if(lim.blokowDziennie&&subs.length){
     const wolne=new Set(lim.dniWolne);
@@ -2012,7 +2080,7 @@ function matEgzekwujLimity(blocks,lim){
         zmiany.przyciete+=dnia.length-lim.blokowDziennie;
       }else if(dnia.length<lim.blokowDziennie&&lim.typ==="cel"){
         const zajete=new Set(dnia.map(b=>b.hour));
-        const wolneGodziny=MAT_HOURS.filter(g=>S.matura.grid[matKey(d,g)]==="avail"&&!zajete.has(g));
+        const wolneGodziny=MAT_HOURS.filter(g=>S.matura.grid[matKey(d,g)]==="avail"&&!zajete.has(g)&&wolnoOGodzinie(d,g));
         let brakuje=lim.blokowDziennie-dnia.length;
         for(const g of wolneGodziny){
           if(!brakuje)break;
@@ -2023,6 +2091,12 @@ function matEgzekwujLimity(blocks,lim){
       }
     }
   }
+  // ujednolicenie przedmiotu w dniu robimy NA KOŃCU, gdy liczba bloków jest już ustalona
+  if(lim.jedenPrzedmiotDziennie&&subs.length>1){
+    const przed=out.map(b=>b.topicId);
+    out=matJedenPrzedmiotNaDzien(out,subs);
+    zmiany.ujednolicone=out.filter((b,i)=>przed[i]!==b.topicId).length;
+  }
   out.sort((a,b)=>a.day-b.day||a.hour-b.hour);
   return{blocks:out,zmiany};
 }
@@ -2030,11 +2104,15 @@ function matOpisKorekt(lim,z){
   const cz=[];
   if(lim.blokowDziennie)cz.push(`${lim.blokowDziennie} ${matsPlural(lim.blokowDziennie,"sesja","sesje","sesji")} dziennie`);
   if(lim.dniWolne.length)cz.push("wolne: "+lim.dniWolne.map(d=>MAT_DAYS[d]).join(", "));
+  if(lim.jedenPrzedmiotDziennie)cz.push("jeden przedmiot dziennie");
+  if(lim.odpoczynekPoSzkole)cz.push(lim.odpoczynekPoSzkole+" h odpoczynku po szkole");
   const nagl=cz.length?"Zrozumiałem: "+cz.join(" · ")+". ":"";
   const p=[];
   if(z.wolneDni)p.push(`usunąłem ${z.wolneDni} ${matsPlural(z.wolneDni,"blok","bloki","bloków")} z dni wolnych`);
   if(z.przyciete)p.push(`przyciąłem ${z.przyciete} ponad limit`);
   if(z.dolozone)p.push(`dołożyłem ${z.dolozone} brakujących`);
+  if(z.poSzkole)p.push(`przesunąłem ${z.poSzkole} ${matsPlural(z.poSzkole,"blok","bloki","bloków")} z czasu odpoczynku`);
+  if(z.ujednolicone)p.push(`ujednoliciłem przedmiot w ${z.ujednolicone} ${matsPlural(z.ujednolicone,"bloku","blokach","blokach")}`);
   if(z.brakMiejsca)p.push(`${z.brakMiejsca} nie zmieściło się w wolnych godzinach — pomaluj więcej okienek na „Dostępny"`);
   return nagl+(p.length?"Poprawki: "+p.join(", ")+". ":"");
 }
@@ -4824,7 +4902,7 @@ function applyCloud(row,goAccount){
   localStorage.setItem(KEY,JSON.stringify(S));
   setDataOwner(sbUserId());
   matMigrate();matRecompute();
-  applyTheme();renderDash();
+  applyTheme();renderDash();przerysujAktywny();
   if(goAccount)show("account");
 }
 /* ── Czyje są dane na tym urządzeniu ──────────────────────────────────────────
@@ -4838,11 +4916,17 @@ function sbUserId(){return(sbSession&&sbSession.user&&sbSession.user.id)||null}
 function dataOwner(){try{return localStorage.getItem(SB_OWNER_KEY)}catch(e){return null}}
 function setDataOwner(id){try{id?localStorage.setItem(SB_OWNER_KEY,id):localStorage.removeItem(SB_OWNER_KEY)}catch(e){}}
 function resetLocalData(){
-  S=JSON.parse(JSON.stringify(defaults));
-  S.materialy=[];                    // defaults.materialy to współdzielona referencja
+  S=kopiaDefaults();
   matMigrate();matRecompute();
   localStorage.setItem(KEY,JSON.stringify(S));
   applyTheme();renderDash();
+  przerysujAktywny();   // bez tego otwarta zakladka pokazuje dane poprzedniego konta do czasu przelaczenia
+}
+// przerysowanie widoku, na ktorym akurat stoi uzytkownik
+function przerysujAktywny(){
+  const w=document.querySelector('.view.active');
+  const nazwa=w?w.id.replace(/^view-/,''):null;
+  if(nazwa&&renderers[nazwa])try{renderers[nazwa]()}catch(e){console.error('przerysujAktywny:',e)}
 }
 function cloudCard(){
   if(recoveryToken)return `<div class="card"><h2>Ustaw nowe hasło</h2>
@@ -6397,6 +6481,42 @@ function librusApplyAttendance(row){
   return true;
 }
 
+/* Oceny — ten sam snapshot co plan/terminarz/frekwencja. Zapis tylko przy realnej
+   zmianie, bo funkcja chodzi co 5 min, a save() pcha dane do chmury. */
+function librusApplyGrades(row){
+  if(!row)return false;
+  const grades=Array.isArray(row.grades)?row.grades:[];
+  const subj=row.grades_subjects&&typeof row.grades_subjects==="object"?row.grades_subjects:{};
+  const before=JSON.stringify([S.matura.grades,S.matura.gradesSubjects,S.matura.gradesFetchedAt,S.matura.gradesErr]);
+  S.matura.grades=grades;
+  S.matura.gradesSubjects=subj;
+  S.matura.gradesFetchedAt=row.grades_fetched_at||null;
+  S.matura.gradesErr=row.grades_error||null;
+  if(JSON.stringify([S.matura.grades,S.matura.gradesSubjects,S.matura.gradesFetchedAt,S.matura.gradesErr])===before)return false;
+  save();
+  if($("#view-frekwencja").classList.contains("active"))renderFrekwencja();
+  return true;
+}
+
+/* ---- oceny: semestr, zakres i średnia ważona ----
+   Semestr bierzemy z daty oceny (wrzesień–styczeń = I), bo kolumn „sem. I / sem. II”
+   w HTML-u Librusa nie da się czytać odpornie. Poza semestrem (wakacje) albo gdy
+   bieżący semestr jest jeszcze pusty, liczymy ze wszystkiego, co jest w dzienniku. */
+function gradeSem(){const mo=new Date().getMonth()+1;return (mo>=9||mo===1)?1:2}
+function gradeScope(){
+  const all=(Array.isArray(S.matura.grades)?S.matura.grades:[]).filter(Boolean);
+  const inSem=all.filter(g=>g.semester===gradeSem());
+  return inSem.length?inSem:all;
+}
+const gradeW=g=>g.weight>0?g.weight:1;
+function gradeAvg(list){
+  const num=list.filter(g=>typeof g.value==="number"&&g.counts!==false);
+  const w=num.reduce((a,g)=>a+gradeW(g),0);
+  return w?num.reduce((a,g)=>a+g.value*gradeW(g),0)/w:null;
+}
+function gradeColor(v){return v==null?"var(--text-3)":v>=4.5?"var(--good)":v>=3.5?"var(--primary)":v>=2.5?"var(--warn)":"var(--bad)"}
+function gradeFmt(v){return v==null?"—":v.toFixed(2).replace(".",",")}
+
 /* ---- widok Frekwencja: obecności/nieobecności z Librusa (S.matura.attendanceFreq/Lessons) ---- */
 function frekPct(b){return b&&b.total>0?Math.round(b.present/b.total*100):null}
 function frekColor(pct){return pct==null?"var(--text-3)":pct>=90?"var(--good)":pct>=75?"var(--warn)":"var(--bad)"}
@@ -6405,10 +6525,15 @@ function renderFrekwencja(){
   const subjects=Object.keys(freq);
   const totals=subjects.reduce((a,s)=>({present:a.present+(freq[s].present||0),absent:a.absent+(freq[s].absent||0),total:a.total+(freq[s].total||0)}),{present:0,absent:0,total:0});
   const overallPct=frekPct(totals);
+  const scope=gradeScope();
+  const avgAll=gradeAvg(scope);
   $("#frekStatCards").innerHTML=`
     <div class="stat"><div class="v" style="color:${frekColor(overallPct)}">${overallPct==null?"—":overallPct+"%"}</div><div class="l">Frekwencja ogółem</div></div>
+    <div class="stat"><div class="v" style="color:${gradeColor(avgAll)}">${gradeFmt(avgAll)}</div><div class="l">Średnia ocen${scope.length?` (${scope.length})`:""}</div></div>
     <div class="stat"><div class="v">${totals.present}</div><div class="l">Obecności</div></div>
     <div class="stat"><div class="v">${totals.absent}</div><div class="l">Nieobecności</div></div>`;
+
+  renderFrekGrades(scope);
 
   const rows=subjects.map(s=>({s,pct:frekPct(freq[s])??0})).sort((a,b)=>a.pct-b.pct);
   $("#frekBySubject").innerHTML=rows.length?rows.map(r=>{
@@ -6436,13 +6561,46 @@ function renderFrekwencja(){
     </div>`;
   }).join(""):`<div class="empty">Brak zrealizowanych lekcji w tym tygodniu (albo dane jeszcze nie doszły).</div>`;
 }
+/* Karta „Średnia wg przedmiotu”: średnia ważona z ocen przedmiotu + same oceny jako
+   plakietki (najnowsze pierwsze). W tooltipie plakietki kategoria/waga/data, a przy
+   średniej — średnia policzona przez samego Librusa: nasza może się różnić, jeśli
+   szkoła ma inaczej ustawione wagi plusów i minusów. */
+function renderFrekGrades(scope){
+  const box=$("#frekGrades");if(!box)return;
+  const bySub={};
+  for(const g of scope){const k=g.subject||"—";(bySub[k]||(bySub[k]=[])).push(g)}
+  const rows=Object.keys(bySub).map(s=>({s,avg:gradeAvg(bySub[s]),list:bySub[s]}))
+    .sort((a,b)=>(a.avg==null)-(b.avg==null)||(a.avg??0)-(b.avg??0)||a.s.localeCompare(b.s,"pl"));
+  box.innerHTML=rows.length?rows.map(r=>{
+    const cells=(S.matura.gradesSubjects&&S.matura.gradesSubjects[r.s]&&S.matura.gradesSubjects[r.s].avgCells)||[];
+    const libTitle=cells.length?"Średnia z Librusa: "+cells.join(" / "):"Średnia ważona z ocen tego przedmiotu";
+    const chips=[...r.list].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).map(g=>{
+      const t=[g.category,g.weight?"waga "+String(g.weight).replace(".",","):"",g.date,g.counts===false?"nie liczy się do średniej":""].filter(Boolean).join(" • ");
+      return `<span class="badge" title="${esc(t)}" style="background:var(--surface-2);color:${gradeColor(g.value)}">${esc(g.raw)}</span>`;
+    }).join(" ");
+    return `<div class="list-item">
+      <div style="flex:1;min-width:0">
+        <strong>${esc(r.s)}</strong>
+        <p class="muted" style="margin:4px 0 0;display:flex;flex-wrap:wrap;gap:4px">${chips}</p>
+      </div>
+      <span class="badge" title="${esc(libTitle)}" style="background:var(--surface-2);color:${gradeColor(r.avg)};font-size:var(--fs-2)">${gradeFmt(r.avg)}</span>
+    </div>`;
+  }).join(""):`<div class="empty">Brak ocen — pojawią się same po synchronizacji z Librusem (serwer sprawdza co godzinę).</div>`;
+
+  const hint=$("#frekGradesHint");if(!hint)return;
+  const zakres=scope.length&&scope.every(g=>g.semester===gradeSem())?"bieżącego semestru":"wszystkich ocen w dzienniku";
+  if(S.matura.gradesErr)hint.textContent="Ostatni błąd pobierania ocen: "+S.matura.gradesErr;
+  else if(S.matura.gradesFetchedAt)hint.textContent=`Oceny sprawdzone: ${new Date(S.matura.gradesFetchedAt).toLocaleString("pl-PL")}. Średnia jest ważona (plus = +0,5, minus = −0,25) i liczona z ${zakres}.`;
+  else hint.textContent="Oceny pobiera serwer razem z planem lekcji — połącz konto Librus w zakładce „Konto”.";
+}
+
 async function librusSyncSchedule(force){
   if(!sbSession)return null;
   let tok; try{tok=await sbToken()}catch(e){return null}
   if(!tok)return null;
   let row;
   try{
-    const r=await fetch(`${SB_URL}/rest/v1/librus_snapshot?select=week,units,fetched_at,exams,exams_fetched_at,exams_error,attendance_lessons,attendance_freq`,{
+    const r=await fetch(`${SB_URL}/rest/v1/librus_snapshot?select=week,units,fetched_at,exams,exams_fetched_at,exams_error,attendance_lessons,attendance_freq,grades,grades_subjects,grades_fetched_at,grades_error`,{
       headers:{apikey:SB_KEY,Authorization:"Bearer "+tok}
     });
     if(!r.ok)return null;             // brak dostępu/sieci nie może wywalić apki
@@ -6450,6 +6608,7 @@ async function librusSyncSchedule(force){
   }catch(e){return null}
   librusApplyExams(row);              // zapowiedzi sprawdzianów jadą tym samym snapshotem
   librusApplyAttendance(row);         // frekwencja jedzie tym samym snapshotem
+  librusApplyGrades(row);             // oceny również
   if(!row||!Array.isArray(row.units))return null;
   if(!force&&S.matura.librusAppliedAt===row.fetched_at)return {days:0,skipped:true};
   const days=librusUnitsToBase(row.units);
