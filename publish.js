@@ -30,6 +30,10 @@ try {
     "APK w docs/ zostaje z poprzedniego builda. Aby zbudowac APK: `npm run android`.\n");
 }
 
+// 2b) podstrony regulaminu i polityki prywatnosci, generowane z plikow .md.
+// Odpalamy przy KAZDEJ publikacji, zeby tresc na stronie nie rozjechala sie ze zrodlem.
+run(`node "${path.join(root, "gen-docs.js")}"`);
+
 // 3) opublikuj na GitHub Pages
 // Uwaga: plik nazywa sie app.html (nie DayMenu.html) - stare wersje (build 1-4)
 // mialy wadliwy mechanizm podmiany; brak DayMenu.html chroni je przed zepsuciem.

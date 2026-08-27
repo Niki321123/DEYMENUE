@@ -1102,8 +1102,8 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     <h2 style="margin-bottom:2px">Dokumenty</h2>
     <p class="muted" style="margin-bottom:var(--sp-3)">Zasady zakupu i zwrotów oraz to, jakie dane trafiają do chmury, komu są przekazywane i jak poprosić o ich usunięcie.</p>
     <div class="row" style="gap:var(--sp-2)">
-      <a class="btn ghost small" href="https://github.com/Niki321123/DEYMENUE/blob/main/REGULAMIN.md" target="_blank" rel="noopener" style="flex:none">Regulamin ↗</a>
-      <a class="btn ghost small" href="https://github.com/Niki321123/DEYMENUE/blob/main/PRIVACY.md" target="_blank" rel="noopener" style="flex:none">Polityka prywatności ↗</a>
+      <a class="btn ghost small" href="https://daymenu.pl/regulamin.html" target="_blank" rel="noopener" style="flex:none">Regulamin ↗</a>
+      <a class="btn ghost small" href="https://daymenu.pl/prywatnosc.html" target="_blank" rel="noopener" style="flex:none">Polityka prywatności ↗</a>
     </div>
   </div>
 </section>
@@ -1123,7 +1123,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=93;
+const DM_BUILD=94;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -5257,8 +5257,8 @@ const PAY_WIDOKI={exams:{caly:true},frekwencja:{caly:true},rywal:{caly:true},tim
 let oplacone=true;          // do czasu pierwszego sprawdzenia nic nie chowamy
 let payOczekuje=false;      // wrocilismy ze Stripe i czekamy, az webhook dopisze wiersz
 
-const PAY_REGULAMIN="https://github.com/Niki321123/DEYMENUE/blob/main/REGULAMIN.md";
-const PAY_PRYWATNOSC="https://github.com/Niki321123/DEYMENUE/blob/main/PRIVACY.md";
+const PAY_REGULAMIN="https://daymenu.pl/regulamin.html";
+const PAY_PRYWATNOSC="https://daymenu.pl/prywatnosc.html";
 /* Zgoda na natychmiastowe udostepnienie tresci cyfrowej. Bez niej kupujacy zachowuje
    14 dni na odstapienie od umowy MIMO ze dostal produkt — wiec przycisk platnosci jest
    nieaktywny, dopoki jej nie zaznaczy. Ten sam warunek sprawdza funkcja serwerowa;
