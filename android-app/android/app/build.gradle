@@ -1,5 +1,24 @@
 apply plugin: 'com.android.application'
 
+// ===== PODPISYWANIE WYDANIA =====
+// Klucz i hasła NIGDY nie trafiają do repozytorium. Gradle czyta je z pliku
+// android-app/android/keystore.properties (ignorowanego przez git) albo — gdy tego pliku
+// nie ma — ze zmiennych środowiskowych, czego używa GitHub Actions (sekrety -> env).
+// Bez kompletu danych build release powstaje NIEPODPISANY, zamiast wywalić się błędem,
+// żeby każdy mógł zbudować projekt bez dostępu do klucza.
+def kpFile = rootProject.file("keystore.properties")
+def kp = new Properties()
+if (kpFile.exists()) { kpFile.withInputStream { kp.load(it) } }
+
+def ksPath      = kp['storeFile']     ?: System.getenv('DAYMENU_KEYSTORE')
+def ksPassword  = kp['storePassword'] ?: System.getenv('DAYMENU_KEYSTORE_PASSWORD')
+def ksAlias     = kp['keyAlias']      ?: System.getenv('DAYMENU_KEY_ALIAS')
+def ksAliasPass = kp['keyPassword']   ?: System.getenv('DAYMENU_KEY_PASSWORD')
+def podpisGotowy = ksPath && ksPassword && ksAlias && ksAliasPass && file(ksPath).exists()
+if (!podpisGotowy) {
+    logger.lifecycle("Day Menu: brak danych klucza (keystore.properties / zmienne DAYMENU_*) — release będzie NIEPODPISANY.")
+}
+
 android {
     namespace = "pl.user.daymenu"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,8 +35,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (podpisGotowy) {
+                storeFile file(ksPath)
+                storePassword ksPassword
+                keyAlias ksAlias
+                keyPassword ksAliasPass
+            }
+        }
+    }
     buildTypes {
         release {
+            if (podpisGotowy) { signingConfig signingConfigs.release }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

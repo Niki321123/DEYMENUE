@@ -9,3 +9,7 @@ android-app/android/build/
 !docs/DayMenu.apk
 .env
 .env.*
+# klucze do podpisywania Androida — nigdy w repozytorium
+keystore.properties
+*.jks
+*.keystore
