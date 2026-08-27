@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#2b3950">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=98">
+<link rel="manifest" href="/manifest.webmanifest?v=99">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -1144,7 +1144,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=98;
+const DM_BUILD=99;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -5251,6 +5251,14 @@ async function sbDoAuth(signup){
   try{
     if(signup){
       const r=await sbSignup(email,pass);
+      /* Gdy adres ma juz konto, Supabase CELOWO odpowiada tak samo jak przy sukcesie (200),
+         zeby nie zdradzac, ktore adresy sa zarejestrowane — i nie wysyla zadnego maila.
+         Rozpoznajemy to po pustej liscie `identities`. Bez tego aplikacja kazala czekac
+         na maila, ktory nigdy nie mial przyjsc. */
+      if(r.user&&Array.isArray(r.user.identities)&&!r.user.identities.length){
+        msg.textContent="Na ten adres jest już założone konto — zaloguj się zamiast zakładać nowe. Jeśli nie pamiętasz hasła, kliknij „Zapomniałeś hasła?”.";
+        return;
+      }
       if(r.session){
         sbSaveSession(r.session);await firstSync();startCloudPolling();renderAccount();toast("Konto utworzone — zalogowano");
       }else{
