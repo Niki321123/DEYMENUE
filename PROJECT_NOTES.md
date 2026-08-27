@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — oceny z Librusa i średnia w zakładce Frekwencja, build 82)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — egzekwowanie preferencji harmonogramu, build 84)_
 
 ## Czym jest projekt
 
@@ -474,6 +474,35 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-27 (sesja 16, cd. — jeden przedmiot dziennie i odpoczynek po szkole, build 84):**
+  Zgloszenie: z trzech preferencji („3h dziennie, jeden dzien na jeden przedmiot, godzine po
+  szkole odpoczywam") AI uszanowalo tylko pierwsza. **Trzeci raz ta sama klasa bledu**:
+  egzekwowane jest wylacznie to, co potrafi sprawdzic kod, reszta zostaje prosba w prompcie.
+  - `limity` z odpowiedzi modelu rozszerzone o `jedenPrzedmiotDziennie` (bool)
+    i `odpoczynekPoSzkole` (godziny). Model tlumaczy zdanie na te pola, kod je wymusza.
+  - **Odpoczynek:** `matPierwszaPoOdpoczynku()` = ostatnia godzina szkolna + 1 (dojscie do domu,
+    bo blok 13:00 trwa do 14:00) + N. Filtr dziala PRZED dobijaniem liczby sesji, a predykat
+    `wolnoOGodzinie` jest podawany takze do uzupelniania, zeby dokladane bloki nie wracaly
+    w okno odpoczynku. Dni bez szkoly nie sa ograniczane.
+  - **Jeden przedmiot dziennie:** `matJedenPrzedmiotNaDzien()` rozdziela DNI miedzy przedmioty
+    metoda najwiekszych reszt wedlug procentow, a konkretny dzien dostaje przedmiot, ktory
+    juz w nim przewaza — plan modelu zmienia sie wtedy minimalnie. Uruchamiane na koncu,
+    gdy liczba blokow jest juz ustalona.
+  - Testy (szkola do 14:00 pon-pt): plan mieszajacy przedmioty i startujacy zaraz po szkole
+    → 28 blokow, kazdy dzien jednoprzedmiotowy, pon-pt start najwczesniej 15:00, weekend bez
+    ograniczenia ✓; przy 55/35/10 podzial dni 4/2/1 ✓; przy 2 h odpoczynku i szkole do 16:00
+    zostaje tylko 19:00 i aplikacja raportuje „15 nie zmiescilo sie" ✓; bez tych preferencji
+    plan modelu nietkniety ✓; planer lokalny bez AI bez zmian ✓.
+
+- **2026-08-27 — UWAGA PROCESOWA: `publish.js` wciaga cudze zmiany.** Build 84 objal takze
+  niedokonczona prace nad ocenami z Librusa, prowadzona rownolegle w tym samym katalogu
+  roboczym (`supabase/functions/librus-timetable/index.ts` +478 linii, `DayMenu.html`,
+  `android-app/www/index.html`). Przyczyna: `publish.js` robi `git add -u` plus dodanie calych
+  katalogow, wiec zgarnia **wszystkie** zmodyfikowane pliki sledzone, nie tylko te zwiazane
+  z publikowana zmiana. Przy dwoch sesjach pracujacych na jednym katalogu konczy sie to
+  opublikowaniem cudzej pracy w trakcie. Do rozwazenia: `publish.js` powinien przerwac
+  z ostrzezeniem, gdy widzi zmiany w plikach spoza swojej listy.
 
 - **2026-08-27 (sesja 16, cd. — oceny z Librusa + średnia w zakładce Frekwencja):**
   Na życzenie użytkownika („zbieraj też z librusa oceny i pokazuj średnią w zakładce
