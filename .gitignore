@@ -1,24 +1,44 @@
+# Zależności i artefakty budowania
 node_modules/
+android-app/node_modules/
 dist/
 build/
-android-app/node_modules/
 android-app/android/app/build/
 android-app/android/.gradle/
 android-app/android/build/
+
+# APK trafia do repozytorium tylko w jednym miejscu — jako plik do pobrania
+# z GitHub Pages. Wszystkie pozostałe (np. w android-app/) zostają lokalnie.
 *.apk
 !docs/DayMenu.apk
+
+# Sekrety. Nigdy w repozytorium — repo jest publiczne.
 .env
 .env.*
-# klucze do podpisywania Androida — nigdy w repozytorium
 keystore.properties
 *.jks
 *.keystore
+*.pem
+*.p12
+*.key
+service-account*.json
 
-# Notatki i konfiguracja wylacznie na wlasny uzytek — zostaja na dysku,
-# nie trafiaja do publicznego repozytorium. PROJECT_NOTES.md zawiera prywatne
-# adresy e-mail i wewnetrzna historie decyzji.
+# Notatki i konfiguracja wyłącznie na własny użytek. Zostają na dysku, nie trafiają
+# do publicznego repozytorium: PROJECT_NOTES.md zawiera prywatne adresy e-mail
+# i wewnętrzną historię decyzji, SUPABASE_RLS.md opisuje model zabezpieczeń bazy.
 PROJECT_NOTES.md
-CLAUDE.md
 SUPABASE_RLS.md
-.mcp.json
+CLAUDE.md
 .claude/
+.mcp.json
+
+# Pliki robocze i śmieci systemowe
+*.tmp
+*.bak
+*.log
+.deploy*
+.fn-*
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/

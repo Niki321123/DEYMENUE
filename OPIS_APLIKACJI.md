@@ -1,7 +1,7 @@
 # Day Menu — opis aplikacji
 
 _Dokument opisuje, co aplikacja robi i jak się z niej korzysta. Bez kodu i szczegółów
-technicznych. Stan na build 69 (26 sierpnia 2026)._
+technicznych. Stan na build 92 (27 sierpnia 2026)._
 
 ---
 
@@ -12,23 +12,30 @@ rzeczy, które normalnie są rozrzucone po kilku aplikacjach: plan nauki na tydz
 pomodoro, spis materiałów z odhaczaniem postępu, dziennik snu i nawyków, dane z Librusa
 (plan lekcji, zapowiedzi sprawdzianów, frekwencja) oraz wykresy pokazujące, jak to wszystko
 wygląda w czasie. Do tego dochodzi moduł rywalizacji z kolegą — punkty za naukę, zakłady,
-sklep z nagrodami i czat. Część planowania wspiera sztuczna inteligencja: układa tygodniowy
-harmonogram i rozpisuje każdy dzień sesja po sesji, dobierając konkretne lekcje z kursów
-i konkretne zadania ze zbiorów.
+sklep z nagrodami i czat. Większość funkcji jest bezpłatna; kilka z nich odblokowuje
+jednorazowa opłata.
 
 ---
 
 ## Dla kogo
 
-Aplikacja powstała dla jednej konkretnej osoby — ucznia zdającego maturę 2027 z matematyki,
-fizyki i geografii na poziomie rozszerzonym — i jego kolegi. Nie jest produktem dla szerokiego
-odbiorcy: nie ma rejestracji otwartej dla wszystkich, marketingu ani płatności. To narzędzie
-robione pod konkretny sposób pracy, rozwijane w miarę pojawiania się potrzeb.
+Dla każdego, kto uczy się do matury albo po prostu chce mieć naukę poukładaną w jednym
+miejscu. Konto zakłada się samodzielnie, aplikacja działa w przeglądarce, na Windowsie
+i na Androidzie.
 
-Wynika z tego kilka rzeczy widocznych w działaniu. Materiały do nauki (wykupione kursy wideo
-i zdigitalizowany zbiór zadań) pojawiają się wyłącznie na koncie właściciela — ktoś inny po
-zalogowaniu zobaczy pustą zakładkę. Dostęp do funkcji AI jest przyznawany imiennie: bez niego
-przyciski AI są niewidoczne i nie da się ich wywołać.
+Powstała jako narzędzie robione pod konkretny sposób pracy — stąd nacisk na rzeczy, które
+realnie pomagają w codziennej nauce, a nie na listę funkcji. Nowe konto startuje puste:
+materiały, przedmioty i harmonogram dodaje się samemu.
+
+### Co jest płatne
+
+Jednorazowa opłata odblokowuje na stałe cztery rzeczy: zakładkę **Sprawdziany**, zakładkę
+**Frekwencja i oceny**, **wykresy** w Analizie czasu oraz **Rywalizację** ze znajomymi
+wraz z podsumowaniami tygodnia, miesiąca i roku. Kto dostał kod promocyjny, wpisuje go
+w zakładce Konto zamiast płacić.
+
+Cała reszta — harmonogram, pomodoro z lasem, materiały, statystyki nauki, nawyki, sen,
+cele, profil i synchronizacja między urządzeniami — jest bezpłatna i zostaje bezpłatna.
 
 ---
 
@@ -49,13 +56,11 @@ trzeba zamknąć aplikację właśnie stamtąd.
 
 ## Wejście do aplikacji
 
-Aplikacja może być chroniona **lokalną blokadą hasłem** — przy uruchomieniu pyta o hasło,
-zanim cokolwiek pokaże. To zabezpieczenie na wypadek, gdyby ktoś dorwał się do komputera;
-nie ma nic wspólnego z kontem w chmurze.
+Aplikacja działa od razu po otwarciu, bez zakładania konta — dane leżą wtedy tylko na tym
+jednym urządzeniu.
 
-Osobno działa **konto w chmurze**. Bez niego aplikacja jest w pełni sprawna, ale dane leżą
-tylko na tym jednym urządzeniu. Po zalogowaniu wszystko synchronizuje się między komputerem
-a telefonem, a dodatkowo odblokowują się funkcje wymagające serwera: Librus, AI i cały moduł
+**Konto w chmurze** jest opcjonalne. Po zalogowaniu wszystko synchronizuje się między
+komputerem a telefonem, a dodatkowo dochodzą funkcje wymagające serwera: Librus i moduł
 rywalizacji.
 
 ---
@@ -103,28 +108,23 @@ który maluje się pędzlem:
 
 | Stan | Znaczenie |
 |---|---|
-| Dostępny | możesz się wtedy uczyć — tutaj AI planuje naukę |
+| Dostępny | możesz się wtedy uczyć — tutaj wstawia się nauka |
 | W szkole | jesteś na lekcjach, nauka dopiero po nich |
 | Niedostępny | godzina zajęta, bez podpisu |
 | Własna aktywność — zajęte | np. trening, praca; blokuje godzinę, ale z nazwą |
-| Własna aktywność — nauka | Twoja forma nauki poza planem AI, którą odhaczasz |
+| Własna aktywność — nauka | Twoja forma nauki poza planem, którą odhaczasz |
 
 Godziny szkolne **wypełniają się same z planu lekcji z Librusa**, więc szkielet tygodnia nie
-wymaga ręcznej roboty. Własne aktywności są ważne z innego powodu: AI je widzi, zna ich nazwy
-i potrafi się do nich odwołać przy tłumaczeniu decyzji („w środy masz trening, więc
-przeniosłem matematykę na czwartek").
+wymaga ręcznej roboty.
 
-Po naciśnięciu przycisku generowania AI układa plan nauki na cały tydzień — wypełnia dostępne
-okienka konkretnymi przedmiotami. Można mu w jednym zdaniu podać preferencje, np. „chcę się
-uczyć 3 godziny 45 minut dziennie, w piątki się nie uczę". Aplikacja tłumaczy takie zdanie na
-liczby i **sama pilnuje ich wykonania**: usuwa bloki z dni wolnych, przycina dni ponad limit
-i dokłada brakujące. Pokazuje przy tym, jak zrozumiała preferencje i co poprawiła — dzięki
-temu widać, kiedy AI się pomyliło, zamiast dowiadywać się o tym po fakcie.
+Plan nauki układa się **samemu**: wybierasz przedmiot pędzlem i wstawiasz go w godziny.
+Kliknięcie tym samym przedmiotem drugi raz zdejmuje go z godziny, klik w nagłówek dnia
+wypełnia całą kolumnę, a przeciągnięcie myszą — na przykład od 12:00 do 17:00 — cały zakres
+naraz. Na telefonie ten sam efekt daje przytrzymanie pierwszej godziny i dotknięcie ostatniej.
 
-Jest też **czat z AI o harmonogramie**. Można napisać „w środy mam trening 17–19, oznacz jako
-niedostępne i przełóż naukę", a aplikacja zmieni siatkę i ułoży plan od nowa. Zmiany
-dostępności zrobione czatem obowiązują tylko w bieżącym tygodniu — stały szkielet z planu
-lekcji wraca w kolejnym.
+Kto woli nie klikać, ma przycisk **Ułóż plan automatycznie**: rozdziela dostępne godziny
+między przedmioty proporcjonalnie do ich priorytetów i rozkłada każdy przedmiot na różne dni,
+zamiast kumulować go w jednym.
 
 Ważny szczegół, który łatwo przeoczyć: **okienko w siatce to godzina zegarowa, ale nauki jest
 w niej tyle, ile trwa sesja pomodoro** (domyślnie 45 minut), reszta to przerwa. Aplikacja
@@ -146,33 +146,6 @@ pracy. Liczba żywych drzew jest jedną z liczb, którymi mierzycie się w rywal
 
 Długość sesji ustawiona tutaj jest jednocześnie budżetem czasowym, którym operuje planer
 dzienny — o tym niżej.
-
-### Lekcja
-
-Panel, który odpowiada na pytanie „co dokładnie mam dziś robić". Po naciśnięciu przycisku AI
-bierze dzisiejsze sesje z harmonogramu i **rozpisuje każdą z osobna**: które lekcje z kursu
-wideo obejrzeć i które zadania z którego działu zrobić. Można podać temat na dziś („dziś chcę
-funkcję kwadratową") albo zostawić puste — wtedy plan po prostu idzie dalej kursem.
-
-System trzyma się kilku zasad:
-
-- **Nie otwiera nowego tematu, dopóki poprzedni nie jest skończony** — chyba że sam wpiszesz
-  temat, wtedy Twoja decyzja jest ważniejsza.
-- **Zadania traktuje na równi z lekcjami.** Po obejrzeniu lekcji następna sesja idzie
-  w większości na zadania z tego samego tematu, a nie „na koniec, jak zostanie czas".
-- **Nie przekracza budżetu sesji.** Lekcja trwająca 35 minut w 45-minutowej sesji zostawia
-  około 10 minut, czyli miejsce na jedno–dwa zadania. Jeśli lekcja jest dłuższa niż cała
-  sesja, zajmuje ją w całości i nic się do niej nie dokłada.
-- **Nie powtarza materiału.** To, co przydzielono wcześniejszej sesji tego dnia albo co jest
-  już odhaczone, nie wróci w kolejnej.
-- **Nie wymyśla sesji.** Liczba sesji zawsze odpowiada harmonogramowi; nadmiarowe propozycje
-  są odrzucane, a fakt odrzucenia — pokazywany.
-
-Quizy i ich omówienia liczone są jako praktyka, czyli razem z zadaniami, a nie jako lekcje.
-Pozycje typu „Wprowadzenie do modułu", trwające kilkanaście sekund, są pomijane całkowicie.
-
-Każda pozycja w planie jest **klikalna**: lekcja otwiera odcinek kursu, zadanie otwiera
-konkretne zadanie na stronie, z której pochodzi. Obok jest pole odhaczania.
 
 ### Statystyki
 
@@ -307,31 +280,8 @@ danych do pliku i import z powrotem.
 
 ### Konto
 
-Logowanie do chmury, włączenie lokalnej blokady hasłem i podłączenie konta Librusa.
-
----
-
-## Sztuczna inteligencja — co robi, a czego nie
-
-AI występuje w aplikacji w trzech miejscach: układa tygodniowy harmonogram, rozpisuje dzienny
-plan sesja po sesji i odpowiada na polecenia w czacie o harmonogramie.
-
-Warto rozumieć podział ról, bo jest w tej aplikacji przemyślany i wynika z doświadczenia.
-**Model odpowiada za rzeczy językowe i uznaniowe**: zrozumienie zdania „w piątki się nie uczę",
-dopasowanie działu zadań do tematu lekcji, uzasadnienie decyzji. **Wszystkie reguły liczbowe
-sprawdza i wymusza sama aplikacja**: budżet czasowy sesji, liczbę sesji w dniu, liczbę bloków
-na dzień, dni wolne, pomijanie już odhaczonego materiału.
-
-Ten podział nie jest teoretyczny. Zdarzało się, że model wciskał 111 minut lekcji w
-45-minutową sesję, proponował siedem sesji zamiast pięciu albo planował naukę w dniu wyraźnie
-zablokowanym. Za każdym razem reguła była zapisana w poleceniu dla modelu — i za każdym razem
-została złamana. Dlatego dziś źródłem prawdy jest stan aplikacji, a odpowiedź modelu tylko się
-do niego dopasowuje. Gdy coś zostanie odrzucone lub poprawione, aplikacja mówi o tym wprost,
-zamiast po cichu korygować.
-
-Dostęp do AI jest przyznawany imiennie. Bez niego przyciski AI są niewidoczne, a zakładka
-Lekcja w ogóle nie istnieje w nawigacji. Planer tygodniowy ma wtedy wersję zapasową działającą
-bez AI — dzieli dostępne godziny proporcjonalnie do priorytetów przedmiotów.
+Logowanie do chmury, podłączenie konta Librusa, wpisanie kodu promocyjnego oraz linki
+do regulaminu i polityki prywatności.
 
 ---
 
@@ -366,8 +316,8 @@ chmury.
 
 ## Ograniczenia, o których warto wiedzieć
 
-- **Materiały są przypisane do jednego konta.** Wgrane kursy i zbiory zadań pojawiają się tylko
-  u właściciela; nowy użytkownik widzi pustą zakładkę i musi dodać własne.
+- **Nowe konto startuje puste.** Materiały do nauki dodaje się samemu — nic nie jest wgrane
+  z góry.
 - **Historia frekwencji zaczyna się od podłączenia Librusa** — wcześniejszej nie da się pobrać.
 - **Saldo sklepu liczy aplikacja, nie serwer.** Przy dwóch osobach to kwestia zaufania;
   technicznie da się to obejść.

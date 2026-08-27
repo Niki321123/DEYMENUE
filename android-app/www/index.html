@@ -1123,7 +1123,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=92;
+const DM_BUILD=93;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -4281,10 +4281,14 @@ function matsSeedFmZadania(){
    wtedy, gdy wiadomo, kto jest zalogowany. Nowy użytkownik widzi pustą zakładkę Materiały.
    Wywoływane po zalogowaniu i po każdym pobraniu danych z chmury — flagi w S.matura
    sprawiają, że ręczne usunięcie materiału jest trwałe. */
-const MATS_OWNER_EMAIL="mikolaj.sledziewski@gmail.com";
 function sbEmail(){return((sbSession&&sbSession.user&&sbSession.user.email)||"").toLowerCase()}
-function matsSeedForOwner(){
-  if(sbEmail()!==MATS_OWNER_EMAIL)return;
+/* Materialy wlasciciela wgrywaja sie tylko na jego koncie. Wczesniej decydowal adres e-mail
+   wpisany na sztywno w kodzie — czyli prywatny adres jechal w kazdej kopii aplikacji i lezal
+   w publicznym repozytorium. Teraz rozstrzyga ta sama tabela app_admins, ktora rzadzi kodami
+   promocyjnymi: jedno pojecie wlasciciela zamiast dwoch i zero danych osobowych w kodzie. */
+async function matsSeedForOwner(){
+  await sprawdzAdmin();
+  if(!promoAdmin)return;
   let ch=false;
   if(!S.matura.wpMatsSeeded){matsSeedWP();S.matura.wpMatsSeeded=true;ch=true;}
   if(!S.matura.zbiorSeeded){matsSeedZbior();S.matura.zbiorSeeded=true;ch=true;}
