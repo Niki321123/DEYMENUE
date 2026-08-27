@@ -56,7 +56,7 @@ fs.writeFileSync(path.join(site, "version.json"), `{"build":${build}}`);
 run("git add -u");
 // PROJECT_NOTES.md celowo poza lista: notatki sa lokalne i ignorowane przez gita,
 // a "git add" na ignorowanym pliku przerwalby publikacje bledem.
-run("git add DayMenu.html publish.js build-android.js package.json docs supabase android-app");
+run("git add DayMenu.html publish.js build-android.js gen-docs.js gen-icon.js package.json REGULAMIN.md PRIVACY.md README.md docs supabase android-app");
 run(`git commit -m "build ${build}"`);
 run("git push");
 console.log(`\nOpublikowano build ${build} - aplikacje zaktualizuja sie same przy uruchomieniu.`);
