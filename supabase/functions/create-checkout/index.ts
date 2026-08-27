@@ -93,15 +93,22 @@ Deno.serve(async (req: Request) => {
   // zaleznie od tego, ktore pole Stripe przysle w danym typie zdarzenia
   form.set("metadata[user_id]", user.id);
 
+  /* Klucz idempotencji liczymy z TRESCI zadania, a nie z samego user_id.
+     Stripe odrzuca ten sam klucz uzyty z innymi parametrami ("Keys for idempotent requests
+     can only be used with the same parameters..."), wiec klucz zbudowany na sztywno psul
+     sie przy kazdej zmianie konfiguracji — ceny, metod platnosci, adresu powrotu.
+     Odcisk z form.toString() daje jedno i drugie: dwuklik w ta sama platnosc trafia
+     w ten sam klucz, a kazda realna zmiana parametrow dostaje wlasny. */
+  const suma = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(form.toString()));
+  const odcisk = [...new Uint8Array(suma)].slice(0, 12)
+    .map((b) => b.toString(16).padStart(2, "0")).join("");
+
   const sRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${STRIPE_KEY}`,
       "Content-Type": "application/x-www-form-urlencoded",
-      // Ten sam uzytkownik klikajacy dwa razy nie tworzy dwoch sesji w Stripe.
-      // Cena wchodzi w klucz, inaczej po jej zmianie w panelu klient dostawalby
-      // przez dobe stara sesje po starej cenie.
-      "Idempotency-Key": `checkout-${user.id}-${PRICE_ID || KWOTA_GROSZE}`,
+      "Idempotency-Key": `checkout-${user.id}-${odcisk}`,
     },
     body: form.toString(),
   });
