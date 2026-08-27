@@ -1,21 +1,44 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# ===== Day Menu — reguły R8 dla wydania =====
+# Aplikacja to WebView (Capacitor) z mostem JS <-> Kotlin/Java. R8 nie widzi wywołań
+# idących z JavaScriptu, więc bez poniższych reguł wyciąłby klasy i metody, które
+# są używane WYŁĄCZNIE przez most — apka zbudowałaby się, a wywróciła dopiero w locie.
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# --- rdzeń Capacitora ---
+# Bridge tworzy instancje pluginów refleksją i czyta ich adnotacje.
+-keep class com.getcapacitor.** { *; }
+-keep interface com.getcapacitor.** { *; }
+-dontwarn com.getcapacitor.**
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Każda klasa pluginu (nasza i z wtyczek zewnętrznych) razem z metodami wołanymi z JS.
+-keep public class * extends com.getcapacitor.Plugin
+-keep @com.getcapacitor.annotation.CapacitorPlugin public class * {
+    @com.getcapacitor.annotation.PermissionCallback <methods>;
+    @com.getcapacitor.annotation.ActivityCallback <methods>;
+    @com.getcapacitor.annotation.PluginMethod <methods>;
+    public <init>(...);
+}
+-keepclassmembers class * {
+    @com.getcapacitor.PluginMethod <methods>;
+}
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# --- most WebView -> Java ---
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+
+# --- wtyczki Cordovy pakowane przez Capacitora ---
+-keep class org.apache.cordova.** { *; }
+-dontwarn org.apache.cordova.**
+
+# --- kod własny aplikacji ---
+# WidgetPlugin i LockTaskPlugin są rejestrowane w MainActivity przez registerPlugin(),
+# a DayMenuWidgetProvider wskazuje manifest — wszystkie trzy muszą przetrwać w całości.
+-keep class pl.user.daymenu.** { *; }
+
+# --- czytelne stack trace z wydania ---
+# Bez tego zgłoszenie błędu od użytkownika jest bezużyteczne (zaciemnione nazwy klas).
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+
+# --- adnotacje i sygnatury generyczne, z których korzysta refleksja Capacitora ---
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
