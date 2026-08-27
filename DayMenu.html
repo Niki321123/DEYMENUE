@@ -214,12 +214,6 @@ body.has-bg::after{content:"";position:fixed;inset:0;z-index:-1;background:var(-
 body.has-bg .card,body.has-bg .stat,body.has-bg #sidebar{background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(10px)}
 body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transparent)}
 /* ekran logowania */
-#loginScreen{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:var(--sp-5)}
-#loginScreen[hidden]{display:none}
-#loginScreen .box{max-width:360px;width:100%;text-align:center}
-#loginScreen .logo-tile{width:64px;height:64px;border-radius:18px;margin:0 auto var(--sp-4);background:conic-gradient(from -135deg,#22d3ee,#4ade80,#facc15,#fb923c,#f43f5e,#d946ef,#8b5cf6,#22d3ee);position:relative}
-#loginScreen .logo-tile::after{content:"";position:absolute;left:14px;right:14px;top:24px;bottom:14px;background:#fff;border-radius:8px}
-#loginScreen h1{margin-bottom:var(--sp-2)}
 
 /* wymagania maturalne — lista do odhaczania */
 .wym-dzial{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:var(--sp-3);overflow:hidden}
@@ -292,7 +286,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 .wrap-tlo{position:fixed;inset:0;z-index:120;background:rgba(10,12,18,.82);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:var(--sp-4)}
 /* Bez tej linii atrybut hidden NIE chowa nakladki: wlasne display:flex wygrywa z domyslnym
    [hidden]{display:none} przegladarki i cala aplikacja zostaje zaslonieta pustym, rozmytym
-   ekranem. Ta sama pulapka co przy #loginScreen i .wym-row. */
+   ekranem. Ta sama pulapka co przy .wym-row i bramce platnosci. */
 .wrap-tlo[hidden]{display:none}
 /* Relacja jak na Instagramie: pionowy kadr 9:16, treść wyśrodkowana w pionie, paski
    postępu u góry, przejście dalej dotknięciem prawej połowy kadru. */
@@ -373,17 +367,6 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 </head>
 <body>
 
-<div id="loginScreen" hidden>
-  <div class="box">
-    <div class="logo-tile" aria-hidden="true"></div>
-    <h1 id="loginHello">Cześć!</h1>
-    <p class="sub">Podaj hasło, aby otworzyć Day Menu.</p>
-    <div class="row">
-      <input type="password" id="loginPass" class="field" placeholder="Hasło" autocomplete="current-password">
-      <button class="btn" id="loginBtn" style="width:100%">Zaloguj się</button>
-    </div>
-  </div>
-</div>
 
 <button id="hamburger" type="button" aria-label="Otwórz menu" aria-expanded="false" aria-controls="sidebar">☰</button>
 <div id="sidebarOverlay"></div>
@@ -1137,7 +1120,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=86;
+const DM_BUILD=87;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -4831,88 +4814,14 @@ $("#habAdd").onclick=()=>{
   $("#habName").value="";save();renderHabits();toast("Nawyk dodany");
 };
 
-/* ================= KONTO / LOGOWANIE ================= */
-async function accHash(pass,salt){
-  const km=await crypto.subtle.importKey("raw",_te.encode(pass),"PBKDF2",false,["deriveBits"]);
-  return b64(await crypto.subtle.deriveBits({name:"PBKDF2",salt:ub64(salt),iterations:150000,hash:"SHA-256"},km,256));
-}
-function showLogin(){
-  if(!S.account){$("#loginScreen").hidden=true;return}
-  $("#loginScreen").hidden=false;
-  $("#loginHello").textContent="Cześć, "+S.account.name+"!";
-  $("#loginPass").value="";
-  setTimeout(()=>$("#loginPass").focus(),100);
-}
-$("#loginBtn").onclick=async()=>{
-  if((await accHash($("#loginPass").value,S.account.salt))===S.account.hash){
-    $("#loginScreen").hidden=true;renderDash();
-  }else{toast("Błędne hasło");$("#loginPass").value="";$("#loginPass").focus()}
-};
-$("#loginPass").onkeydown=e=>{if(e.key==="Enter")$("#loginBtn").click()};
+/* ================= KONTO =================
+   Lokalne logowanie haslem na urzadzeniu USUNIETE (2026-08-27). Bylo pozostaloscia
+   sprzed konta w chmurze i mylilo sie z nim: dwa osobne hasla, dwa "logowania",
+   a lokalnego nie dalo sie odzyskac. Jedynym logowaniem jest konto w chmurze.
+   `S.account` zostaje w stanie WYLACZNIE jako zrodlo imienia na pulpicie: nikt go juz
+   nie zaklada haslem, ale uzupelnia je zapis nazwy w zakladce Profil. */
 function renderAccount(){
-  const el=$("#accBox");
-  if(!S.account){
-    el.innerHTML=`<div class="card"><h2>Włącz logowanie</h2>
-      <div class="row">
-        <div class="field"><label class="fld">Twoje imię</label><input type="text" id="accName" placeholder="Jak się do Ciebie zwracać?"></div>
-        <div class="field"><label class="fld">Hasło (min. 4 znaki)</label><input type="password" id="accP1"></div>
-        <div class="field"><label class="fld">Powtórz hasło</label><input type="password" id="accP2"></div>
-      </div>
-      <button class="btn" id="accCreate" style="margin-top:var(--sp-3)">Utwórz profil i włącz logowanie</button>
-      <p class="muted" style="margin-top:var(--sp-2)">Hasło chroni dostęp do aplikacji na tym urządzeniu. Nie da się go odzyskać — zapamiętaj je dobrze.</p></div>`;
-    $("#accCreate").onclick=async()=>{
-      const n=$("#accName").value.trim(),p1=$("#accP1").value,p2=$("#accP2").value;
-      if(!n)return toast("Podaj imię");
-      if(p1.length<4)return toast("Hasło musi mieć min. 4 znaki");
-      if(p1!==p2)return toast("Hasła się różnią");
-      const salt=b64(crypto.getRandomValues(new Uint8Array(16)));
-      S.account={name:n,salt,hash:await accHash(p1,salt)};
-      save();renderAccount();toast("Logowanie włączone");
-    };
-  }else{
-    el.innerHTML=`
-      <div class="card"><h2>Profil</h2>
-        <div class="row"><span class="badge b-good">Logowanie włączone</span><strong style="font-size:var(--fs-3)">${esc(S.account.name)}</strong></div>
-        <div class="row" style="margin-top:var(--sp-3)">
-          <input type="text" id="accNewName" class="field" placeholder="Nowe imię">
-          <button class="btn small ghost" id="accRename">Zmień imię</button>
-        </div>
-      </div>
-      <div class="card"><h2>Zmiana hasła</h2>
-        <div class="row">
-          <div class="field"><label class="fld">Obecne hasło</label><input type="password" id="accOld"></div>
-          <div class="field"><label class="fld">Nowe hasło</label><input type="password" id="accN1"></div>
-          <div class="field"><label class="fld">Powtórz nowe</label><input type="password" id="accN2"></div>
-        </div>
-        <button class="btn" id="accChange" style="margin-top:var(--sp-3)">Zmień hasło</button>
-      </div>
-      <div class="card"><h2>Wyłączenie logowania</h2>
-        <div class="row">
-          <input type="password" id="accDelPass" class="field" placeholder="Obecne hasło">
-          <button class="btn danger" id="accRemove">Wyłącz logowanie</button>
-        </div>
-      </div>`;
-    $("#accRename").onclick=()=>{
-      const n=$("#accNewName").value.trim();
-      if(!n)return toast("Podaj nowe imię");
-      S.account.name=n;save();renderAccount();toast("Imię zmienione");
-    };
-    $("#accChange").onclick=async()=>{
-      if((await accHash($("#accOld").value,S.account.salt))!==S.account.hash)return toast("Obecne hasło jest błędne");
-      const p1=$("#accN1").value,p2=$("#accN2").value;
-      if(p1.length<4)return toast("Nowe hasło musi mieć min. 4 znaki");
-      if(p1!==p2)return toast("Nowe hasła się różnią");
-      const salt=b64(crypto.getRandomValues(new Uint8Array(16)));
-      S.account.salt=salt;S.account.hash=await accHash(p1,salt);
-      save();renderAccount();toast("Hasło zmienione");
-    };
-    $("#accRemove").onclick=async()=>{
-      if((await accHash($("#accDelPass").value,S.account.salt))!==S.account.hash)return toast("Błędne hasło");
-      if(!confirm("Wyłączyć logowanie? Aplikacja będzie otwierać się bez hasła."))return;
-      S.account=null;save();renderAccount();toast("Logowanie wyłączone");
-    };
-  }
-  el.insertAdjacentHTML("afterbegin",cloudCard());
+  $("#accBox").innerHTML=cloudCard();
   wireCloud();
 }
 
@@ -6248,6 +6157,9 @@ async function profZapisz(){
       body:JSON.stringify(zmiany)
     });
     if(!r.ok)throw new Error("HTTP "+r.status);
+    // powitanie na pulpicie czyta S.account.name — po usunieciu lokalnego logowania
+    // to jedyne miejsce, ktore je uzupelnia
+    S.account={...(S.account||{}),name:nazwa};save();
     rywalProfile.name=nazwa;
     if(profAvatarRoboczy!==null)rywalProfile.avatar=profAvatarRoboczy||null;
     profAvatarRoboczy=null;
@@ -7112,7 +7024,7 @@ function allDates(){
 
 /* init */
 renderDash();
-showLogin();
+/* showLogin() usuniete razem z lokalnym logowaniem */
 if(pendingAccountView)show("account");
 </script>
 </body>

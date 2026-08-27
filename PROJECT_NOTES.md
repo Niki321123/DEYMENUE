@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — platny dostep wdrozony na produkcji)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — platny dostep + usuniete lokalne logowanie)_
 
 ## Czym jest projekt
 
@@ -494,6 +494,20 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-27 (sesja 16, cd. — usuniete lokalne logowanie haslem):** Zakladka Konto miala
+  dwa rozne logowania obok siebie: konto w chmurze (Supabase) i stara karte „Wlacz
+  logowanie" z wlasnym haslem na urzadzeniu. Mylily sie ze soba, a lokalnego hasla nie
+  dalo sie odzyskac. Wyciete w calosci: ekran blokady `#loginScreen` (markup + CSS),
+  `accHash()`, `showLogin()`, karty profilu / zmiany hasla / wylaczenia logowania oraz
+  wywolanie `showLogin()` przy starcie — razem ~4,5 tys. znakow. `renderAccount()`
+  renderuje teraz wylacznie karte chmury.
+  - `S.account` ZOSTAJE w stanie, ale juz tylko jako zrodlo imienia w powitaniu na pulpicie.
+    Nikt go nie zaklada haslem; uzupelnia je zapis nazwy w zakladce Profil (`profZapisz`).
+  - Skutek dla osob, ktore mialy wlaczone lokalne haslo: aplikacja przestaje o nie pytac.
+    Dane na urzadzeniu nie sa juz nim zaslaniane — swiadoma zmiana, nie przeoczenie.
+  - Zweryfikowane: skladnia, brak `#loginScreen` w DOM, w Koncie zostaje jedna karta
+    („Konto w chmurze"), przelaczenie po 13 zakladkach bez bledow, powitanie z imieniem.
 
 - **2026-08-27 (sesja 16, cd. — platny dostep WDROZONY):** Migracja wykonana na
   `jkpwboekztpkfxivueql`: tabela `entitlements` + RLS (select tylko wlasnego wiersza),
