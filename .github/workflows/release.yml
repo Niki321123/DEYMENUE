@@ -1,11 +1,14 @@
 name: Wydanie APK
 
-# Uruchamia się po wypchnięciu tagu w formacie v* (np. v1.0.0).
-# Buduje podpisany release APK, liczy sumę SHA256 i publikuje oba pliki w GitHub Release.
+# NIEAKTYWNY: wymaga klucza do podpisywania, ktorego projekt swiadomie nie ma.
+# Zostaje w repo gotowy do uzycia - wystarczy ustawic cztery sekrety (KEYSTORE_BASE64,
+# KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD) i odkomentowac wyzwalacz na tagi.
+# Do tego czasu uruchamia sie WYLACZNIE recznie, zeby przypadkowy tag nie konczyl sie
+# czerwonym bledem w Actions.
 on:
-  push:
-    tags:
-      - "v*"
+  # push:
+  #   tags:
+  #     - "v*"
   workflow_dispatch:
 
 permissions:

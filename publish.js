@@ -38,6 +38,12 @@ fs.copyFileSync(htmlPath, path.join(site, "app.html"));
 if (fs.existsSync(path.join(site, "DayMenu.html"))) fs.unlinkSync(path.join(site, "DayMenu.html"));
 if (apkOk && fs.existsSync(path.join(root, "DayMenu.apk"))) {
   fs.copyFileSync(path.join(root, "DayMenu.apk"), path.join(site, "DayMenu.apk"));
+  // Suma kontrolna obok pliku: pozwala sprawdzic, ze pobrany APK nie zostal po drodze
+  // podmieniony ani uszkodzony. Bez tego instrukcja weryfikacji w README bylaby pusta.
+  const suma = require("crypto").createHash("sha256")
+    .update(fs.readFileSync(path.join(site, "DayMenu.apk"))).digest("hex");
+  fs.writeFileSync(path.join(site, "DayMenu.apk.sha256"), suma + "  DayMenu.apk\n");
+  console.log("SHA256 APK: " + suma);
 }
 fs.writeFileSync(path.join(site, "version.json"), `{"build":${build}}`);
 // UWAGA: NIE uzywamy `git add -A` — w rootcie repo lubia pojawiac sie pliki-smieci

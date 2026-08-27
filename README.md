@@ -18,37 +18,46 @@ aktualizują się same.
 
 <https://niki321123.github.io/DEYMENUE/>
 
+Nie wymaga instalacji i aktualizuje się sama. Na telefonie można ją dodać do ekranu
+głównego i działa wtedy jak zwykła aplikacja.
+
 ## Instalacja (Android)
 
-APK pobierasz z [wydań na GitHubie](https://github.com/Niki321123/DEYMENUE/releases).
+Projekt jest prywatny i **nie jest przeznaczony do szerokiej dystrybucji**. APK powstaje
+jako build deweloperski podpisany domyślnym kluczem debug — wystarcza to do instalacji na
+własnych urządzeniach, ale nie daje żadnej gwarancji autorstwa. Jeśli nie znasz autora
+osobiście, korzystaj z wersji przeglądarkowej.
+
+Plik: <https://niki321123.github.io/DEYMENUE/DayMenu.apk>
+Suma kontrolna: <https://niki321123.github.io/DEYMENUE/DayMenu.apk.sha256>
+
 Aplikacji nie ma w Google Play, więc telefon poprosi o **zezwolenie na instalację
-z nieznanych źródeł** — zgoda dotyczy tylko tej przeglądarki lub menedżera plików,
-którym otwierasz APK, i można ją potem cofnąć.
+z nieznanych źródeł**. Zgoda dotyczy tylko tej przeglądarki lub menedżera plików, którym
+otwierasz APK, i można ją potem cofnąć.
 
-### Sprawdź sumę kontrolną przed instalacją
+### Sprawdzenie sumy kontrolnej
 
-Obok każdego APK leży plik `.sha256`, a ta sama suma jest w opisie wydania. Sprawdzenie
-zajmuje chwilę i daje pewność, że plik nie został po drodze podmieniony ani uszkodzony.
+Porównanie sumy wykrywa uszkodzenie pliku przy pobieraniu i podmianę pliku po drodze.
 
 Windows (PowerShell):
 
 ```powershell
-Get-FileHash .\DayMenu-v1.0.0.apk -Algorithm SHA256
+Get-FileHash .\DayMenu.apk -Algorithm SHA256
 ```
 
 Linux / macOS:
 
 ```bash
-sha256sum -c DayMenu-v1.0.0.apk.sha256
+sha256sum -c DayMenu.apk.sha256
 ```
 
 Android (Termux):
 
 ```bash
-sha256sum ~/storage/downloads/DayMenu-v1.0.0.apk
+sha256sum ~/storage/downloads/DayMenu.apk
 ```
 
-Wynik musi zgadzać się **znak w znak** z sumą z opisu wydania. Jeśli się różni —
+Wynik musi zgadzać się **znak w znak** z zawartością pliku `.sha256`. Jeśli się różni —
 nie instaluj tego pliku.
 
 ### Aktualizacje
@@ -57,22 +66,18 @@ Aplikacja aktualizuje warstwę webową sama przy uruchomieniu, więc nowe funkcj
 się bez pobierania nowego APK. Świeży APK jest potrzebny tylko przy zmianach w części
 natywnej: widżet, przypinanie ekranu, ikony, uprawnienia.
 
-Wszystkie wydania są podpisane tym samym kluczem. Gdyby kiedykolwiek trzeba było go
-zmienić, Android odmówi aktualizacji w miejscu i konieczne będzie odinstalowanie
-poprzedniej wersji — **razem z danymi trzymanymi lokalnie**. Dlatego przed każdą większą
-operacją warto zrobić eksport danych (Wygląd → Dane → Eksport).
-
 ## Budowanie ze źródeł
 
 ```bash
 npm install                 # zależności Electrona
-npm run publish             # web + desktop + APK debug
+npm run publish             # web + desktop + APK (debug) + suma SHA256
 ```
 
-Podpisane wydanie Androida powstaje w GitHub Actions po wypchnięciu tagu `v*`
-(zob. [.github/workflows/release.yml](.github/workflows/release.yml)). Lokalnie da się je
-zbudować po utworzeniu pliku `android-app/android/keystore.properties` z danymi klucza —
-plik jest w `.gitignore` i nigdy nie trafia do repozytorium.
+W repozytorium leży też gotowy [workflow wydania](.github/workflows/release.yml), który
+buduje **podpisany** APK z sumą kontrolną i publikuje go w GitHub Releases. Jest celowo
+wyłączony — wymaga własnego klucza do podpisywania, którego projekt nie posiada.
+Uruchomienie go wymaga wygenerowania klucza (`keytool`), ustawienia czterech sekretów
+repozytorium i odkomentowania wyzwalacza na tagi.
 
 ## Licencja
 
