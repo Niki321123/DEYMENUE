@@ -7,6 +7,7 @@
 //
 // Sekrety (ustawiane w Supabase, NIE w repo):
 //   STRIPE_SECRET_KEY  — klucz sekretny Stripe (sk_test_... / sk_live_...)
+//   STRIPE_PRICE_ID    — opcjonalnie, cena z katalogu Stripe (price_...)
 //   DAYMENU_APP_URL    — opcjonalnie, adres powrotu; domyslnie wersja webowa
 
 const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
@@ -14,7 +15,14 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const APP_URL = Deno.env.get("DAYMENU_APP_URL") ?? "https://niki321123.github.io/DEYMENUE/app.html";
 
-// Cena w groszach. Zmiana ceny = zmiana tej jednej liczby (i redeploy funkcji).
+/* Cena moze pochodzic z dwoch zrodel:
+   1. STRIPE_PRICE_ID — pozycja z katalogu Stripe. Wtedy kwota, nazwa, opis i obrazek
+      pochodza z panelu i zmienia sie je klikiem, bez ruszania kodu. Wersja preferowana.
+   2. Brak tej zmiennej — awaryjnie skladamy cene w locie ze stalych ponizej.
+   ID ceny jest ROZNE w piaskownicy i w trybie live, dlatego siedzi w zmiennej
+   srodowiskowej, a nie w kodzie: przelaczenie na live to podmiana sekretu, nie redeploy.
+   Fallback istnieje po to, zeby literowka w nazwie sekretu nie zatrzymala sprzedazy. */
+const PRICE_ID = (Deno.env.get("STRIPE_PRICE_ID") ?? "").trim();
 const KWOTA_GROSZE = 300;
 const WALUTA = "pln";
 // tekst widoczny dla klienta na stronie platnosci — jedyny w tym pliku z polskimi znakami
@@ -70,9 +78,14 @@ Deno.serve(async (req: Request) => {
   form.set("success_url", `${APP_URL}?zaplacono=1`);
   form.set("cancel_url", `${APP_URL}?zaplacono=0`);
   form.set("line_items[0][quantity]", "1");
-  form.set("line_items[0][price_data][currency]", WALUTA);
-  form.set("line_items[0][price_data][unit_amount]", String(KWOTA_GROSZE));
-  form.set("line_items[0][price_data][product_data][name]", NAZWA_PRODUKTU);
+  if (PRICE_ID) {
+    form.set("line_items[0][price]", PRICE_ID);
+  } else {
+    console.warn("Brak STRIPE_PRICE_ID — skladam cene w locie z wartosci wpisanych w kodzie");
+    form.set("line_items[0][price_data][currency]", WALUTA);
+    form.set("line_items[0][price_data][unit_amount]", String(KWOTA_GROSZE));
+    form.set("line_items[0][price_data][product_data][name]", NAZWA_PRODUKTU);
+  }
   METODY.forEach((m, i) => form.set(`payment_method_types[${i}]`, m));
   // metadata dubluje client_reference_id — webhook czyta jedno albo drugie,
   // zaleznie od tego, ktore pole Stripe przysle w danym typie zdarzenia
@@ -83,8 +96,10 @@ Deno.serve(async (req: Request) => {
     headers: {
       Authorization: `Bearer ${STRIPE_KEY}`,
       "Content-Type": "application/x-www-form-urlencoded",
-      // ten sam uzytkownik klikajacy dwa razy nie tworzy dwoch sesji w Stripe
-      "Idempotency-Key": `checkout-${user.id}`,
+      // Ten sam uzytkownik klikajacy dwa razy nie tworzy dwoch sesji w Stripe.
+      // Cena wchodzi w klucz, inaczej po jej zmianie w panelu klient dostawalby
+      // przez dobe stara sesje po starej cenie.
+      "Idempotency-Key": `checkout-${user.id}-${PRICE_ID || KWOTA_GROSZE}`,
     },
     body: form.toString(),
   });
