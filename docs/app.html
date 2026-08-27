@@ -1096,6 +1096,11 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   <h1>Konto i logowanie</h1>
   <p class="sub">Konto w chmurze synchronizuje dane między komputerem a telefonem. Dodatkowo możesz włączyć lokalną blokadę hasłem przy uruchamianiu.</p>
   <div id="accBox"></div>
+  <div class="card">
+    <h2 style="margin-bottom:2px">Prywatność</h2>
+    <p class="muted" style="margin-bottom:var(--sp-3)">Jakie dane trafiają do chmury, komu są przekazywane i jak poprosić o ich usunięcie.</p>
+    <a class="btn ghost small" href="https://github.com/Niki321123/DEYMENUE/blob/main/PRIVACY.md" target="_blank" rel="noopener" style="flex:none">Polityka prywatności ↗</a>
+  </div>
 </section>
 
 </main>
@@ -1113,7 +1118,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=80;
+const DM_BUILD=81;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
