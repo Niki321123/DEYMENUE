@@ -794,10 +794,16 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 
 <!-- ============ FREKWENCJA ============ -->
 <section class="view" id="view-frekwencja">
-  <h1>Frekwencja</h1>
-  <p class="sub">Obecności i nieobecności z Librusa — liczone automatycznie od dnia podłączenia konta, bez klikania. Historia sprzed podłączenia nie jest dostępna.</p>
+  <h1>Frekwencja i oceny</h1>
+  <p class="sub">Obecności, nieobecności i oceny z Librusa — pobierane automatycznie, bez klikania. Frekwencja liczy się od dnia podłączenia konta (historia sprzed podłączenia nie jest dostępna), oceny widać wszystkie, jakie są w dzienniku.</p>
 
-  <div class="grid3" id="frekStatCards"></div>
+  <div class="grid4" id="frekStatCards"></div>
+
+  <div class="card">
+    <h2>Średnia wg przedmiotu</h2>
+    <div id="frekGrades"></div>
+    <p class="muted" id="frekGradesHint" style="margin:var(--sp-3) 0 0"></p>
+  </div>
 
   <div class="card">
     <h2>Frekwencja wg przedmiotu</h2>
@@ -1118,7 +1124,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=81;
+const DM_BUILD=82;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1185,7 +1191,16 @@ const KEY="daymenu_v1";
 const defaults={theme:"light",moods:[],goals:[],books:[],timelog:[],sleep:[],appearance:null,habits:[],account:null,lastCloudSync:null,forest:[],matura:{grid:{},topics:[],plan:[],sessions:[],pomo:{work:25,break:5},prefs:""},exams:{librus:[],fetchedAt:null,err:null,manual:[],retakes:{}},wymagania:{opanowane:{},notatki:{},ukryjFakultatywne:true,ostatnioOtwarty:"matematyka"},materialy:[]};
 let S=load();
 let sbSession=null; // zadeklarowane WCZEŚNIE — save()→cloudQueuePush() bywa wołane już przy starcie (matMigrate), zanim wykona się sekcja chmury
-function load(){try{const d=JSON.parse(localStorage.getItem(KEY));return Object.assign({},defaults,d||{})}catch(e){return {...defaults}}}
+/* Object.assign({},defaults,...) kopiuje TYLKO pierwszy poziom, wiec przy braku danego klucza
+   w zapisanych danych (np. swieza przegladarka bez "matura") S.matura stawal sie TA SAMA
+   referencja co defaults.matura. Kazdy dopisany wtedy rekord — sesja nauki, drzewo, nawyk —
+   trwale zanieczyszczal wzorzec. resetLocalData() klonuje defaults, wiec przy przelogowaniu na
+   inne konto oddawal te zanieczyszczone dane nowemu uzytkownikowi. Klonujemy wiec przy kazdym
+   odczycie: wzorzec zostaje nietkniety, a "puste konto" jest naprawde puste. */
+// deklaracja funkcyjna, NIE const: load() wola to juz w linii `let S=load()`, czyli zanim
+// wykona sie ta linia — const wpadlby w martwa strefe czasowa i aplikacja nie wstalaby wcale
+function kopiaDefaults(){return JSON.parse(JSON.stringify(defaults))}
+function load(){try{const d=JSON.parse(localStorage.getItem(KEY));return Object.assign(kopiaDefaults(),d||{})}catch(e){return kopiaDefaults()}}
 function save(){
   // Jeśli localStorage.setItem rzuci (np. przekroczony limit pamięci przeglądarki),
   // błąd wcześniej znikał w ciszy — przycisk "wyglądał" jakby nic nie robił. Teraz
@@ -1620,6 +1635,8 @@ function matMigrate(){
   if(!Array.isArray(m.attendanceLessons)){m.attendanceLessons=[];ch=true;}
   if(!m.attendanceFreq||typeof m.attendanceFreq!=="object"){m.attendanceFreq={};ch=true;}
   if(!Array.isArray(m.lessonSubjects)){m.lessonSubjects=[];ch=true;}
+  if(!Array.isArray(m.grades)){m.grades=[];ch=true;}                                   // oceny z Librusa
+  if(!m.gradesSubjects||typeof m.gradesSubjects!=="object"){m.gradesSubjects={};ch=true;} // srednie policzone przez Librusa
   // Dwie warstwy harmonogramu: base = stały szkielet (Librus + ręczny pędzel),
   // ovr = nadpisania z czatu AI ważne tylko w bieżącym tygodniu. `grid` jest wyliczane.
   if(!m.base){m.base={...(m.grid||{})};ch=true;}         // istniejąca siatka staje się bazą
@@ -4829,7 +4846,7 @@ function applyCloud(row,goAccount){
   localStorage.setItem(KEY,JSON.stringify(S));
   setDataOwner(sbUserId());
   matMigrate();matRecompute();
-  applyTheme();renderDash();
+  applyTheme();renderDash();przerysujAktywny();
   if(goAccount)show("account");
 }
 /* ── Czyje są dane na tym urządzeniu ──────────────────────────────────────────
@@ -4843,11 +4860,17 @@ function sbUserId(){return(sbSession&&sbSession.user&&sbSession.user.id)||null}
 function dataOwner(){try{return localStorage.getItem(SB_OWNER_KEY)}catch(e){return null}}
 function setDataOwner(id){try{id?localStorage.setItem(SB_OWNER_KEY,id):localStorage.removeItem(SB_OWNER_KEY)}catch(e){}}
 function resetLocalData(){
-  S=JSON.parse(JSON.stringify(defaults));
-  S.materialy=[];                    // defaults.materialy to współdzielona referencja
+  S=kopiaDefaults();
   matMigrate();matRecompute();
   localStorage.setItem(KEY,JSON.stringify(S));
   applyTheme();renderDash();
+  przerysujAktywny();   // bez tego otwarta zakladka pokazuje dane poprzedniego konta do czasu przelaczenia
+}
+// przerysowanie widoku, na ktorym akurat stoi uzytkownik
+function przerysujAktywny(){
+  const w=document.querySelector('.view.active');
+  const nazwa=w?w.id.replace(/^view-/,''):null;
+  if(nazwa&&renderers[nazwa])try{renderers[nazwa]()}catch(e){console.error('przerysujAktywny:',e)}
 }
 function cloudCard(){
   if(recoveryToken)return `<div class="card"><h2>Ustaw nowe hasło</h2>
@@ -6402,6 +6425,42 @@ function librusApplyAttendance(row){
   return true;
 }
 
+/* Oceny — ten sam snapshot co plan/terminarz/frekwencja. Zapis tylko przy realnej
+   zmianie, bo funkcja chodzi co 5 min, a save() pcha dane do chmury. */
+function librusApplyGrades(row){
+  if(!row)return false;
+  const grades=Array.isArray(row.grades)?row.grades:[];
+  const subj=row.grades_subjects&&typeof row.grades_subjects==="object"?row.grades_subjects:{};
+  const before=JSON.stringify([S.matura.grades,S.matura.gradesSubjects,S.matura.gradesFetchedAt,S.matura.gradesErr]);
+  S.matura.grades=grades;
+  S.matura.gradesSubjects=subj;
+  S.matura.gradesFetchedAt=row.grades_fetched_at||null;
+  S.matura.gradesErr=row.grades_error||null;
+  if(JSON.stringify([S.matura.grades,S.matura.gradesSubjects,S.matura.gradesFetchedAt,S.matura.gradesErr])===before)return false;
+  save();
+  if($("#view-frekwencja").classList.contains("active"))renderFrekwencja();
+  return true;
+}
+
+/* ---- oceny: semestr, zakres i średnia ważona ----
+   Semestr bierzemy z daty oceny (wrzesień–styczeń = I), bo kolumn „sem. I / sem. II”
+   w HTML-u Librusa nie da się czytać odpornie. Poza semestrem (wakacje) albo gdy
+   bieżący semestr jest jeszcze pusty, liczymy ze wszystkiego, co jest w dzienniku. */
+function gradeSem(){const mo=new Date().getMonth()+1;return (mo>=9||mo===1)?1:2}
+function gradeScope(){
+  const all=(Array.isArray(S.matura.grades)?S.matura.grades:[]).filter(Boolean);
+  const inSem=all.filter(g=>g.semester===gradeSem());
+  return inSem.length?inSem:all;
+}
+const gradeW=g=>g.weight>0?g.weight:1;
+function gradeAvg(list){
+  const num=list.filter(g=>typeof g.value==="number"&&g.counts!==false);
+  const w=num.reduce((a,g)=>a+gradeW(g),0);
+  return w?num.reduce((a,g)=>a+g.value*gradeW(g),0)/w:null;
+}
+function gradeColor(v){return v==null?"var(--text-3)":v>=4.5?"var(--good)":v>=3.5?"var(--primary)":v>=2.5?"var(--warn)":"var(--bad)"}
+function gradeFmt(v){return v==null?"—":v.toFixed(2).replace(".",",")}
+
 /* ---- widok Frekwencja: obecności/nieobecności z Librusa (S.matura.attendanceFreq/Lessons) ---- */
 function frekPct(b){return b&&b.total>0?Math.round(b.present/b.total*100):null}
 function frekColor(pct){return pct==null?"var(--text-3)":pct>=90?"var(--good)":pct>=75?"var(--warn)":"var(--bad)"}
@@ -6410,10 +6469,15 @@ function renderFrekwencja(){
   const subjects=Object.keys(freq);
   const totals=subjects.reduce((a,s)=>({present:a.present+(freq[s].present||0),absent:a.absent+(freq[s].absent||0),total:a.total+(freq[s].total||0)}),{present:0,absent:0,total:0});
   const overallPct=frekPct(totals);
+  const scope=gradeScope();
+  const avgAll=gradeAvg(scope);
   $("#frekStatCards").innerHTML=`
     <div class="stat"><div class="v" style="color:${frekColor(overallPct)}">${overallPct==null?"—":overallPct+"%"}</div><div class="l">Frekwencja ogółem</div></div>
+    <div class="stat"><div class="v" style="color:${gradeColor(avgAll)}">${gradeFmt(avgAll)}</div><div class="l">Średnia ocen${scope.length?` (${scope.length})`:""}</div></div>
     <div class="stat"><div class="v">${totals.present}</div><div class="l">Obecności</div></div>
     <div class="stat"><div class="v">${totals.absent}</div><div class="l">Nieobecności</div></div>`;
+
+  renderFrekGrades(scope);
 
   const rows=subjects.map(s=>({s,pct:frekPct(freq[s])??0})).sort((a,b)=>a.pct-b.pct);
   $("#frekBySubject").innerHTML=rows.length?rows.map(r=>{
@@ -6441,13 +6505,46 @@ function renderFrekwencja(){
     </div>`;
   }).join(""):`<div class="empty">Brak zrealizowanych lekcji w tym tygodniu (albo dane jeszcze nie doszły).</div>`;
 }
+/* Karta „Średnia wg przedmiotu”: średnia ważona z ocen przedmiotu + same oceny jako
+   plakietki (najnowsze pierwsze). W tooltipie plakietki kategoria/waga/data, a przy
+   średniej — średnia policzona przez samego Librusa: nasza może się różnić, jeśli
+   szkoła ma inaczej ustawione wagi plusów i minusów. */
+function renderFrekGrades(scope){
+  const box=$("#frekGrades");if(!box)return;
+  const bySub={};
+  for(const g of scope){const k=g.subject||"—";(bySub[k]||(bySub[k]=[])).push(g)}
+  const rows=Object.keys(bySub).map(s=>({s,avg:gradeAvg(bySub[s]),list:bySub[s]}))
+    .sort((a,b)=>(a.avg==null)-(b.avg==null)||(a.avg??0)-(b.avg??0)||a.s.localeCompare(b.s,"pl"));
+  box.innerHTML=rows.length?rows.map(r=>{
+    const cells=(S.matura.gradesSubjects&&S.matura.gradesSubjects[r.s]&&S.matura.gradesSubjects[r.s].avgCells)||[];
+    const libTitle=cells.length?"Średnia z Librusa: "+cells.join(" / "):"Średnia ważona z ocen tego przedmiotu";
+    const chips=[...r.list].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).map(g=>{
+      const t=[g.category,g.weight?"waga "+String(g.weight).replace(".",","):"",g.date,g.counts===false?"nie liczy się do średniej":""].filter(Boolean).join(" • ");
+      return `<span class="badge" title="${esc(t)}" style="background:var(--surface-2);color:${gradeColor(g.value)}">${esc(g.raw)}</span>`;
+    }).join(" ");
+    return `<div class="list-item">
+      <div style="flex:1;min-width:0">
+        <strong>${esc(r.s)}</strong>
+        <p class="muted" style="margin:4px 0 0;display:flex;flex-wrap:wrap;gap:4px">${chips}</p>
+      </div>
+      <span class="badge" title="${esc(libTitle)}" style="background:var(--surface-2);color:${gradeColor(r.avg)};font-size:var(--fs-2)">${gradeFmt(r.avg)}</span>
+    </div>`;
+  }).join(""):`<div class="empty">Brak ocen — pojawią się same po synchronizacji z Librusem (serwer sprawdza co godzinę).</div>`;
+
+  const hint=$("#frekGradesHint");if(!hint)return;
+  const zakres=scope.length&&scope.every(g=>g.semester===gradeSem())?"bieżącego semestru":"wszystkich ocen w dzienniku";
+  if(S.matura.gradesErr)hint.textContent="Ostatni błąd pobierania ocen: "+S.matura.gradesErr;
+  else if(S.matura.gradesFetchedAt)hint.textContent=`Oceny sprawdzone: ${new Date(S.matura.gradesFetchedAt).toLocaleString("pl-PL")}. Średnia jest ważona (plus = +0,5, minus = −0,25) i liczona z ${zakres}.`;
+  else hint.textContent="Oceny pobiera serwer razem z planem lekcji — połącz konto Librus w zakładce „Konto”.";
+}
+
 async function librusSyncSchedule(force){
   if(!sbSession)return null;
   let tok; try{tok=await sbToken()}catch(e){return null}
   if(!tok)return null;
   let row;
   try{
-    const r=await fetch(`${SB_URL}/rest/v1/librus_snapshot?select=week,units,fetched_at,exams,exams_fetched_at,exams_error,attendance_lessons,attendance_freq`,{
+    const r=await fetch(`${SB_URL}/rest/v1/librus_snapshot?select=week,units,fetched_at,exams,exams_fetched_at,exams_error,attendance_lessons,attendance_freq,grades,grades_subjects,grades_fetched_at,grades_error`,{
       headers:{apikey:SB_KEY,Authorization:"Bearer "+tok}
     });
     if(!r.ok)return null;             // brak dostępu/sieci nie może wywalić apki
@@ -6455,6 +6552,7 @@ async function librusSyncSchedule(force){
   }catch(e){return null}
   librusApplyExams(row);              // zapowiedzi sprawdzianów jadą tym samym snapshotem
   librusApplyAttendance(row);         // frekwencja jedzie tym samym snapshotem
+  librusApplyGrades(row);             // oceny również
   if(!row||!Array.isArray(row.units))return null;
   if(!force&&S.matura.librusAppliedAt===row.fetched_at)return {days:0,skipped:true};
   const days=librusUnitsToBase(row.units);
