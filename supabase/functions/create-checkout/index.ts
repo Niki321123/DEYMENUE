@@ -28,8 +28,11 @@ const WALUTA = "pln";
 // tekst widoczny dla klienta na stronie platnosci — jedyny w tym pliku z polskimi znakami
 const NAZWA_PRODUKTU = "Day Menu — pełny dostęp";
 
-// BLIK i Przelewy24 obok karty: wiekszosc uczniow nie ma wlasnej karty platniczej.
-const METODY = ["card", "blik", "p24"];
+/* Metod platnosci celowo NIE wpisujemy tutaj. Podanie ich na sztywno konczy sie bledem
+   "The payment method type provided: blik is invalid", gdy dana metoda nie jest jeszcze
+   wlaczona na koncie — i blokuje sprzedaz do czasu zmiany kodu. Bez tego pola Stripe
+   Checkout pokazuje to, co masz wlaczone w panelu (Settings -> Payments -> Payment methods),
+   wiec BLIK czy Przelewy24 dokladasz jednym klikiem, bez wdrazania funkcji. */
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -86,7 +89,6 @@ Deno.serve(async (req: Request) => {
     form.set("line_items[0][price_data][unit_amount]", String(KWOTA_GROSZE));
     form.set("line_items[0][price_data][product_data][name]", NAZWA_PRODUKTU);
   }
-  METODY.forEach((m, i) => form.set(`payment_method_types[${i}]`, m));
   // metadata dubluje client_reference_id — webhook czyta jedno albo drugie,
   // zaleznie od tego, ktore pole Stripe przysle w danym typie zdarzenia
   form.set("metadata[user_id]", user.id);
