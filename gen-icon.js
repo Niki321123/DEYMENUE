@@ -64,6 +64,30 @@ const DRAW = `(function(S,pad,tlo,kolo){
   return c.toDataURL("image/png");
 })`;
 
+// Logo ze znakiem i napisem — do paneli i sklepow (Stripe, Google Play, stopki stron).
+// Znak rysujemy tym samym kodem co ikony, wiec nie trzymamy drugiej, rozjezdzajacej sie
+// wersji logo. Wyjscie to czysty PNG kilkudziesieciu kB, a nie kilkusetkilobajtowy render.
+const DRAW_LOGO = `(async function(S){
+  const c=document.createElement("canvas");c.width=c.height=S;
+  const x=c.getContext("2d");
+  x.fillStyle="#ffffff";x.fillRect(0,0,S,S);
+
+  const znak=Math.round(S*0.46);
+  const img=new Image();
+  await new Promise(gotowe=>{img.onload=gotowe;img.src=${DRAW}(znak,0,null,false)});
+  x.drawImage(img,(S-znak)/2,S*0.20,znak,znak);
+
+  // napis dwukolorowy jak w logo: "Day" granatowe, "Menu" jasniejsze
+  x.font="600 "+Math.round(S*0.13)+"px system-ui,-apple-system,Segoe UI,Arial,sans-serif";
+  x.textBaseline="middle";x.textAlign="left";
+  const a="Day ",b="Menu";
+  const wa=x.measureText(a).width,wb=x.measureText(b).width;
+  const tx=(S-(wa+wb))/2;
+  x.fillStyle="#2b3950";x.fillText(a,tx,S*0.82);
+  x.fillStyle="#5b6b85";x.fillText(b,tx+wa,S*0.82);
+  return c.toDataURL("image/png");
+})`;
+
 const png = (dataUrl) => Buffer.from(dataUrl.split(",")[1], "base64");
 
 app.whenReady().then(async () => {
@@ -106,6 +130,13 @@ app.whenReady().then(async () => {
     zapisz(path.join(res, "mipmap-" + g, "ic_launcher.png"), await rysuj(ikona, 0.10, "#ffffff", false));
     zapisz(path.join(res, "mipmap-" + g, "ic_launcher_round.png"), await rysuj(ikona, 0.14, "#ffffff", true));
     zapisz(path.join(res, "mipmap-" + g, "ic_launcher_foreground.png"), await rysuj(przod, 0.26, null, false));
+  }
+
+  // ---- logo z napisem (panele, sklepy) ----
+  for (const S of [512, 1024]) {
+    const buf = await w.webContents.executeJavaScript(`${DRAW_LOGO}(${S})`).then(png);
+    zapisz(path.join(root, "build", `logo-${S}.png`), buf);
+    console.log(`build/logo-${S}.png — ${(buf.length / 1024).toFixed(1)} kB`);
   }
 
   console.log("Ikony zapisane: build/ oraz android-app/.../mipmap-*");
