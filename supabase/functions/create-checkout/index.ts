@@ -17,7 +17,8 @@ const APP_URL = Deno.env.get("DAYMENU_APP_URL") ?? "https://niki321123.github.io
 // Cena w groszach. Zmiana ceny = zmiana tej jednej liczby (i redeploy funkcji).
 const KWOTA_GROSZE = 300;
 const WALUTA = "pln";
-const NAZWA_PRODUKTU = "Day Menu — pelny dostep";
+// tekst widoczny dla klienta na stronie platnosci — jedyny w tym pliku z polskimi znakami
+const NAZWA_PRODUKTU = "Day Menu — pełny dostęp";
 
 // BLIK i Przelewy24 obok karty: wiekszosc uczniow nie ma wlasnej karty platniczej.
 const METODY = ["card", "blik", "p24"];
