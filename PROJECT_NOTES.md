@@ -1,6 +1,6 @@
 # Day Menu — notatka projektowa
 
-_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — odtwarzanie podsumowania, build 79)_
+_Ostatnia aktualizacja: 2026-08-27 (sesja 16, cd. — mobilne menu boczne, build 80)_
 
 ## Czym jest projekt
 
@@ -448,6 +448,33 @@ desktopową od zera, np. po zmianie `DM_UPDATE_URL`) → `electron-packager`, wy
 (inaczej `EBUSY` na `dist/`).
 
 ## Historia sesji (skrót)
+
+- **2026-08-27 (sesja 16, cd. — mobilna nawigacja jako panel boczny, build 80):**
+  Poziomy pasek pigułek na telefonie zastąpiony wysuwanym panelem — na wąskim ekranie
+  wygląda teraz tak samo jak na desktopie: pionowo, z nagłówkami kategorii, logo u góry
+  i stopką (Motyw/Eksport/Import) na dole. Wcześniej ginęły nazwy kategorii, a zakładek
+  było więcej, niż mieści szerokość ekranu.
+  - `#sidebar` na `<=760px`: `position:fixed`, `width:min(280px,84vw)`, `height:100dvh`
+    z paddingiem na `env(safe-area-inset-*)`, domyślnie `translateX(-100%)`; klasa
+    `body.sidebar-open` wysuwa go i pokazuje `#sidebarOverlay` oraz blokuje scroll strony.
+    Wszystkie reguły siedzą w media query, więc na desktopie klasa nic nie zmienia.
+  - `#hamburger` (☰ / ✕, `aria-expanded`, `aria-controls`) w lewym górnym rogu, `display:none`
+    poza media query. **Po otwarciu przesuwa się za krawędź panelu**
+    (`left:calc(min(280px,84vw) + 10px)`), żeby nie zasłaniał logo — zamiast zmieniać style
+    samego panelu.
+  - Zamykanie: kliknięcie w przyciemnienie, Escape (pomijany, gdy otwarte jest podsumowanie
+    okresu — leży wyżej i ma własną obsługę) oraz automatycznie po wyborze zakładki.
+    Jedyna zmiana w JS nawigacji to dopisanie `menuBoczne(false)` do handlera `.nav-btn`.
+  - **Pułapka środowiska testowego:** przejścia CSS nie animują się w niewyświetlanym oknie
+    przeglądarki, więc `getComputedStyle` uparcie zwracał `translateX(-280px)` mimo poprawnej
+    reguły. Weryfikacja wymaga wyłączenia `transition` (`transition:none!important` + reflow)
+    — dopiero wtedy geometria jest miarodajna.
+  - Testy przy 375x812: zamknięty panel poza ekranem (lewa -280), otwarty na 0..280,
+    hamburger przesunięty na 290 (poza panelem), przyciemnienie `block`, `body{overflow:hidden}`,
+    5 nagłówków kategorii, logo i stopka widoczne, panel przewijalny na pełnej wysokości ✓;
+    zamykanie przyciemnieniem, Escape i wyborem zakładki ✓. Desktop 1280 px bez zmian:
+    `sticky`, 248 px, `transform:none`, hamburger i przyciemnienie `display:none`, a wymuszona
+    klasa `sidebar-open` nie robi tam nic ✓.
 
 - **2026-08-27 (sesja 16, cd. — „Odtwórz" podsumowanie w Profilu, build 79):**
   Podsumowanie znikało od jednego przypadkowego dotknięcia i wracało dopiero za tydzień.
