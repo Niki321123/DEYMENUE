@@ -38,6 +38,13 @@ button{cursor:pointer}
 /* ===== LAYOUT ===== */
 #sidebar{width:248px;min-width:248px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;position:sticky;top:0;overflow-y:auto}
 #main{flex:1;height:100vh;overflow-y:auto;padding:var(--sp-6)}
+/* Hamburger i przyciemnienie istnieją tylko na wąskich ekranach — na desktopie nie ma po nich
+   śladu (display:none), więc układ z zawsze widocznym panelem zostaje nietknięty. */
+#hamburger{display:none;position:fixed;left:10px;top:calc(10px + env(safe-area-inset-top));z-index:115;
+  width:42px;height:42px;align-items:center;justify-content:center;font-size:20px;line-height:1;
+  background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-s);
+  box-shadow:var(--shadow);transition:left .22s ease-out}
+#sidebarOverlay{display:none;position:fixed;inset:0;z-index:105;background:rgba(0,0,0,.4)}
 .view{display:none;max-width:980px;margin:0 auto}
 .view.active{display:block;animation:fadein .2s ease-out}
 @keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -307,15 +314,20 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
 /* ===== TELEFON ===== */
 @media(max-width:760px){
   body{flex-direction:column}
-  #sidebar{position:sticky;top:0;z-index:50;width:100%;min-width:0;height:auto;display:flex;flex-direction:row;align-items:center;gap:0;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;border-right:none;border-bottom:1px solid var(--border);padding:8px 10px;padding-top:calc(8px + env(safe-area-inset-top));box-shadow:var(--shadow)}
-  #sidebar::-webkit-scrollbar{display:none}
-  .brand,.side-footer{display:none}
-  .nav-group{display:flex;flex:none;padding:0}
-  .nav-group h3{display:none}
-  .nav-btn{flex:none;width:auto;padding:9px 15px;border-radius:99px;font-size:14px;min-height:42px;white-space:nowrap;background:var(--surface-2);margin-right:6px}
-  .nav-btn.active{background:var(--primary);color:var(--primary-text);font-weight:700}
-  body.has-bg #sidebar{background:color-mix(in srgb,var(--surface) 92%,transparent)}
-  #main{height:auto;padding:14px 14px calc(28px + env(safe-area-inset-bottom))}
+  /* Panel boczny wysuwany z lewej — wygląda i działa DOKŁADNIE jak na desktopie (pionowo,
+     z nagłówkami kategorii, logo u góry i stopką na dole). Wcześniej był poziomym paskiem
+     pigułek, w którym ginęły nazwy kategorii, a zakładek było więcej, niż mieści ekran. */
+  #sidebar{position:fixed;left:0;top:0;z-index:110;width:min(280px,84vw);min-width:0;
+    height:100dvh;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);
+    transform:translateX(-100%);transition:transform .22s ease-out;box-shadow:var(--shadow)}
+  body.sidebar-open #sidebar{transform:translateX(0)}
+  body.sidebar-open #sidebarOverlay{display:block}
+  body.sidebar-open{overflow:hidden}
+  /* otwarty panel przesuwa przycisk poza swoją krawędź, żeby nie zasłaniał logo */
+  body.sidebar-open #hamburger{left:calc(min(280px,84vw) + 10px)}
+  #hamburger{display:flex}
+  #main{height:auto;padding:14px 14px calc(28px + env(safe-area-inset-bottom));
+    padding-top:calc(62px + env(safe-area-inset-top))}
   h1{font-size:24px}
   .sub{font-size:14px;margin-bottom:var(--sp-4)}
   .card{padding:var(--sp-4)}
@@ -367,6 +379,9 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     </div>
   </div>
 </div>
+
+<button id="hamburger" type="button" aria-label="Otwórz menu" aria-expanded="false" aria-controls="sidebar">☰</button>
+<div id="sidebarOverlay"></div>
 
 <nav id="sidebar" aria-label="Nawigacja">
   <div class="brand"><span class="znak"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 106 106"><rect x="0" y="11.7" width="100" height="88.3" rx="13.5" fill="#2b3950"/><rect x="19.2" y="-2.5" width="14.8" height="29.7" rx="7.4" fill="#fff"/><rect x="66" y="-2.5" width="14.8" height="29.7" rx="7.4" fill="#fff"/><rect x="21.7" y="0" width="9.8" height="24.5" rx="4.9" fill="#2b3950"/><rect x="68.5" y="0" width="9.8" height="24.5" rx="4.9" fill="#2b3950"/><rect x="11.5" y="31.9" width="77" height="62.8" rx="7.5" fill="#fff"/><rect x="15.9" y="44.9" width="28.7" height="6" rx="3" fill="#4a80d4"/><rect x="15.9" y="60.8" width="28.7" height="6" rx="3" fill="#4a9d52"/><rect x="15.9" y="75.7" width="28.7" height="6" rx="3" fill="#7069e6"/><path d="M51.1 64.9 64.1 74.5 82.6 53.2" fill="none" stroke="#2b3950" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Day Menu</div>
@@ -1098,7 +1113,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=79;
+const DM_BUILD=80;
 const DM_UPDATE_URL="https://niki321123.github.io/DEYMENUE/";
 (function(){
   if(!/^https?:/.test(DM_UPDATE_URL))return;
@@ -1277,7 +1292,22 @@ applyTheme();loadBg();
 
 /* ================= NAV ================= */
 const renderers={dash:renderDash,mood:renderMood,goals:renderGoals,books:renderBooks,time:renderTime,sleep:renderSleep,look:renderLook,habits:renderHabits,account:renderAccount,matura:renderMatura,exams:renderExams,wymagania:renderWymagania,mats:renderMats,frekwencja:renderFrekwencja,rywal:renderRywal,profil:renderProfil};
-$$(".nav-btn").forEach(b=>b.onclick=()=>show(b.dataset.view));
+/* Panel boczny na telefonie. Na desktopie te reguły CSS nie działają, więc klasa
+   "sidebar-open" nic tam nie zmienia — logika może być wspólna. */
+function menuBoczne(otwarty){
+  document.body.classList.toggle("sidebar-open",otwarty);
+  const b=$("#hamburger");
+  b.textContent=otwarty?"✕":"☰";
+  b.setAttribute("aria-expanded",String(otwarty));
+  b.setAttribute("aria-label",otwarty?"Zamknij menu":"Otwórz menu");
+}
+$("#hamburger").onclick=()=>menuBoczne(!document.body.classList.contains("sidebar-open"));
+$("#sidebarOverlay").onclick=()=>menuBoczne(false);
+document.addEventListener("keydown",e=>{
+  // podsumowanie okresu leży wyżej (z-index 120) i ma własny Escape — nie zamykamy obu naraz
+  if(e.key==="Escape"&&$("#wrapTlo").hidden&&document.body.classList.contains("sidebar-open"))menuBoczne(false);
+});
+$$(".nav-btn").forEach(b=>b.onclick=()=>{show(b.dataset.view);menuBoczne(false)});
 function show(v){
   $$(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
   $$(".view").forEach(x=>x.classList.remove("active"));
