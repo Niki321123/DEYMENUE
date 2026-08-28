@@ -3,14 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Day Menu</title>
-<meta name="description" content="Aplikacja do planowania nauki do matury: tygodniowy harmonogram, pomodoro z lasem, materiały, statystyki i rywalizacja ze znajomymi. Plan lekcji zaciąga się z Librusa.">
+<title>Day Menu — Twój planer nauki</title>
+<meta name="description" content="Twoja nauka do matury w jednym miejscu: plan na tydzień, uczciwie liczony czas i postępy, które widać. Wejdź i zaplanuj najbliższe dni.">
+<!-- Adres kanoniczny: strona jest serwowana z /app.html, ale w wynikach ma sie
+     pojawiac sam daymenu.pl. Bez tego Google moze indeksowac oba adresy osobno. -->
+<link rel="canonical" href="https://daymenu.pl/">
 <!-- Podglad przy udostepnianiu linku (Instagram, Messenger, WhatsApp, Discord).
      Bez tych znacznikow platformy pokazuja goly adres bez obrazka i opisu. -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Day Menu">
-<meta property="og:title" content="Day Menu — planowanie nauki do matury">
-<meta property="og:description" content="Ułóż tygodniowy plan nauki, licz sesje pomodoro i rywalizuj ze znajomymi. Plan lekcji zaciąga się z Librusa.">
+<meta property="og:title" content="Day Menu — Twój planer nauki">
+<meta property="og:description" content="Plan na tydzień, uczciwie liczony czas nauki i postępy, które widać. Zaplanuj najbliższe dni.">
 <meta property="og:url" content="https://daymenu.pl/">
 <meta property="og:image" content="https://daymenu.pl/podglad.png">
 <meta property="og:image:width" content="1200">
@@ -25,7 +28,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=103">
+<link rel="manifest" href="/manifest.webmanifest?v=104">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -1162,7 +1165,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=103;
+const DM_BUILD=104;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
