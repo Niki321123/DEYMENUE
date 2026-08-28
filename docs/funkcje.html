@@ -117,6 +117,7 @@ img{max-width:100%;height:auto;display:block}
 .detal figure img{border:1px solid var(--border);border-radius:var(--radius);
   box-shadow:var(--shadow);background:var(--surface)}
 .detal figcaption{font-size:var(--fs-1);color:var(--text-3);margin-top:var(--sp-2)}
+.detal figure.waska img{max-width:420px}
 /* Routing bez JS: gdy przegladarka celuje w sekcje (#nauka), sekcja sie pokazuje.
    JS dodatkowo chowa siatke i przewija na gore — ale sama tresc dziala i bez niego. */
 .detal:target{display:block}
@@ -238,6 +239,13 @@ footer .prawa{margin-left:auto}
       <div class="foto"><img src="/img/funkcje/rywalizacja-punkty.png" alt="Ranking punktów rywalizacji: karty graczy z punktami za naukę, tygodnie i zakłady" loading="lazy" decoding="async"></div>
       <div class="opis"><h2>Rywalizacja <span class="plakietka platna">pakiet 3 zł</span></h2>
       <p>Pojedynek na godziny nauki, punkty, zakłady i sklep z nagrodami. Znajomych dodajesz jednym kodem.</p>
+      <span class="dalej">Zobacz więcej →</span></div>
+    </a>
+
+    <a class="kafelek" href="#recapy">
+      <div class="foto"><img src="/img/funkcje/recap-hero.png" alt="Pełnoekranowe podsumowanie tygodnia nałożone na przyciemnioną aplikację: godziny nauki, dni z nauką, seria i drzewa" loading="lazy" decoding="async"></div>
+      <div class="opis"><h2>Recapy <span class="plakietka platna">pakiet 3 zł</span></h2>
+      <p>Podsumowania tygodnia, miesiąca i roku szkolnego — Twoje liczby i pojedynek ze znajomym na jednej planszy.</p>
       <span class="dalej">Zobacz więcej →</span></div>
     </a>
 
@@ -481,6 +489,29 @@ footer .prawa{margin-left:auto}
       <figcaption>Sklep — nagrody wymyślacie sami, punkty są prawdziwe.</figcaption></figure>
       <figure><img src="/img/funkcje/rywalizacja-czat.png" alt="Czat ze znajomym wewnątrz aplikacji" loading="lazy" decoding="async">
       <figcaption>Czat — krótkie wiadomości między rywalami.</figcaption></figure>
+    </div>
+  </article>
+
+  <article class="detal" id="recapy">
+    <a class="powrot" href="#">← Wszystkie funkcje</a>
+    <h1>Recapy <span class="plakietka platna">pakiet 3 zł</span></h1>
+    <p class="wstep">Podsumowania jak z ulubionych aplikacji muzycznych — tylko że o Twojej
+       nauce. Pojawiają się same, w odpowiednim momencie.</p>
+    <div class="tresc">
+      <p>Recap tygodnia wita Cię <strong>w poniedziałek</strong>, miesiąca —
+         <strong>pierwszego dnia miesiąca</strong>, a roku szkolnego —
+         <strong>30 kwietnia</strong>, w ostatni dzień zajęć maturzystów. Obejrzany recap
+         zapisuje się na koncie, więc telefon nie pokaże drugi raz tego, co widziałeś już
+         na komputerze. Przegapiony odtworzysz z zakładki Profil do końca dnia.</p>
+      <figure class="waska"><img src="/img/funkcje/recap-liczby.png" alt="Plansza Twoje liczby: suma nauki, dni z nauką, najdłuższa seria, drzewa, ulubiona pora, najlepszy dzień, średni sen i podział czasu na przedmioty" loading="lazy" decoding="async">
+      <figcaption>Twoje liczby — cały tydzień na jednej planszy.</figcaption></figure>
+      <p>Plansza <strong>„Twoje liczby”</strong> zbiera sumę nauki, dni z nauką, najdłuższą
+         serię, drzewa z pomodoro, ulubioną porę nauki, najlepszy dzień, średni sen i podział
+         czasu na przedmioty. Jeśli rywalizujesz ze znajomym, recap zaczyna się od planszy
+         <strong>„Pojedynek”</strong> — godziny nauki, punkty, produktywność i rozstrzygnięte
+         zakłady w minionym okresie, obok siebie.</p>
+      <figure class="waska"><img src="/img/funkcje/recap-pojedynek.png" alt="Plansza Pojedynek w podsumowaniu tygodnia: porównanie godzin nauki, punktów, produktywności i zakładów dwóch osób" loading="lazy" decoding="async">
+      <figcaption>Pojedynek — kto wygrał miniony tydzień, czarno na białym.</figcaption></figure>
     </div>
   </article>
 
