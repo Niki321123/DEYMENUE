@@ -30,7 +30,7 @@
 :root{
   --bg:#f6f7f9; --surface:#ffffff; --surface-2:#eef0f4; --border:#e2e5ea;
   --text:#1b1f27; --text-2:#5b6472; --text-3:#6b7280;
-  --primary:#4a5ecb; --primary-soft:#e8ebfb;
+  --primary:#4a5ecb; --primary-soft:#e8ebfb; --primary-text:#ffffff;
   --accent:#e8743b;        /* tylko dekoracja i duze napisy */
   --accent-text:#b4531f;   /* male napisy na jasnym tle: 5.0:1 */
   --good:#2e9e5b;
@@ -44,7 +44,9 @@
   :root{
     --bg:#14161c; --surface:#1d2029; --surface-2:#262a35; --border:#323744;
     --text:#eceef2; --text-2:#a7aeba; --text-3:#868f9e;
-    --primary:#8b9bf5; --primary-soft:#2a3052;
+    /* w ciemnym motywie tlo przycisku jest jasne, wiec napis musi byc ciemny —
+       bialy dalby na nim kontrast 2.6:1, czyli tekst nieczytelny */
+    --primary:#8b9bf5; --primary-soft:#2a3052; --primary-text:#0f1118;
     --accent:#f08c57; --accent-text:#f08c57;
     --good:#4cc07e;
     --shadow:0 1px 3px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.25);
@@ -96,7 +98,7 @@ img,svg{max-width:100%}
   transition:transform .15s ease-out,background .15s,border-color .15s}
 .btn:hover{transform:translateY(-1px)}
 .btn:active{transform:translateY(0)}
-.btn.glowny{background:var(--primary);color:#fff}
+.btn.glowny{background:var(--primary);color:var(--primary-text)}
 .btn.glowny:hover{background:color-mix(in srgb,var(--primary) 88%,#000)}
 .btn.drugi{background:var(--surface);color:var(--text);border-color:var(--border)}
 .btn.drugi:hover{background:var(--surface-2)}
