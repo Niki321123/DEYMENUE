@@ -12,8 +12,10 @@ const path = require("path");
 const root = __dirname;
 
 const STRONY = [
-  { zrodlo: "REGULAMIN.md", cel: "regulamin.html", tytul: "Regulamin — Day Menu" },
-  { zrodlo: "PRIVACY.md", cel: "prywatnosc.html", tytul: "Polityka prywatności — Day Menu" },
+  { zrodlo: "REGULAMIN.md", cel: "regulamin.html", tytul: "Regulamin — Day Menu",
+    opis: "Regulamin korzystania z Day Menu: zasady zakładania konta, dostęp do funkcji płatnych, prawo odstąpienia i reklamacje." },
+  { zrodlo: "PRIVACY.md", cel: "prywatnosc.html", tytul: "Polityka prywatności — Day Menu",
+    opis: "Jakie dane zbiera Day Menu, po co, jak długo je przechowuje i jakie prawa przysługują Ci wobec swoich danych." },
 ];
 
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -149,7 +151,11 @@ for (const s of STRONY) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${s.tytul}</title>
+<meta name="description" content="${s.opis}">
+<link rel="canonical" href="https://daymenu.pl/${s.cel}">
 <meta name="robots" content="index,follow">
+<meta name="theme-color" content="#2b3950">
+<link rel="apple-touch-icon" href="/icon-180.png">
 <style>${STYL}</style>
 </head>
 <body>
@@ -169,3 +175,29 @@ ${md2html(md)}
   ile++;
 }
 console.log(`Wygenerowano ${ile} podstrony z plikow .md`);
+
+// ---- mapa strony i robots.txt ----
+// Wyszukiwarki znajduja strone same, ale mapa mowi im wprost, ktore adresy sa wazne
+// i kiedy naprawde sie zmienily. Date bierzemy z pliku zrodlowego, a nie z dnia publikacji:
+// inaczej kazdy build zglaszalby regulamin jako zmieniony, choc nikt go nie tknal.
+const dzien = (plik) => fs.statSync(path.join(root, plik)).mtime.toISOString().slice(0, 10);
+const ADRESY = [
+  { loc: "https://daymenu.pl/", zrodlo: "DayMenu.html", waga: "1.0", czesto: "weekly" },
+  { loc: "https://daymenu.pl/regulamin.html", zrodlo: "REGULAMIN.md", waga: "0.3", czesto: "yearly" },
+  { loc: "https://daymenu.pl/prywatnosc.html", zrodlo: "PRIVACY.md", waga: "0.3", czesto: "yearly" },
+];
+const mapa = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${ADRESY.map((a) => `  <url>
+    <loc>${a.loc}</loc>
+    <lastmod>${dzien(a.zrodlo)}</lastmod>
+    <changefreq>${a.czesto}</changefreq>
+    <priority>${a.waga}</priority>
+  </url>`).join("\n")}
+</urlset>
+`;
+fs.writeFileSync(path.join(root, "docs", "sitemap.xml"), mapa);
+// app.html celowo poza mapa: to ten sam dokument co "/", wskazany juz jako kanoniczny.
+fs.writeFileSync(path.join(root, "docs", "robots.txt"),
+  "User-agent: *\nAllow: /\n\nSitemap: https://daymenu.pl/sitemap.xml\n");
+console.log("docs/sitemap.xml i docs/robots.txt");
