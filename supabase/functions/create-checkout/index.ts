@@ -23,7 +23,7 @@ const APP_URL = Deno.env.get("DAYMENU_APP_URL") ?? "https://daymenu.pl/app.html"
    srodowiskowej, a nie w kodzie: przelaczenie na live to podmiana sekretu, nie redeploy.
    Fallback istnieje po to, zeby literowka w nazwie sekretu nie zatrzymala sprzedazy. */
 const PRICE_ID = (Deno.env.get("STRIPE_PRICE_ID") ?? "").trim();
-const KWOTA_GROSZE = 300;
+const KWOTA_GROSZE = 500;
 const WALUTA = "pln";
 // tekst widoczny dla klienta na stronie platnosci — jedyny w tym pliku z polskimi znakami
 const NAZWA_PRODUKTU = "Day Menu — pełny dostęp";
