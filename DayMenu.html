@@ -25,7 +25,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=102">
+<link rel="manifest" href="/manifest.webmanifest?v=103">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -38,7 +38,7 @@
 :root{
   --bg:#f6f7f9; --surface:#ffffff; --surface-2:#eef0f4; --border:#e2e5ea;
   --text:#1b1f27; --text-2:#5b6472; --text-3:#6b7280;
-  --primary:#4f63d2; --primary-soft:#e8ebfb; --primary-text:#fff;
+  --primary:#4a5ecb; --primary-soft:#e8ebfb; --primary-text:#fff;
   --accent:#e8743b; --accent-soft:#fdeee5;
   --good:#2e9e5b; --good-soft:#e3f5ea; --warn:#d9a514; --warn-soft:#faf3d9; --bad:#d24f4f; --bad-soft:#fbe7e7;
   --radius:12px; --radius-s:8px;
@@ -49,7 +49,7 @@
 [data-theme="dark"]{
   --bg:#14161c; --surface:#1d2029; --surface-2:#262a35; --border:#323744;
   --text:#eceef2; --text-2:#a7aeba; --text-3:#868f9e;
-  --primary:#7b8cf0; --primary-soft:#2a3052; --primary-text:#0f1118;
+  --primary:#8b9bf5; --primary-soft:#2a3052; --primary-text:#0f1118;
   --accent:#f08c57; --accent-soft:#43301f;
   --good:#4cc07e; --good-soft:#1d3a2a; --warn:#e0b53e; --warn-soft:#3d3517; --bad:#e57373; --bad-soft:#412323;
   --shadow:0 1px 3px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.25);
@@ -1162,7 +1162,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=102;
+const DM_BUILD=103;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -7213,7 +7213,7 @@ $("#slSave").onclick=()=>{
 };
 
 /* ================= WYGLĄD — PANEL ================= */
-const PAL_PRIMARY=["#4f63d2","#2e7dd2","#0d9488","#2e9e5b","#9b59d0","#d04f7d","#c0392b","#33415c"];
+const PAL_PRIMARY=["#4a5ecb","#2e7dd2","#0d9488","#2e9e5b","#9b59d0","#d04f7d","#c0392b","#33415c"];
 const PAL_ACCENT=["#e8743b","#d9a514","#d04f7d","#0d9488","#7b8cf0","#6e7685"];
 function renderLook(){
   const a=S.appearance;
@@ -7222,7 +7222,7 @@ function renderLook(){
     b.onclick=()=>{a.theme=b.dataset.t;save();applyTheme();renderLook()};
   });
   const sw=(list,cur,key)=>list.map(c=>`<button class="swatch ${cur===c?'sel':''}" data-c="${c}" data-k="${key}" style="background:${c}" aria-label="Kolor ${c}"></button>`).join("")
-    +`<input type="color" data-k="${key}" value="${cur||'#4f63d2'}" title="Własny kolor">`
+    +`<input type="color" data-k="${key}" value="${cur||'#4a5ecb'}" title="Własny kolor">`
     +`<button class="btn small ghost" data-reset="${key}">Domyślny</button>`;
   $("#lookPrimary").innerHTML=sw(PAL_PRIMARY,a.primary,"primary");
   $("#lookAccent").innerHTML=sw(PAL_ACCENT,a.accent,"accent");
