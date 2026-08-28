@@ -5,14 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Day Menu — Twój planer nauki</title>
 <meta name="description" content="Twoja nauka do matury w jednym miejscu: plan na tydzień, uczciwie liczony czas i postępy, które widać. Wejdź i zaplanuj najbliższe dni.">
-<!-- Adres kanoniczny: strona jest serwowana z /app.html, ale w wynikach ma sie
-     pojawiac sam daymenu.pl. Bez tego Google moze indeksowac oba adresy osobno. -->
-<link rel="canonical" href="https://daymenu.pl/">
-<!-- Nazwa witryny w wynikach Google. Bez tego wyszukiwarka pisze nad tytulem sam adres
-     "daymenu.pl"; z tym pokazuje "Day Menu". To jedyne, do czego sluzy ten fragment. -->
-<script type="application/ld+json">
-{"@context":"https://schema.org","@type":"WebSite","name":"Day Menu","alternateName":"Day Menu — Twój planer nauki","url":"https://daymenu.pl/","inLanguage":"pl-PL"}
-</script>
+<!-- Ta strona to sama aplikacja, a nie tresc do czytania. W wynikach wyszukiwania ma
+     pojawiac sie strona powitalna pod adresem daymenu.pl, dlatego app.html jest wylaczony
+     z indeksu. "follow" zostawia robotowi prawo isc dalej za linkami stad. -->
+<meta name="robots" content="noindex,follow">
 <!-- Podglad przy udostepnianiu linku (Instagram, Messenger, WhatsApp, Discord).
      Bez tych znacznikow platformy pokazuja goly adres bez obrazka i opisu. -->
 <meta property="og:type" content="website">
@@ -33,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=105">
+<link rel="manifest" href="/manifest.webmanifest?v=106">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -1170,7 +1166,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=105;
+const DM_BUILD=106;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.

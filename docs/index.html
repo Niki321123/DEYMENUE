@@ -1,19 +1,13 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Day Menu — Twój planer nauki</title>
-<meta name="description" content="Twoja nauka do matury w jednym miejscu: plan na tydzień, uczciwie liczony czas i postępy, które widać. Wejdź i zaplanuj najbliższe dni.">
+<meta name="description" content="Twoja nauka do matury w jednym miejscu: plan na tydzień, uczciwie liczony czas i postępy, które widać. Pobierz na telefon lub komputer albo otwórz w przeglądarce.">
 <link rel="canonical" href="https://daymenu.pl/">
-<!-- Nazwa witryny w wynikach Google. Bez tego wyszukiwarka pisze nad tytulem sam adres
-     "daymenu.pl"; z tym pokazuje "Day Menu". To jedyne, do czego sluzy ten fragment. -->
-<script type="application/ld+json">
-{"@context":"https://schema.org","@type":"WebSite","name":"Day Menu","alternateName":"Day Menu — Twój planer nauki","url":"https://daymenu.pl/","inLanguage":"pl-PL"}
-</script>
-<!-- Te same znaczniki co w app.html. Ta strona tylko przekierowuje, ale roboty
-     wyszukiwarek i podglady linkow czesto czytaja wlasnie ja i nie ida dalej —
-     bez tego udostepniony adres daymenu.pl nie mial ani opisu, ani obrazka. -->
+<meta name="theme-color" content="#2b3950">
+<link rel="apple-touch-icon" href="/icon-180.png">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Day Menu">
 <meta property="og:title" content="Day Menu — Twój planer nauki">
@@ -24,12 +18,363 @@
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="pl_PL">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#2b3950">
-<link rel="apple-touch-icon" href="/icon-180.png">
-<meta http-equiv="refresh" content="0; url=app.html">
-<script>location.replace("app.html" + location.search + location.hash);</script>
+<!-- Nazwa witryny w wynikach Google. Bez tego wyszukiwarka pisze nad tytulem sam adres
+     "daymenu.pl"; z tym pokazuje "Day Menu". To jedyne, do czego sluzy ten fragment. -->
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebSite","name":"Day Menu","alternateName":"Day Menu — Twój planer nauki","url":"https://daymenu.pl/","inLanguage":"pl-PL"}
+</script>
+<style>
+/* ===== TOKENY =====
+   Te same wartosci co w aplikacji, zeby strona i aplikacja wygladaly jak jeden produkt.
+   Kazdy kolor tekstu ma kontrast co najmniej 4.5:1 wzgledem swojego tla (WCAG AA). */
+:root{
+  --bg:#f6f7f9; --surface:#ffffff; --surface-2:#eef0f4; --border:#e2e5ea;
+  --text:#1b1f27; --text-2:#5b6472; --text-3:#6b7280;
+  --primary:#4a5ecb; --primary-soft:#e8ebfb;
+  --accent:#e8743b;        /* tylko dekoracja i duze napisy */
+  --accent-text:#b4531f;   /* male napisy na jasnym tle: 5.0:1 */
+  --good:#2e9e5b;
+  --radius:14px; --radius-s:9px;
+  --shadow:0 1px 3px rgba(20,24,33,.07),0 4px 16px rgba(20,24,33,.05);
+  --fs-1:13px; --fs-2:15px; --fs-3:18px; --fs-4:22px; --fs-5:28px; --fs-6:36px;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
+  --sp-7:48px; --sp-8:64px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14161c; --surface:#1d2029; --surface-2:#262a35; --border:#323744;
+    --text:#eceef2; --text-2:#a7aeba; --text-3:#868f9e;
+    --primary:#8b9bf5; --primary-soft:#2a3052;
+    --accent:#f08c57; --accent-text:#f08c57;
+    --good:#4cc07e;
+    --shadow:0 1px 3px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.25);
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  *{transition:none!important;animation:none!important}
+}
+body{
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+  font-size:var(--fs-2);line-height:1.6;color:var(--text);background:var(--bg);
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--primary)}
+img,svg{max-width:100%}
+:focus-visible{outline:2px solid var(--primary);outline-offset:3px;border-radius:4px}
+
+/* pominiecie nawigacji dla osob korzystajacych z klawiatury i czytnikow ekranu */
+.pomin{position:absolute;left:-9999px;top:0;background:var(--surface);color:var(--text);
+  padding:var(--sp-3) var(--sp-4);border-radius:var(--radius-s);z-index:100}
+.pomin:focus{left:var(--sp-4);top:var(--sp-4)}
+
+.srodek{width:100%;max-width:1060px;margin:0 auto;padding:0 var(--sp-5)}
+
+/* ===== GORNY PASEK ===== */
+.pasek{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.pasek .srodek{display:flex;align-items:center;gap:var(--sp-4);min-height:64px}
+.marka{display:flex;align-items:center;gap:var(--sp-2);font-weight:700;font-size:var(--fs-3);
+  color:var(--text);text-decoration:none;letter-spacing:-.01em}
+.marka svg{width:26px;height:26px;flex:none}
+.menu{display:flex;gap:var(--sp-2);margin-left:auto;align-items:center}
+.menu a{color:var(--text-2);text-decoration:none;font-size:var(--fs-2);
+  padding:10px var(--sp-3);border-radius:var(--radius-s);transition:color .15s,background .15s}
+.menu a:hover{color:var(--text);background:var(--surface-2)}
+.menu .link-app{display:none}
+@media (max-width:719px){
+  .menu .ukryj-mobile{display:none}
+  .menu .link-app{display:inline-flex}
+}
+
+/* ===== PRZYCISKI ===== */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);
+  min-height:48px;padding:0 var(--sp-5);border:1px solid transparent;border-radius:var(--radius-s);
+  font-size:var(--fs-2);font-weight:600;text-decoration:none;cursor:pointer;
+  transition:transform .15s ease-out,background .15s,border-color .15s}
+.btn:hover{transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn.glowny{background:var(--primary);color:#fff}
+.btn.glowny:hover{background:color-mix(in srgb,var(--primary) 88%,#000)}
+.btn.drugi{background:var(--surface);color:var(--text);border-color:var(--border)}
+.btn.drugi:hover{background:var(--surface-2)}
+.btn.pelny{width:100%}
+
+/* ===== HERO ===== */
+.hero{padding:var(--sp-8) 0 var(--sp-7);text-align:center}
+.hero .znak{width:76px;height:76px;margin:0 auto var(--sp-5)}
+/* max-width zamiast recznego <br>: lamie sie samo i nie skleja wyrazow czytnikom ekranu */
+.hero h1{font-size:clamp(30px,6vw,46px);line-height:1.12;letter-spacing:-.025em;
+  font-weight:700;margin:0 auto var(--sp-4);max-width:15ch}
+.hero p{font-size:var(--fs-3);color:var(--text-2);max-width:34em;margin:0 auto var(--sp-6)}
+.hero-akcje{display:flex;flex-wrap:wrap;gap:var(--sp-3);justify-content:center}
+.hero .drobne{font-size:var(--fs-1);color:var(--text-3);margin-top:var(--sp-4)}
+
+/* ===== SEKCJE ===== */
+section{padding:var(--sp-8) 0;border-top:1px solid var(--border)}
+h2{font-size:var(--fs-5);line-height:1.2;letter-spacing:-.02em;margin-bottom:var(--sp-2)}
+.podtytul{color:var(--text-2);margin-bottom:var(--sp-6);max-width:52ch}
+
+/* ===== KARTY POBIERANIA ===== */
+.siatka{display:grid;gap:var(--sp-4);grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.karta{position:relative;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:var(--sp-5);box-shadow:var(--shadow);
+  display:flex;flex-direction:column}
+.karta h3{font-size:var(--fs-4);letter-spacing:-.01em;margin-bottom:var(--sp-1)}
+.karta .waga{font-size:var(--fs-1);color:var(--text-3);margin-bottom:var(--sp-3)}
+.karta p{color:var(--text-2);font-size:var(--fs-2);margin-bottom:var(--sp-4)}
+.karta .btn{margin-top:auto}
+.karta ol{margin:0 0 var(--sp-4) 1.15em;color:var(--text-2);font-size:var(--fs-2)}
+.karta ol li{margin-bottom:var(--sp-2)}
+.karta ol li::marker{color:var(--primary);font-weight:600}
+.karta .uwaga{font-size:var(--fs-1);color:var(--text-3);margin:var(--sp-3) 0 0}
+/* znacznik wykrytego systemu; jest zawsze w HTML, tylko niewidoczny, wiec jego
+   pojawienie sie nie przesuwa ukladu strony */
+.twoj-sys{position:absolute;top:var(--sp-4);right:var(--sp-4);
+  background:var(--primary-soft);color:var(--primary);font-size:11px;font-weight:700;
+  letter-spacing:.03em;text-transform:uppercase;padding:4px 9px;border-radius:99px;
+  opacity:0;transition:opacity .2s ease-out}
+.karta.twoj{border-color:var(--primary)}
+.karta.twoj .twoj-sys{opacity:1}
+
+/* ===== CENNIK ===== */
+.cennik{display:grid;gap:var(--sp-4);grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.cennik .karta .cena{font-size:var(--fs-6);font-weight:700;line-height:1.1;
+  letter-spacing:-.02em;margin-bottom:var(--sp-1)}
+.cennik .karta .cena small{font-size:var(--fs-2);font-weight:400;color:var(--text-2);
+  display:block;letter-spacing:0;margin-top:var(--sp-1)}
+.cennik .platna .cena{color:var(--accent-text)}
+.lista{list-style:none;margin:var(--sp-4) 0 0}
+.lista li{position:relative;padding-left:26px;margin-bottom:var(--sp-2);color:var(--text-2)}
+.lista li::before{content:"";position:absolute;left:0;top:8px;width:13px;height:8px;
+  border-left:2.5px solid var(--good);border-bottom:2.5px solid var(--good);
+  transform:rotate(-45deg);border-radius:1px}
+.cennik .uwaga{font-size:var(--fs-1);color:var(--text-3);margin-top:var(--sp-4);
+  padding-top:var(--sp-4);border-top:1px solid var(--border)}
+
+/* ===== O NAS ===== */
+.tekst{max-width:65ch}
+.tekst p{color:var(--text-2);margin-bottom:var(--sp-4)}
+.tekst p:last-child{margin-bottom:0}
+.tekst strong{color:var(--text);font-weight:600}
+
+/* ===== STOPKA ===== */
+footer{border-top:1px solid var(--border);padding:var(--sp-6) 0 var(--sp-7);
+  color:var(--text-3);font-size:var(--fs-1)}
+footer .srodek{display:flex;flex-wrap:wrap;gap:var(--sp-3) var(--sp-5);align-items:center}
+footer nav{display:flex;flex-wrap:wrap;gap:var(--sp-3) var(--sp-4)}
+footer a{color:var(--text-2);text-decoration:none}
+footer a:hover{color:var(--text);text-decoration:underline}
+footer .prawa{margin-left:auto}
+@media (max-width:719px){footer .prawa{margin-left:0;width:100%}}
+</style>
 </head>
 <body>
-<p>Przekierowanie do <a href="app.html">Day Menu</a>…</p>
+<a class="pomin" href="#tresc">Przejdź do treści</a>
+
+<header class="pasek">
+  <div class="srodek">
+    <a class="marka" href="/">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 106 106" aria-hidden="true"><rect x="0" y="11.7" width="100" height="88.3" rx="13.5" fill="#2b3950"/><rect x="19.2" y="-2.5" width="14.8" height="29.7" rx="7.4" fill="#fff"/><rect x="66" y="-2.5" width="14.8" height="29.7" rx="7.4" fill="#fff"/><rect x="21.7" y="0" width="9.8" height="24.5" rx="4.9" fill="#2b3950"/><rect x="68.5" y="0" width="9.8" height="24.5" rx="4.9" fill="#2b3950"/><rect x="11.5" y="31.9" width="77" height="62.8" rx="7.5" fill="#fff"/><rect x="15.9" y="44.9" width="28.7" height="6" rx="3" fill="#4a80d4"/><rect x="15.9" y="60.8" width="28.7" height="6" rx="3" fill="#4a9d52"/><rect x="15.9" y="75.7" width="28.7" height="6" rx="3" fill="#7069e6"/><path d="M51.1 64.9 64.1 74.5 82.6 53.2" fill="none" stroke="#2b3950" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Day Menu
+    </a>
+    <nav class="menu">
+      <a class="ukryj-mobile" href="#pobierz">Pobierz</a>
+      <a class="ukryj-mobile" href="#cennik">Cennik</a>
+      <a class="ukryj-mobile" href="#o-nas">O nas</a>
+      <a class="link-app" href="/app.html">Otwórz</a>
+      <a class="ukryj-mobile" href="/app.html" style="color:var(--primary);font-weight:600">Otwórz aplikację</a>
+    </nav>
+  </div>
+</header>
+
+<main id="tresc">
+
+  <div class="srodek">
+    <div class="hero">
+      <svg class="znak" xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 106 106" aria-hidden="true"><rect x="0" y="11.7" width="100" height="88.3" rx="13.5" fill="#2b3950"/><rect x="19.2" y="-2.5" width="14.8" height="29.7" rx="7.4" fill="#fff"/><rect x="66" y="-2.5" width="14.8" height="29.7" rx="7.4" fill="#fff"/><rect x="21.7" y="0" width="9.8" height="24.5" rx="4.9" fill="#2b3950"/><rect x="68.5" y="0" width="9.8" height="24.5" rx="4.9" fill="#2b3950"/><rect x="11.5" y="31.9" width="77" height="62.8" rx="7.5" fill="#fff"/><rect x="15.9" y="44.9" width="28.7" height="6" rx="3" fill="#4a80d4"/><rect x="15.9" y="60.8" width="28.7" height="6" rx="3" fill="#4a9d52"/><rect x="15.9" y="75.7" width="28.7" height="6" rx="3" fill="#7069e6"/><path d="M51.1 64.9 64.1 74.5 82.6 53.2" fill="none" stroke="#2b3950" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <h1>Twoja nauka do matury w jednym miejscu</h1>
+      <p>Ułóż plan na tydzień, licz czas przy biurku i patrz, jak rosną postępy.
+         Bez rozsypanych kartek i bez zgadywania, ile naprawdę udało się zrobić.</p>
+      <div class="hero-akcje">
+        <a class="btn glowny" href="/app.html">Otwórz aplikację</a>
+        <a class="btn drugi" href="#pobierz">Pobierz na urządzenie</a>
+      </div>
+      <p class="drobne">Działa w przeglądarce od razu, bez instalowania czegokolwiek.</p>
+    </div>
+  </div>
+
+  <!-- ================= POBIERANIE ================= -->
+  <section id="pobierz">
+    <div class="srodek">
+      <h2>Pobierz Day Menu</h2>
+      <p class="podtytul">Ta sama aplikacja i to samo konto na każdym urządzeniu — dane
+         synchronizują się same. Nie musisz nic pobierać: wersja w przeglądarce ma
+         wszystkie funkcje.</p>
+
+      <div class="siatka">
+
+        <div class="karta" data-sys="android">
+          <span class="twoj-sys">Twój system</span>
+          <h3>Android</h3>
+          <p class="waga">Plik APK · około 4 MB</p>
+          <p>Pobierz i otwórz plik. Android poprosi o zgodę na instalację z tego źródła —
+             to normalne przy aplikacjach spoza sklepu Play.</p>
+          <a class="btn glowny pelny" href="/DayMenu.apk" download>Pobierz na Androida</a>
+          <p class="uwaga"><a href="/DayMenu.apk.sha256">Suma kontrolna</a> pozwala sprawdzić,
+             czy pobrany plik nie został po drodze podmieniony.</p>
+        </div>
+
+        <div class="karta" data-sys="ios">
+          <span class="twoj-sys">Twój system</span>
+          <h3>iPhone i iPad</h3>
+          <p class="waga">Bez pobierania · kilka sekund</p>
+          <ol>
+            <li>Otwórz <strong>daymenu.pl</strong> w Safari.</li>
+            <li>Dotknij przycisku <strong>Udostępnij</strong> na dole ekranu.</li>
+            <li>Wybierz <strong>Do ekranu początkowego</strong>, potem <strong>Dodaj</strong>.</li>
+          </ol>
+          <p class="uwaga">Apple nie pozwala instalować aplikacji jednym przyciskiem ze strony,
+             dlatego te trzy kroki trzeba zrobić ręcznie. Efekt jest ten sam: ikona na ekranie
+             i aplikacja bez paska przeglądarki.</p>
+        </div>
+
+        <div class="karta" data-sys="windows">
+          <span class="twoj-sys">Twój system</span>
+          <h3>Windows</h3>
+          <p class="waga">Archiwum ZIP · około 145 MB</p>
+          <p>Rozpakuj archiwum i uruchom <strong>Day Menu.exe</strong>. Aplikacja aktualizuje
+             się potem sama, więc pobierasz ją tylko raz.</p>
+          <a class="btn glowny pelny" href="https://github.com/Niki321123/DEYMENUE/releases/latest/download/DayMenu-Windows.zip">Pobierz na Windows</a>
+          <p class="uwaga">Windows pokaże ostrzeżenie SmartScreen, bo aplikacja nie ma płatnego
+             podpisu wydawcy. Kliknij <strong>Więcej informacji</strong>, potem
+             <strong>Uruchom mimo to</strong>.</p>
+        </div>
+
+        <div class="karta" data-sys="macos">
+          <span class="twoj-sys">Twój system</span>
+          <h3>macOS</h3>
+          <p class="waga">Bez pobierania · kilka sekund</p>
+          <ol>
+            <li>Otwórz <strong>daymenu.pl</strong> w Chrome lub Edge.</li>
+            <li>Kliknij ikonę instalacji po prawej stronie paska adresu.</li>
+            <li>Potwierdź <strong>Zainstaluj</strong>.</li>
+          </ol>
+          <p class="uwaga">W Safari zamiast tego wybierz <strong>Plik → Dodaj do Docka</strong>.
+             Nie ma osobnego pliku do pobrania, bo bez podpisu Apple macOS i tak zablokowałby
+             jego uruchomienie.</p>
+        </div>
+
+        <div class="karta" data-sys="linux">
+          <span class="twoj-sys">Twój system</span>
+          <h3>Linux</h3>
+          <p class="waga">Archiwum ZIP · około 122 MB · x86-64</p>
+          <p>Rozpakuj archiwum i uruchom plik <strong>Day Menu</strong>. Jeśli system odmawia,
+             nadaj mu prawo wykonywania poleceniem <strong>chmod +x</strong>.</p>
+          <a class="btn glowny pelny" href="https://github.com/Niki321123/DEYMENUE/releases/latest/download/DayMenu-Linux.zip">Pobierz na Linuksa</a>
+          <p class="uwaga">Wersja przenośna, bez instalatora i bez pakietu systemowego.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= CENNIK ================= -->
+  <section id="cennik">
+    <div class="srodek">
+      <h2>Cennik</h2>
+      <p class="podtytul">Bez abonamentu. Trzon aplikacji jest darmowy na zawsze, a jedna
+         opłata odblokowuje resztę na stałe.</p>
+
+      <div class="cennik">
+
+        <div class="karta">
+          <p class="cena">0 zł<small>Za darmo, bez limitu czasu</small></p>
+          <ul class="lista">
+            <li>Harmonogram tygodnia — układany ręcznie, godzina po godzinie</li>
+            <li>Plan lekcji pobierany prosto z Librusa</li>
+            <li>Pomodoro z rosnącym lasem</li>
+            <li>Materiały do nauki</li>
+            <li>Nawyki, licznik snu i cele</li>
+            <li>Pulpit z podsumowaniem dnia</li>
+            <li>Analiza czasu — dane bez wykresów</li>
+          </ul>
+          <p class="uwaga">Do korzystania wystarczy konto założone na adres e-mail.
+             Nie ma reklam ani wersji próbnej, która wygasa.</p>
+        </div>
+
+        <div class="karta platna">
+          <p class="cena">3 zł<small>Jednorazowo, dostęp na stałe</small></p>
+          <ul class="lista">
+            <li>Sprawdziany — terminy i przygotowanie</li>
+            <li>Frekwencja i oceny</li>
+            <li>Wykresy w Analizie czasu</li>
+            <li>Rywalizacja ze znajomymi</li>
+            <li>Podsumowania tygodnia, miesiąca i roku</li>
+          </ul>
+          <p class="uwaga">Płatność obsługuje Stripe — my nie widzimy danych Twojej karty.
+             To jedna opłata, nie subskrypcja: odblokowane funkcje zostają na koncie także
+             po zmianie telefonu czy komputera. Szczegóły, w tym prawo odstąpienia, opisuje
+             <a href="/regulamin.html">regulamin</a>.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= O NAS ================= -->
+  <section id="o-nas">
+    <div class="srodek">
+      <h2>O nas</h2>
+      <div class="tekst">
+        <p>Day Menu powstał z prostej potrzeby: ogarnąć naukę do matury bez rozsypanych
+           kartek, pięciu różnych aplikacji i ciągłego poczucia, że coś umyka.</p>
+        <p>Zależało nam na narzędziu, które <strong>pokazuje prawdę</strong>, a nie ładne
+           statystyki. Stąd ręcznie układany harmonogram zamiast gotowych szablonów, stąd
+           czas liczony faktycznie przy biurku, a nie deklarowany po fakcie, i stąd plan
+           lekcji zaciągany wprost z Librusa — żeby zajęcia w szkole nie musiały być
+           przepisywane po raz kolejny.</p>
+        <p>Aplikacja rozwija się małymi krokami, w rytmie tego, co naprawdę przydaje się
+           w codziennej nauce. <strong>Bez reklam i bez abonamentu.</strong> Jeśli czegoś
+           brakuje albo coś nie działa — napisz na
+           <a href="mailto:kontakt.daymenu@gmail.com">kontakt.daymenu@gmail.com</a>.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="srodek">
+    <nav>
+      <a href="/app.html">Otwórz aplikację</a>
+      <a href="#pobierz">Pobierz</a>
+      <a href="#cennik">Cennik</a>
+      <a href="/regulamin.html">Regulamin</a>
+      <a href="/prywatnosc.html">Polityka prywatności</a>
+      <a href="mailto:kontakt.daymenu@gmail.com">Kontakt</a>
+    </nav>
+    <span class="prawa">Day Menu · daymenu.pl</span>
+  </div>
+</footer>
+
+<script>
+/* Podswietlenie karty pasujacej do systemu odwiedzajacego. Czysta wygoda — wszystkie
+   karty sa widoczne i dzialaja tak samo, gdy skrypt sie nie wykona. */
+(function(){
+  var ua = navigator.userAgent, sys = null;
+  if (/Android/i.test(ua)) sys = "android";
+  // iPad z iPadOS podaje sie za Maca, stad dodatkowe sprawdzenie dotyku PRZED macOS
+  else if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) sys = "ios";
+  else if (/Macintosh|Mac OS X/.test(ua)) sys = "macos";
+  else if (/Windows/i.test(ua)) sys = "windows";
+  else if (/Linux/i.test(ua)) sys = "linux";
+  if (!sys) return;
+  var karta = document.querySelector('[data-sys="' + sys + '"]');
+  if (karta) karta.classList.add("twoj");
+})();
+</script>
 </body>
 </html>
