@@ -107,15 +107,18 @@ img,svg{max-width:100%}
 /* ===== HERO ===== */
 .hero{padding:var(--sp-8) 0 var(--sp-7);text-align:center}
 .hero .znak{width:76px;height:76px;margin:0 auto var(--sp-5)}
-/* max-width zamiast recznego <br>: lamie sie samo i nie skleja wyrazow czytnikom ekranu */
+/* Bez recznego <br>: sklejal wyrazy czytnikom ekranu ("maturyw jednym miejscu").
+   text-wrap:balance rozklada wiersze rowno, zamiast zostawiac sierotke w ostatnim. */
 .hero h1{font-size:clamp(30px,6vw,46px);line-height:1.12;letter-spacing:-.025em;
-  font-weight:700;margin:0 auto var(--sp-4);max-width:15ch}
+  font-weight:700;margin:0 auto var(--sp-4);max-width:640px;text-wrap:balance}
 .hero p{font-size:var(--fs-3);color:var(--text-2);max-width:34em;margin:0 auto var(--sp-6)}
 .hero-akcje{display:flex;flex-wrap:wrap;gap:var(--sp-3);justify-content:center}
 .hero .drobne{font-size:var(--fs-1);color:var(--text-3);margin-top:var(--sp-4)}
 
 /* ===== SEKCJE ===== */
-section{padding:var(--sp-8) 0;border-top:1px solid var(--border)}
+/* scroll-margin-top: bez tego skok z menu ustawia sekcje przy samej krawedzi okna,
+   a przyklejony pasek zaslania jej tytul */
+section{padding:var(--sp-8) 0;border-top:1px solid var(--border);scroll-margin-top:80px}
 h2{font-size:var(--fs-5);line-height:1.2;letter-spacing:-.02em;margin-bottom:var(--sp-2)}
 .podtytul{color:var(--text-2);margin-bottom:var(--sp-6);max-width:52ch}
 
@@ -298,7 +301,7 @@ footer .prawa{margin-left:auto}
             <li>Harmonogram tygodnia — układany ręcznie, godzina po godzinie</li>
             <li>Plan lekcji pobierany prosto z Librusa</li>
             <li>Pomodoro z rosnącym lasem</li>
-            <li>Materiały do nauki</li>
+            <li>Spis własnych arkuszy i zbiorów zadań, z odhaczaniem postępu</li>
             <li>Nawyki, licznik snu i cele</li>
             <li>Pulpit z podsumowaniem dnia</li>
             <li>Analiza czasu — dane bez wykresów</li>
@@ -310,10 +313,10 @@ footer .prawa{margin-left:auto}
         <div class="karta platna">
           <p class="cena">3 zł<small>Jednorazowo, dostęp na stałe</small></p>
           <ul class="lista">
-            <li>Sprawdziany — terminy i przygotowanie</li>
-            <li>Frekwencja i oceny</li>
+            <li>Zapowiedzi sprawdzianów i kartkówek z Librusa</li>
+            <li>Frekwencja i oceny z Librusa</li>
             <li>Wykresy w Analizie czasu</li>
-            <li>Rywalizacja ze znajomymi</li>
+            <li>Rywalizacja ze znajomymi — godziny nauki i sesje pomodoro</li>
             <li>Podsumowania tygodnia, miesiąca i roku</li>
           </ul>
           <p class="uwaga">Płatność obsługuje Stripe — my nie widzimy danych Twojej karty.
