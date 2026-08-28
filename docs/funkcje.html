@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Funkcje — Day Menu</title>
+<meta name="description" content="Wszystkie funkcje Day Menu na prawdziwych zrzutach ekranu: harmonogram tygodnia, pomodoro z lasem, sprawdziany i oceny z Librusa, nawyki, sen, cele, analiza czasu i rywalizacja ze znajomymi.">
+<link rel="canonical" href="https://daymenu.pl/funkcje.html">
+<meta name="theme-color" content="#2b3950">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Day Menu">
+<meta property="og:title" content="Funkcje — Day Menu">
+<meta property="og:description" content="Harmonogram tygodnia, pomodoro z lasem, sprawdziany i oceny z Librusa, nawyki, sen, cele, analiza czasu i rywalizacja — na prawdziwych zrzutach ekranu.">
+<meta property="og:url" content="https://daymenu.pl/funkcje.html">
+<meta property="og:image" content="https://daymenu.pl/img/funkcje/pulpit.png">
+<meta property="og:locale" content="pl_PL">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+/* Te same tokeny co strona glowna i aplikacja — jeden produkt, jeden wyglad. */
+:root{
+  --bg:#f6f7f9; --surface:#ffffff; --surface-2:#eef0f4; --border:#e2e5ea;
+  --text:#1b1f27; --text-2:#5b6472; --text-3:#6b7280;
+  --primary:#4a5ecb; --primary-soft:#e8ebfb; --primary-text:#ffffff;
+  --accent:#e8743b; --accent-text:#b4531f;
+  --good:#2e9e5b;
+  --radius:14px; --radius-s:9px;
+  --shadow:0 1px 3px rgba(20,24,33,.07),0 4px 16px rgba(20,24,33,.05);
+  --fs-1:13px; --fs-2:15px; --fs-3:18px; --fs-4:22px; --fs-5:28px;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
+  --sp-7:48px; --sp-8:64px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14161c; --surface:#1d2029; --surface-2:#262a35; --border:#323744;
+    --text:#eceef2; --text-2:#a7aeba; --text-3:#868f9e;
+    --primary:#8b9bf5; --primary-soft:#2a3052; --primary-text:#0f1118;
+    --accent:#f08c57; --accent-text:#f08c57;
+    --good:#4cc07e;
+    --shadow:0 1px 3px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.25);
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  *{transition:none!important;animation:none!important}
+}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:var(--fs-2);
+  line-height:1.6;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+a{color:var(--primary)}
+img{max-width:100%;height:auto;display:block}
+:focus-visible{outline:2px solid var(--primary);outline-offset:3px;border-radius:4px}
+.pomin{position:absolute;left:-9999px;top:0;background:var(--surface);color:var(--text);
+  padding:var(--sp-3) var(--sp-4);border-radius:var(--radius-s);z-index:100}
+.pomin:focus{left:var(--sp-4);top:var(--sp-4)}
+.srodek{width:100%;max-width:1060px;margin:0 auto;padding:0 var(--sp-5)}
+
+/* ===== GORNY PASEK (jak na stronie glownej) ===== */
+.pasek{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.pasek .srodek{display:flex;align-items:center;gap:var(--sp-4);min-height:64px}
+.marka{display:flex;align-items:center;gap:var(--sp-2);font-weight:700;font-size:var(--fs-3);
+  color:var(--text);text-decoration:none;letter-spacing:-.01em}
+.marka svg{width:26px;height:26px;flex:none}
+.menu{display:flex;gap:var(--sp-2);margin-left:auto;align-items:center}
+.menu a{color:var(--text-2);text-decoration:none;font-size:var(--fs-2);
+  padding:10px var(--sp-3);border-radius:var(--radius-s);transition:color .15s,background .15s}
+.menu a:hover{color:var(--text);background:var(--surface-2)}
+.menu a[aria-current="page"]{color:var(--text);background:var(--surface-2)}
+.menu .link-app{display:none}
+@media (max-width:719px){
+  .menu .ukryj-mobile{display:none}
+  .menu .link-app{display:inline-flex}
+}
+
+/* ===== NAGLOWEK STRONY ===== */
+.naglowek{padding:var(--sp-7) 0 var(--sp-5)}
+.naglowek h1{font-size:clamp(28px,5vw,40px);line-height:1.15;letter-spacing:-.02em;
+  margin-bottom:var(--sp-3);text-wrap:balance}
+.naglowek p{color:var(--text-2);max-width:56ch}
+
+/* ===== SIATKA KAFELKOW ===== */
+.siatka{display:grid;gap:var(--sp-4);grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+  padding-bottom:var(--sp-8)}
+.kafelek{display:flex;flex-direction:column;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);
+  overflow:hidden;text-decoration:none;color:var(--text);
+  transition:transform .15s ease-out,border-color .15s}
+.kafelek:hover{transform:translateY(-2px);border-color:var(--primary)}
+.kafelek .foto{aspect-ratio:16/10;overflow:hidden;background:var(--surface-2);
+  border-bottom:1px solid var(--border)}
+.kafelek .foto img{width:100%;height:100%;object-fit:cover;object-position:top center}
+.kafelek .opis{padding:var(--sp-4) var(--sp-4) var(--sp-5)}
+.kafelek h2{font-size:var(--fs-3);letter-spacing:-.01em;margin-bottom:var(--sp-1);
+  display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap}
+.kafelek p{color:var(--text-2);font-size:var(--fs-2)}
+.plakietka{flex:none;font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+  background:var(--primary-soft);color:var(--primary);padding:3px 8px;border-radius:99px}
+.plakietka.platna{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent-text)}
+.kafelek .dalej{margin-top:var(--sp-2);font-size:var(--fs-1);color:var(--primary);font-weight:600}
+
+/* ===== WIDOK SZCZEGOLOWY ===== */
+.detal{display:none;padding-bottom:var(--sp-8)}
+.detal .powrot{display:inline-flex;align-items:center;gap:var(--sp-2);margin:0 0 var(--sp-5);
+  font-size:var(--fs-2);font-weight:600;text-decoration:none;color:var(--primary);
+  border:1px solid var(--border);background:var(--surface);padding:10px var(--sp-4);
+  border-radius:var(--radius-s)}
+.detal .powrot:hover{background:var(--surface-2)}
+.detal h1{font-size:clamp(26px,4.5vw,36px);letter-spacing:-.02em;line-height:1.15;
+  margin-bottom:var(--sp-2);display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap}
+.detal .wstep{color:var(--text-2);font-size:var(--fs-3);max-width:60ch;margin-bottom:var(--sp-5)}
+.detal .tresc{max-width:72ch}
+.detal .tresc p{color:var(--text-2);margin-bottom:var(--sp-4)}
+.detal .tresc strong{color:var(--text);font-weight:600}
+.detal figure{margin:var(--sp-5) 0}
+.detal figure img{border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);background:var(--surface)}
+.detal figcaption{font-size:var(--fs-1);color:var(--text-3);margin-top:var(--sp-2)}
+/* Routing bez JS: gdy przegladarka celuje w sekcje (#nauka), sekcja sie pokazuje.
+   JS dodatkowo chowa siatke i przewija na gore — ale sama tresc dziala i bez niego. */
+.detal:target{display:block}
+body.otwarte .siatka,body.otwarte .naglowek{display:none}
+body.otwarte .detal.aktywny{display:block}
+
+footer{border-top:1px solid var(--border);padding:var(--sp-6) 0 var(--sp-7);
+  color:var(--text-3);font-size:var(--fs-1)}
+footer .srodek{display:flex;flex-wrap:wrap;gap:var(--sp-3) var(--sp-5);align-items:center}
+footer nav{display:flex;flex-wrap:wrap;gap:var(--sp-3) var(--sp-4)}
+footer a{color:var(--text-2);text-decoration:none}
+footer a:hover{color:var(--text);text-decoration:underline}
+footer .prawa{margin-left:auto}
+@media (max-width:719px){footer .prawa{margin-left:0;width:100%}}
+</style>
+</head>
+<body>
+<a class="pomin" href="#tresc">Przejdź do treści</a>
+
+<header class="pasek">
+  <div class="srodek">
+    <a class="marka" href="/">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 106 106" aria-hidden="true"><rect x="0" y="11.7" width="100" height="88.3" rx="13.5" fill="#2b3950"/><rect x="19.2" y="-2.5" width="14.8" height="29.7" rx="7.4" fill="#fff"/><rect x="66" y="-2.5" width="14.8" height="29.7" rx="7.4" fill="#fff"/><rect x="21.7" y="0" width="9.8" height="24.5" rx="4.9" fill="#2b3950"/><rect x="68.5" y="0" width="9.8" height="24.5" rx="4.9" fill="#2b3950"/><rect x="11.5" y="31.9" width="77" height="62.8" rx="7.5" fill="#fff"/><rect x="15.9" y="44.9" width="28.7" height="6" rx="3" fill="#4a80d4"/><rect x="15.9" y="60.8" width="28.7" height="6" rx="3" fill="#4a9d52"/><rect x="15.9" y="75.7" width="28.7" height="6" rx="3" fill="#7069e6"/><path d="M51.1 64.9 64.1 74.5 82.6 53.2" fill="none" stroke="#2b3950" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Day Menu
+    </a>
+    <nav class="menu">
+      <a class="ukryj-mobile" href="/funkcje.html" aria-current="page">Funkcje</a>
+      <a class="ukryj-mobile" href="/#pobierz">Pobierz</a>
+      <a class="ukryj-mobile" href="/#cennik">Cennik</a>
+      <a class="ukryj-mobile" href="/#o-nas">O nas</a>
+      <a class="link-app" href="/app.html">Otwórz</a>
+      <a class="ukryj-mobile" href="/app.html" style="color:var(--primary);font-weight:600">Otwórz aplikację</a>
+    </nav>
+  </div>
+</header>
+
+<main id="tresc" class="srodek">
+
+  <div class="naglowek">
+    <h1>Wszystko, czego potrzebujesz do nauki — w jednym miejscu</h1>
+    <p>Każdy obrazek poniżej to prawdziwy zrzut ekranu z aplikacji, nie wizualizacja.
+       Kliknij funkcję, żeby zobaczyć, jak działa w środku.</p>
+  </div>
+
+  <!-- ============ SIATKA ============ -->
+  <div class="siatka" id="siatka">
+
+    <a class="kafelek" href="#pulpit">
+      <div class="foto"><img src="/img/funkcje/pulpit.png" alt="Pulpit Day Menu: dzisiejsza nauka, sesje pomodoro, sen i nawyki w kartach podsumowania" loading="lazy" decoding="async"></div>
+      <div class="opis"><h2>Pulpit</h2>
+      <p>Cały dzień w pigułce: ile nauki już za Tobą, sesje pomodoro, ostatni sen, nawyki i aktywne cele.</p>
+      <span class="dalej">Zobacz więcej →</span></div>
+    </a>
+
+    <a class="kafelek" href="#nauka">
+      <div class="foto"><img src="/img/funkcje/nauka-harmonogram.png" alt="Harmonogram tygodnia: siatka godzin z lekcjami w szkole, dostępnymi godzinami i zaplanowanymi przedmiotami" loading="lazy" decoding="async"></div>
+      <div class="opis"><h2>Nauka i plan tygodnia</h2>
+      <p>Zamaluj godziny szkoły i dostępności, ustaw priorytety przedmiotów — plan ułoży się sam i czeka na odhaczanie.</p>
+      <span class="dalej">Zobacz więcej →</span></div>
+    </a>
+
+    <a class="kafelek" href="#pomodoro">
+      <div class="foto"><img src="/img/funkcje/nauka-las.png" alt="Las drzew wyrośniętych z ukończonych sesji pomodoro" loading="lazy" decoding="async"></div>
+      <div class="opis"><h2>Pomodoro i las</h2>
+      <p>Każda skończona sesja skupienia to jedno drzewo. Przerwiesz w połowie — drzewo usycha. Las nie kłamie.</p>
+      <span class="dalej">Zobacz więcej →</span></div>
+    </a>
+
+    <a class="kafelek" href="#sprawdziany">
+      <div class="foto"><img src="/img/funkcje/sprawdziany.png" alt="Lista nadchodzących sprawdzianów z odliczaniem dni, pobrana z terminarza Librusa" loading="lazy" decoding="async"></div>
+      <div class="opis"><h2>Sprawdziany <span class="plakietka platna">pakiet 3 zł</span></h2>
+      <p>Zapowiedzi z terminarza Librusa pobierają się same. Widzisz, ile dni zostało, i umawiasz poprawy.</p>
+      <span class="dalej">Zobacz więcej →</span></div>
+    </a>
+
+    <a class="kafelek" href="#frekwencja">
+      <div class="foto"><img src="/img/funkcje/frekwencja.png" alt="Frekwencja ogółem, średnia ocen i frekwencja rozbita na przedmioty" loading="lazy" decoding="async"></div>
+      <div class="opis"><h2>Frekwencja i oceny <span class="plakietka platna">pakiet 3 zł</span></h2>
+      <p>Obecności i oceny z Librusa bez logowania się do dziennika: średnie ważone, kolory ostrzegawcze, ten tydzień lekcja po lekcji.</p>
+      <span class="dalej">Zobacz więcej →</span></div>
+    </a>
+
+    <a class="kafelek" href="#materialy">
+      <div class="foto"><img src="/img/funkcje/materialy.png" alt="Lista arkuszy i zbiorów zadań z paskami postępu rozwiązanych zadań" loading="lazy" decoding="async"></div>
+      <div class="opis"><h2>Materiały</h2>
+      <p>Arkusze CKE i zbiory zadań w jednym spisie. Odhaczasz zadanie po zadaniu i widzisz, ile naprawdę zostało.</p>
+      <span class="dalej">Zobacz więcej →</span></div>
+    </a>
+
+    <a class="kafelek" href="#nawyki">
+      <div class="foto"><img src="/img/funkcje/nawyki.png" alt="Lista nawyków z odhaczaniem dzisiaj i kropkami ostatniego tygodnia" loading="lazy" decoding="async"></div>
+      <div class="opis"><h2>Nawyki</h2>
+      <p>Codzienne odhaczanie, ostatni tydzień w kropkach i licznik serii, którego szkoda przerwać.</p>
+      <span class="dalej">Zobacz więcej →</span></div>
+    </a>
+
+    <a class="kafelek" href="#sen">
+      <div class="foto"><img src="/img/funkcje/sen-wykres.png" alt="Wykres długości snu z ostatnich 14 nocy" loading="lazy" decoding="async"></div>
+      <div class="opis"><h2>Licznik snu</h2>
+      <p>Zapisujesz, o której się położyłeś i wstałeś. Aplikacja liczy resztę i pokazuje, co się dzieje z Twoim snem.</p>
+      <span class="dalej">Zobacz więcej →</span></div>
+    </a>
+
+    <a class="kafelek" href="#cele">
+      <div class="foto"><img src="/img/funkcje/cele.png" alt="Planer celów: cele z terminami rozbite na kroki z paskiem postępu" loading="lazy" decoding="async"></div>
+      <div class="opis"><h2>Cele</h2>
+      <p>Duży cel rozbijasz na kroki, kroki odhaczasz, a postęp widzisz też na Pulpicie — codziennie.</p>
+      <span class="dalej">Zobacz więcej →</span></div>
+    </a>
+
+    <a class="kafelek" href="#analiza">
+      <div class="foto"><img src="/img/funkcje/analiza-wykres.png" alt="Wykres produktywności, snu i nauki nałożonych na jedną oś czasu" loading="lazy" decoding="async"></div>
+      <div class="opis"><h2>Analiza czasu <span class="plakietka platna">wykresy w pakiecie</span></h2>
+      <p>Zmierzony czas, nie deklarowany. Kategorie, dni, trafność szacunków i zależność „sen a nauka”.</p>
+      <span class="dalej">Zobacz więcej →</span></div>
+    </a>
+
+    <a class="kafelek" href="#rywalizacja">
+      <div class="foto"><img src="/img/funkcje/rywalizacja-punkty.png" alt="Ranking punktów rywalizacji: karty graczy z punktami za naukę, tygodnie i zakłady" loading="lazy" decoding="async"></div>
+      <div class="opis"><h2>Rywalizacja <span class="plakietka platna">pakiet 3 zł</span></h2>
+      <p>Pojedynek na godziny nauki, punkty, zakłady i sklep z nagrodami. Znajomych dodajesz jednym kodem.</p>
+      <span class="dalej">Zobacz więcej →</span></div>
+    </a>
+
+    <a class="kafelek" href="#wyglad">
+      <div class="foto"><img src="/img/funkcje/wyglad.png" alt="Ustawienia wyglądu: motyw jasny i ciemny, kolory, tło ze zdjęcia" loading="lazy" decoding="async"></div>
+      <div class="opis"><h2>Wygląd</h2>
+      <p>Jasny, ciemny albo za systemem. Do tego własne kolory i tło ze zdjęcia — apka wygląda po Twojemu.</p>
+      <span class="dalej">Zobacz więcej →</span></div>
+    </a>
+
+    <a class="kafelek" href="#konto">
+      <div class="foto"><img src="/img/funkcje/konto.png" alt="Zakładka Konto: zalogowane konto w chmurze i łączenie z Librusem" loading="lazy" decoding="async"></div>
+      <div class="opis"><h2>Konto i synchronizacja</h2>
+      <p>Jedno konto na telefon, komputer i przeglądarkę. Dane synchronizują się same, kilka sekund po zapisie.</p>
+      <span class="dalej">Zobacz więcej →</span></div>
+    </a>
+
+  </div>
+
+  <!-- ============ SZCZEGOLY ============ -->
+
+  <article class="detal" id="pulpit">
+    <a class="powrot" href="#">← Wszystkie funkcje</a>
+    <h1>Pulpit</h1>
+    <p class="wstep">Pierwszy ekran po otwarciu aplikacji odpowiada na jedno pytanie:
+       jak wygląda dzisiejszy dzień?</p>
+    <div class="tresc">
+      <p>Cztery karty na górze pokazują <strong>naukę dzisiaj</strong> (zliczoną z odhaczonych
+         godzin i sesji pomodoro), <strong>liczbę sesji pomodoro</strong>, <strong>ostatni
+         sen</strong> i <strong>nawyki</strong> zrobione dziś. Nic nie trzeba wpisywać — wszystko
+         zbiera się samo z pozostałych zakładek.</p>
+      <figure><img src="/img/funkcje/pulpit.png" alt="Pełny widok Pulpitu z kartami podsumowania i aktywnymi celami" loading="lazy" decoding="async">
+      <figcaption>Pulpit — podsumowanie dnia i aktywne cele.</figcaption></figure>
+      <p>Niżej są <strong>aktywne cele</strong> z paskami postępu, żeby to, na czym Ci zależy,
+         było widoczne codziennie — a nie tylko wtedy, gdy przypadkiem zajrzysz do zakładki Cele.</p>
+      <figure><img src="/img/funkcje/pulpit-cele.png" alt="Karta aktywnych celów na Pulpicie z paskami postępu" loading="lazy" decoding="async">
+      <figcaption>Aktywne cele — postęp liczony z odhaczonych kroków.</figcaption></figure>
+    </div>
+  </article>
+
+  <article class="detal" id="nauka">
+    <a class="powrot" href="#">← Wszystkie funkcje</a>
+    <h1>Nauka i plan tygodnia</h1>
+    <p class="wstep">Serce aplikacji: stały harmonogram tygodnia, w który plan nauki
+       wpisuje się bezpośrednio — bez osobnych list i kalendarzy.</p>
+    <div class="tresc">
+      <p>Siatkę tygodnia malujesz trzema pędzlami: <strong>Dostępny</strong>,
+         <strong>W szkole</strong> i <strong>Niedostępny</strong>. Klik nagłówka dnia maluje cały
+         dzień, klik godziny — cały wiersz, a większe obszary zaznaczasz przeciągnięciem.
+         Jeśli połączysz konto z Librusem, godziny szkolne wypełnią się same z planu lekcji
+         i będą się aktualizować, gdy szkoła coś przestawi.</p>
+      <figure><img src="/img/funkcje/nauka-harmonogram.png" alt="Harmonogram tygodnia z zamalowanymi godzinami szkolnymi, dostępnością i planem nauki z odhaczonymi godzinami" loading="lazy" decoding="async">
+      <figcaption>Harmonogram tygodnia — plan nauki siedzi w zielonych okienkach, zrobione godziny są odhaczone.</figcaption></figure>
+      <p>Przedmioty dostają <strong>priorytety w procentach</strong> — przy 40% i 20% pierwszy
+         dostanie dwa razy więcej godzin. Przycisk „Ułóż plan automatycznie” rozdziela naukę po
+         dostępnych okienkach, ale równie dobrze możesz rozstawić przedmioty ręcznie, pędzlem.
+         Zaplanowaną godzinę <strong>odhaczasz jednym kliknięciem</strong>, a pasek „Zrobione”
+         nad siatką pilnuje tygodniowego wyniku. Konta z dostępem do AI mogą też poprosić czat,
+         żeby przestawił plan — np. „przenieś fizykę na weekend”.</p>
+      <figure><img src="/img/funkcje/nauka-przedmioty.png" alt="Lista przedmiotów z priorytetami procentowymi i preferencjami nauki" loading="lazy" decoding="async">
+      <figcaption>Przedmioty i ich priorytety — od nich zależy podział godzin w planie.</figcaption></figure>
+      <p>Zakładka <strong>Statystyki</strong> zlicza czas nauki według przedmiotu — z odhaczonych
+         godzin i sesji pomodoro, więc to czas rzeczywisty, a nie planowany.</p>
+      <figure><img src="/img/funkcje/nauka-statystyki.png" alt="Statystyki czasu nauki rozbite na przedmioty" loading="lazy" decoding="async">
+      <figcaption>Czas nauki wg przedmiotu.</figcaption></figure>
+    </div>
+  </article>
+
+  <article class="detal" id="pomodoro">
+    <a class="powrot" href="#">← Wszystkie funkcje</a>
+    <h1>Pomodoro i las</h1>
+    <p class="wstep">Technika pomodoro z konsekwencjami: skupienie sadzi drzewa,
+       rozproszenie je ususza.</p>
+    <div class="tresc">
+      <p>Podwójne kliknięcie zaplanowanej godziny w harmonogramie startuje sesję —
+         domyślnie <strong>25 minut pracy i 5 minut przerwy</strong>, długości ustawisz pod siebie.
+         Ukończona sesja sama odhacza godzinę w planie i dopisuje czas do statystyk
+         oraz Analizy czasu.</p>
+      <figure><img src="/img/funkcje/nauka-pomodoro.png" alt="Karta sesji pomodoro z czasem pracy i przerwy" loading="lazy" decoding="async">
+      <figcaption>Sesja pomodoro — start prosto z zaplanowanego okienka w harmonogramie.</figcaption></figure>
+      <p>Każda skończona sesja pracy to <strong>jedno drzewo w Twoim lesie</strong>. Wyjście
+         z aplikacji w trakcie pracy oznacza uschnięte drzewo — zostaje w lesie jako pamiątka.
+         Po tygodniu nauki las mówi o Tobie więcej niż jakikolwiek wykres.</p>
+      <figure><img src="/img/funkcje/nauka-las.png" alt="Las drzew z licznikiem żywych i uschniętych" loading="lazy" decoding="async">
+      <figcaption>Las — jedna sesja, jedno drzewo. Uschnięte też się liczą, tylko inaczej.</figcaption></figure>
+    </div>
+  </article>
+
+  <article class="detal" id="sprawdziany">
+    <a class="powrot" href="#">← Wszystkie funkcje</a>
+    <h1>Sprawdziany <span class="plakietka platna">pakiet 3 zł</span></h1>
+    <p class="wstep">Zapowiedzi z terminarza Librusa trafiają tu same — serwer sprawdza
+       dziennik co godzinę, także gdy aplikacja jest zamknięta.</p>
+    <div class="tresc">
+      <p>Każdy wpis ma plakietkę z <strong>odliczaniem dni</strong>, przedmiot, opis
+         i nauczyciela. Listę filtrujesz na nadchodzące i minione, a to, czego w Librusie nie ma
+         (np. sprawdzian zapowiedziany ustnie), <strong>dodasz ręcznie</strong> w kilka sekund.</p>
+      <figure><img src="/img/funkcje/sprawdziany.png" alt="Widok sprawdzianów: status synchronizacji z Librusem, lista zapowiedzi z odliczaniem i formularz ręcznego dodawania" loading="lazy" decoding="async">
+      <figcaption>Sprawdziany — terminarz z Librusa plus wpisy ręczne, w jednej liście.</figcaption></figure>
+      <p>Do każdego sprawdzianu <strong>umówisz poprawę</strong> — z datą, godziną i notatką.
+         Umówione poprawy mają własną kartę na górze zakładki, więc żadna nie zniknie
+         z pola widzenia.</p>
+    </div>
+  </article>
+
+  <article class="detal" id="frekwencja">
+    <a class="powrot" href="#">← Wszystkie funkcje</a>
+    <h1>Frekwencja i oceny <span class="plakietka platna">pakiet 3 zł</span></h1>
+    <p class="wstep">Obecności i oceny z Librusa bez wchodzenia do dziennika —
+       pobierane automatycznie, co godzinę.</p>
+    <div class="tresc">
+      <p>Na górze cztery liczby: <strong>frekwencja ogółem, średnia ocen, obecności
+         i nieobecności</strong>. Frekwencja rozbija się na przedmioty z kolorami ostrzegawczymi —
+         od zieleni po czerwień — więc od razu widać, gdzie robi się niebezpiecznie.</p>
+      <figure><img src="/img/funkcje/frekwencja.png" alt="Pełny widok frekwencji i ocen: karty statystyk, średnie wg przedmiotu, frekwencja wg przedmiotu i lekcje z tego tygodnia" loading="lazy" decoding="async">
+      <figcaption>Frekwencja i oceny — wszystko, co ważne z dziennika, w jednym widoku.</figcaption></figure>
+      <p>Sekcja <strong>„Ten tydzień”</strong> pokazuje zrealizowane lekcje jedna po drugiej:
+         przedmiot, temat i obecność. Oceny mają <strong>średnią ważoną</strong> (plus liczy się
+         jako +0,5, minus jako −0,25), a w podpowiedzi zobaczysz też średnią policzoną przez
+         samego Librusa — gdyby szkoła ważyła inaczej.</p>
+      <figure><img src="/img/funkcje/oceny.png" alt="Średnie ocen wg przedmiotu z plakietkami pojedynczych ocen" loading="lazy" decoding="async">
+      <figcaption>Oceny wg przedmiotu — każda plakietka to jedna ocena, z wagą i datą w podpowiedzi.</figcaption></figure>
+    </div>
+  </article>
+
+  <article class="detal" id="materialy">
+    <a class="powrot" href="#">← Wszystkie funkcje</a>
+    <h1>Materiały</h1>
+    <p class="wstep">Spis arkuszy, zbiorów zadań i repetytoriów — z postępem liczonym
+       zadanie po zadaniu, nie „na oko”.</p>
+    <div class="tresc">
+      <p>Dodajesz materiał, podajesz liczbę zadań i <strong>odhaczasz je w miarę
+         rozwiązywania</strong>. Pasek postępu przy każdej pozycji pokazuje, ile faktycznie
+         zostało — koniec ze zgadywaniem, czy „prawie skończony” arkusz to 60% czy 90%.</p>
+      <figure><img src="/img/funkcje/materialy.png" alt="Materiały: formularz dodawania i lista arkuszy ze szczegółowym postępem zadań" loading="lazy" decoding="async">
+      <figcaption>Materiały — arkusze CKE, zbiory i repetytoria z realnym postępem.</figcaption></figure>
+      <p>Listę filtrujesz według przedmiotu, a materiały bez liczby zadań (np. playlista
+         z kursem) też mają swoje miejsce — po prostu bez paska.</p>
+    </div>
+  </article>
+
+  <article class="detal" id="nawyki">
+    <a class="powrot" href="#">← Wszystkie funkcje</a>
+    <h1>Nawyki</h1>
+    <p class="wstep">Proste odhaczanie codziennych rzeczy — z serią, której nie chce się przerwać.</p>
+    <div class="tresc">
+      <p>Każdy nawyk to jeden wiersz: checkbox na dziś, <strong>ostatni tydzień
+         w kropkach</strong> i licznik bieżącej serii. Podsumowanie nad listą pokazuje,
+         ile z dzisiejszych nawyków już zaliczone — ta sama liczba trafia na Pulpit.</p>
+      <figure><img src="/img/funkcje/nawyki.png" alt="Nawyki: dodawanie nowego nawyku i lista z odhaczaniem, kropkami tygodnia i seriami" loading="lazy" decoding="async">
+      <figcaption>Nawyki — dziś, ostatni tydzień i seria w jednym wierszu.</figcaption></figure>
+      <p>Nawyków może być dowolnie dużo, ale najlepiej działa kilka naprawdę ważnych:
+         powtórka słówek, ruch, czytanie, telefon poza biurkiem podczas nauki.</p>
+    </div>
+  </article>
+
+  <article class="detal" id="sen">
+    <a class="powrot" href="#">← Wszystkie funkcje</a>
+    <h1>Licznik snu</h1>
+    <p class="wstep">Bez opasek i aplikacji śledzących — wpisujesz dwie godziny,
+       resztę liczy Day Menu.</p>
+    <div class="tresc">
+      <p>Zapisujesz, o której się położyłeś i wstałeś, do tego <strong>ocenę jakości
+         i notatkę</strong>. Aplikacja liczy długość snu, średnie i pokazuje
+         <strong>wykres ostatnich 14 nocy</strong> z kolorami: zielony to zdrowa długość,
+         żółty i czerwony — ostrzeżenie.</p>
+      <figure><img src="/img/funkcje/sen-wykres.png" alt="Wykres snu z ostatnich 14 nocy z kolorowym oznaczeniem długości" loading="lazy" decoding="async">
+      <figcaption>Ostatnie 14 nocy — kolor mówi wszystko.</figcaption></figure>
+      <p>Sen nie żyje tu w izolacji: w Analizie czasu zobaczysz sekcję
+         <strong>„Sen a nauka”</strong>, która zestawia długość snu z ilością nauki następnego
+         dnia i wyciąga z tego wnioski — na Twoich danych, nie z poradników.</p>
+      <figure><img src="/img/funkcje/sen.png" alt="Pełny widok licznika snu: formularz zapisu nocy, statystyki, wykres i historia" loading="lazy" decoding="async">
+      <figcaption>Cała zakładka: zapis nocy, statystyki, wykres i historia.</figcaption></figure>
+    </div>
+  </article>
+
+  <article class="detal" id="cele">
+    <a class="powrot" href="#">← Wszystkie funkcje</a>
+    <h1>Cele</h1>
+    <p class="wstep">Duże cele rozbite na kroki — bo „zdać maturę” to nie zadanie,
+       tylko kierunek.</p>
+    <div class="tresc">
+      <p>Cel dostaje <strong>termin i listę kroków</strong>. Odhaczasz kroki, a procent
+         postępu liczy się sam. Kroki dopisujesz w locie, gdy plan się doprecyzowuje.</p>
+      <figure><img src="/img/funkcje/cele.png" alt="Planer celów: cele z terminami, krokami do odhaczenia i paskami postępu" loading="lazy" decoding="async">
+      <figcaption>Planer celów — kroki, terminy i postęp.</figcaption></figure>
+      <p>Aktywne cele są też na <strong>Pulpicie</strong>, więc widzisz je codziennie —
+         to najprostszy sposób, żeby długoterminowe plany nie umarły po tygodniu.</p>
+    </div>
+  </article>
+
+  <article class="detal" id="analiza">
+    <a class="powrot" href="#">← Wszystkie funkcje</a>
+    <h1>Analiza czasu <span class="plakietka platna">wykresy w pakiecie 3 zł</span></h1>
+    <p class="wstep">Czas zmierzony przy biurku, nie deklarowany po fakcie —
+       i wnioski, które z niego wynikają.</p>
+    <div class="tresc">
+      <p>Główny wykres nakłada na jedną oś <strong>produktywność, sen i naukę</strong> —
+         w skali tygodnia, miesiąca, roku albo całości. Linie włączasz i wyłączasz
+         jak w serwisie giełdowym.</p>
+      <figure><img src="/img/funkcje/analiza-wykres.png" alt="Wykres produktywności, snu i nauki na jednej osi czasu" loading="lazy" decoding="async">
+      <figcaption>Jeden wykres, trzy wskaźniki — od razu widać zależności.</figcaption></figure>
+      <p>Niżej: <strong>zmierzony czas łącznie, średnia na aktywny dzień
+         i trafność szacunków</strong> (jak dobrze przewidujesz, ile coś zajmie), podział
+         na kategorie i ostatnie 7 dni. Statystyki liczbowe są darmowe; wykresy należą
+         do pakietu 3 zł.</p>
+      <figure><img src="/img/funkcje/analiza.png" alt="Pełny widok Analizy czasu: statystyki, kategorie, dni i sekcja sen a nauka" loading="lazy" decoding="async">
+      <figcaption>Cała zakładka — od sumy czasu po korelacje.</figcaption></figure>
+      <p>Sekcja <strong>„Sen a nauka”</strong> zestawia noce z nauką następnego dnia
+         i pisze wnioski wprost, np. o ile więcej nauki wychodzi po przespanych 7 godzinach.
+         Na Twoich danych — nie na średniej z internetu.</p>
+      <figure><img src="/img/funkcje/analiza-sen.png" alt="Sekcja sen a nauka: zestawienie długości snu i czasu nauki dzień po dniu" loading="lazy" decoding="async">
+      <figcaption>Sen a nauka — dane z dwóch zakładek, jeden wniosek.</figcaption></figure>
+    </div>
+  </article>
+
+  <article class="detal" id="rywalizacja">
+    <a class="powrot" href="#">← Wszystkie funkcje</a>
+    <h1>Rywalizacja <span class="plakietka platna">pakiet 3 zł</span></h1>
+    <p class="wstep">Nauka we dwoje (albo w trójkę) idzie lepiej. Dodajesz znajomego
+       jednym kodem i zaczyna się pojedynek.</p>
+    <div class="tresc">
+      <p>Każdy ma swój <strong>kod zaproszenia</strong> — wysyłasz go znajomemu i gotowe.
+         Pojedynek porównuje <strong>produktywność, godziny nauki, sesje pomodoro i dni
+         z nauką</strong> w bieżącym tygodniu albo od początku rywalizacji. Korona wędruje
+         do lidera każdej kategorii.</p>
+      <figure><img src="/img/funkcje/rywalizacja.png" alt="Pojedynek: porównanie produktywności, godzin nauki, sesji pomodoro i dni z nauką trzech osób" loading="lazy" decoding="async">
+      <figcaption>Pojedynek tygodnia — dane wszystkich uczestników z chmury, na bieżąco.</figcaption></figure>
+      <p><strong>Punkty</strong> zbiera się za naukę (1 godzina = 1 pkt) oraz za wygrane
+         tygodnie i miesiące. Punkty nie są tylko do chwalenia się —
+         wydajesz je w <strong>sklepie nagród</strong>, który sami zapełniacie:
+         „wieczór na grze”, „wybór filmu w piątek”, co chcecie.</p>
+      <figure><img src="/img/funkcje/rywalizacja-punkty.png" alt="Karty punktów graczy z podziałem na naukę, tygodnie, zakłady i wydatki w sklepie" loading="lazy" decoding="async">
+      <figcaption>Punkty — za naukę, wygrane tygodnie, miesiące i zakłady.</figcaption></figure>
+      <p><strong>Zakłady</strong> podnoszą stawkę: „kto zrobi więcej godzin w tym tygodniu”,
+         „wyższy wynik ze sprawdzianu” — proponujesz, znajomy przyjmuje, wygrany bierze punkty.
+         A wbudowany <strong>czat</strong> służy do doceniania i dogryzania, zależnie od wyniku.</p>
+      <figure><img src="/img/funkcje/rywalizacja-zaklady.png" alt="Lista zakładów: propozycje, aktywne i rozstrzygnięte" loading="lazy" decoding="async">
+      <figcaption>Zakłady — od propozycji po rozstrzygnięcie.</figcaption></figure>
+      <figure><img src="/img/funkcje/rywalizacja-sklep.png" alt="Sklep nagród za punkty z saldem do wydania" loading="lazy" decoding="async">
+      <figcaption>Sklep — nagrody wymyślacie sami, punkty są prawdziwe.</figcaption></figure>
+      <figure><img src="/img/funkcje/rywalizacja-czat.png" alt="Czat ze znajomym wewnątrz aplikacji" loading="lazy" decoding="async">
+      <figcaption>Czat — krótkie wiadomości między rywalami.</figcaption></figure>
+    </div>
+  </article>
+
+  <article class="detal" id="wyglad">
+    <a class="powrot" href="#">← Wszystkie funkcje</a>
+    <h1>Wygląd</h1>
+    <p class="wstep">Aplikacja, w której spędzasz godziny, powinna wyglądać po Twojemu.</p>
+    <div class="tresc">
+      <p>Motyw <strong>jasny, ciemny albo za systemem</strong>, do tego własny
+         <strong>kolor główny i akcent</strong>. Możesz też ustawić <strong>zdjęcie jako
+         tło</strong> — z regulacją przyciemnienia i rozmycia, żeby treść zawsze była czytelna.</p>
+      <figure><img src="/img/funkcje/wyglad.png" alt="Ustawienia wyglądu: motyw, kolor główny, akcent i tło ze zdjęcia" loading="lazy" decoding="async">
+      <figcaption>Wygląd — motyw, kolory i tło.</figcaption></figure>
+    </div>
+  </article>
+
+  <article class="detal" id="konto">
+    <a class="powrot" href="#">← Wszystkie funkcje</a>
+    <h1>Konto i synchronizacja</h1>
+    <p class="wstep">Jedno konto, wszystkie urządzenia. Telefon, komputer i przeglądarka
+       widzą te same dane.</p>
+    <div class="tresc">
+      <p>Konto zakładasz na <strong>adres e-mail</strong>. Zmiany wysyłają się do chmury
+         kilka sekund po każdym zapisie, a dane z innych urządzeń dociągają się same w tle —
+         bez żadnego klikania. Tutaj też <strong>łączysz konto z Librusem</strong>, wpisujesz
+         kod promocyjny i znajdziesz regulamin z polityką prywatności.</p>
+      <figure><img src="/img/funkcje/konto.png" alt="Zakładka Konto: zalogowane konto w chmurze, łączenie z Librusem, kod promocyjny i dokumenty" loading="lazy" decoding="async">
+      <figcaption>Konto — synchronizacja, Librus i dokumenty w jednym miejscu.</figcaption></figure>
+      <p>Bez konta aplikacja też działa — dane zostają wtedy na urządzeniu. Konto jest po to,
+         żeby rano zaplanować dzień na komputerze, a po południu odhaczać go na telefonie.</p>
+    </div>
+  </article>
+
+</main>
+
+<footer>
+  <div class="srodek">
+    <nav>
+      <a href="/app.html">Otwórz aplikację</a>
+      <a href="/funkcje.html">Funkcje</a>
+      <a href="/#pobierz">Pobierz</a>
+      <a href="/#cennik">Cennik</a>
+      <a href="/regulamin.html">Regulamin</a>
+      <a href="/prywatnosc.html">Polityka prywatności</a>
+      <a href="mailto:kontakt.daymenu@gmail.com">Kontakt</a>
+    </nav>
+    <span class="prawa">Day Menu · daymenu.pl</span>
+  </div>
+</footer>
+
+<script>
+/* Routing po #hash: kafelek otwiera szczegoly, "← Wszystkie funkcje" wraca do siatki.
+   Bez JS dziala fallback :target (sekcja tylko sie pokazuje, siatka zostaje nad nia). */
+(function(){
+  var detale = document.querySelectorAll(".detal");
+  function pokaz(){
+    var id = location.hash.replace("#", "");
+    var cel = null;
+    detale.forEach(function(d){
+      var trafiony = d.id === id;
+      d.classList.toggle("aktywny", trafiony);
+      if (trafiony) cel = d;
+    });
+    document.body.classList.toggle("otwarte", !!cel);
+    if (cel) window.scrollTo(0, 0);
+    document.title = cel
+      ? cel.querySelector("h1").childNodes[0].textContent.trim() + " — Funkcje Day Menu"
+      : "Funkcje — Day Menu";
+  }
+  window.addEventListener("hashchange", pokaz);
+  pokaz();
+})();
+</script>
+</body>
+</html>

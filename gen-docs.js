@@ -183,6 +183,7 @@ console.log(`Wygenerowano ${ile} podstrony z plikow .md`);
 const dzien = (plik) => fs.statSync(path.join(root, plik)).mtime.toISOString().slice(0, 10);
 const ADRESY = [
   { loc: "https://daymenu.pl/", zrodlo: "DayMenu.html", waga: "1.0", czesto: "weekly" },
+  { loc: "https://daymenu.pl/funkcje.html", zrodlo: "docs/funkcje.html", waga: "0.8", czesto: "monthly" },
   { loc: "https://daymenu.pl/regulamin.html", zrodlo: "REGULAMIN.md", waga: "0.3", czesto: "yearly" },
   { loc: "https://daymenu.pl/prywatnosc.html", zrodlo: "PRIVACY.md", waga: "0.3", czesto: "yearly" },
 ];
