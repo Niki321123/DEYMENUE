@@ -4,10 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Day Menu</title>
+<meta name="description" content="Aplikacja do planowania nauki do matury: tygodniowy harmonogram, pomodoro z lasem, materiały, statystyki i rywalizacja ze znajomymi. Plan lekcji zaciąga się z Librusa.">
+<!-- Podglad przy udostepnianiu linku (Instagram, Messenger, WhatsApp, Discord).
+     Bez tych znacznikow platformy pokazuja goly adres bez obrazka i opisu. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Day Menu">
+<meta property="og:title" content="Day Menu — planowanie nauki do matury">
+<meta property="og:description" content="Ułóż tygodniowy plan nauki, licz sesje pomodoro i rywalizuj ze znajomymi. Plan lekcji zaciąga się z Librusa.">
+<meta property="og:url" content="https://daymenu.pl/">
+<meta property="og:image" content="https://daymenu.pl/podglad.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="pl_PL">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#2b3950">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=100">
+<link rel="manifest" href="/manifest.webmanifest?v=101">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -19,7 +32,7 @@
 /* ===== TOKENS ===== */
 :root{
   --bg:#f6f7f9; --surface:#ffffff; --surface-2:#eef0f4; --border:#e2e5ea;
-  --text:#1b1f27; --text-2:#5b6472; --text-3:#9099a6;
+  --text:#1b1f27; --text-2:#5b6472; --text-3:#6b7280;
   --primary:#4f63d2; --primary-soft:#e8ebfb; --primary-text:#fff;
   --accent:#e8743b; --accent-soft:#fdeee5;
   --good:#2e9e5b; --good-soft:#e3f5ea; --warn:#d9a514; --warn-soft:#faf3d9; --bad:#d24f4f; --bad-soft:#fbe7e7;
@@ -30,7 +43,7 @@
 }
 [data-theme="dark"]{
   --bg:#14161c; --surface:#1d2029; --surface-2:#262a35; --border:#323744;
-  --text:#eceef2; --text-2:#a7aeba; --text-3:#6e7685;
+  --text:#eceef2; --text-2:#a7aeba; --text-3:#868f9e;
   --primary:#7b8cf0; --primary-soft:#2a3052; --primary-text:#0f1118;
   --accent:#f08c57; --accent-soft:#43301f;
   --good:#4cc07e; --good-soft:#1d3a2a; --warn:#e0b53e; --warn-soft:#3d3517; --bad:#e57373; --bad-soft:#412323;
@@ -1144,7 +1157,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=100;
+const DM_BUILD=101;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.

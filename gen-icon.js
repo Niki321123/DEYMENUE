@@ -88,6 +88,35 @@ const DRAW_LOGO = `(async function(S){
   return c.toDataURL("image/png");
 })`;
 
+/* Obrazek podgladu linku (Open Graph), 1200x630 — to widac, gdy ktos wrzuci adres
+   na Instagrama, Messengera czy Discorda. Bez niego platformy pokazuja goly link. */
+const DRAW_OG = `(async function(W,H){
+  const c=document.createElement("canvas");c.width=W;c.height=H;
+  const x=c.getContext("2d");
+  const GRANAT="#2b3950";
+  x.fillStyle="#ffffff";x.fillRect(0,0,W,H);
+
+  // delikatny pasek marki u gory, w kolorach listy z logo
+  const paski=["#4a80d4","#4a9d52","#7069e6"];
+  paski.forEach((k,i)=>{x.fillStyle=k;x.fillRect(i*(W/3),0,W/3,10)});
+
+  const znak=Math.round(H*0.34);
+  const img=new Image();
+  await new Promise(g=>{img.onload=g;img.src=${DRAW}(znak,0,null,false)});
+  x.drawImage(img,(W-znak)/2,H*0.16,znak,znak);
+
+  x.textAlign="center";x.textBaseline="middle";
+  x.font="700 "+Math.round(H*0.115)+"px system-ui,-apple-system,Segoe UI,Arial,sans-serif";
+  x.fillStyle=GRANAT;x.fillText("Day Menu",W/2,H*0.68);
+
+  x.font="400 "+Math.round(H*0.052)+"px system-ui,-apple-system,Segoe UI,Arial,sans-serif";
+  x.fillStyle="#5b6472";x.fillText("Planowanie nauki do matury",W/2,H*0.80);
+
+  x.font="400 "+Math.round(H*0.040)+"px system-ui,-apple-system,Segoe UI,Arial,sans-serif";
+  x.fillStyle="#6b7280";x.fillText("harmonogram · pomodoro · statystyki · rywalizacja",W/2,H*0.885);
+  return c.toDataURL("image/png");
+})`;
+
 const png = (dataUrl) => Buffer.from(dataUrl.split(",")[1], "base64");
 
 app.whenReady().then(async () => {
@@ -146,6 +175,11 @@ app.whenReady().then(async () => {
     zapisz(path.join(root, "docs", nazwa), await rysuj(rozmiar, pad, tlo, false));
     console.log(`docs/${nazwa}`);
   }
+
+  // ---- podglad linku w mediach spolecznosciowych ----
+  const og = await w.webContents.executeJavaScript(`${DRAW_OG}(1200,630)`).then(png);
+  zapisz(path.join(root, "docs", "podglad.png"), og);
+  console.log(`docs/podglad.png — ${(og.length / 1024).toFixed(1)} kB`);
 
   // ---- logo z napisem (panele, sklepy) ----
   for (const S of [512, 1024]) {
