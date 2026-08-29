@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=115">
+<link rel="manifest" href="/manifest.webmanifest?v=116">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -865,12 +865,13 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
   <div id="rywalMain" hidden>
     <div class="card">
       <h2 style="margin-bottom:2px">Twój kod zaproszenia</h2>
-      <p class="muted" style="margin-bottom:var(--sp-3)">Wyślij go znajomemu — po wpisaniu zobaczycie nawzajem swoje wyniki.</p>
+      <p class="muted" style="margin-bottom:var(--sp-3)">Wyślij go znajomemu — po wpisaniu zobaczycie nawzajem swoje wyniki, a każda osoba, która go użyje, daje <b>Tobie 30 dni pełnego dostępu za darmo</b>.</p>
       <div class="row" style="margin-bottom:var(--sp-3)">
         <code id="rywalCode" class="field" style="flex:none;width:auto;font-size:var(--fs-3);font-weight:700;letter-spacing:.08em">————</code>
         <button class="btn ghost small" id="rywalCopy" style="flex:none">Kopiuj</button>
         <input type="text" id="rywalName" class="field" placeholder="Twoja nazwa widoczna dla znajomych" maxlength="40">
       </div>
+      <p class="muted" id="rywalPolecenia" style="margin-bottom:var(--sp-3)"></p>
       <div class="row">
         <input type="text" id="rywalAddCode" class="field" placeholder="Wpisz kod znajomego, np. A1B2-C3D4" maxlength="20">
         <button class="btn" id="rywalAdd" style="flex:none">Dodaj znajomego</button>
@@ -1166,7 +1167,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=115;
+const DM_BUILD=116;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -5423,10 +5424,12 @@ async function sprawdzOplate(){
     try{
       const tok=await sbToken();
       if(tok){
-        const r=await fetch(`${SB_URL}/rest/v1/entitlements?select=user_id`,
+        const r=await fetch(`${SB_URL}/rest/v1/entitlements?select=expires_at`,
           {headers:{apikey:SB_KEY,Authorization:"Bearer "+tok}});
-        // 404 = tabeli jeszcze nie ma (platnosc niewdrozona) → nie blokujemy nikogo
-        if(r.ok){const rows=await r.json();oplacone=Array.isArray(rows)&&rows.length>0;}
+        // 404 = tabeli jeszcze nie ma (platnosc niewdrozona) → nie blokujemy nikogo.
+        // Dostep czasowy (z polecenia) ma date wygasniecia; platny/promo ma ja pusta (=wieczny).
+        // Liczy sie tylko wiersz bezterminowy albo jeszcze niewygasly.
+        if(r.ok){const rows=await r.json();oplacone=Array.isArray(rows)&&rows.some(x=>x.expires_at==null||new Date(x.expires_at)>new Date());}
       }
     }catch(e){/* brak sieci — zostawiamy odblokowane */}
   }
@@ -5685,6 +5688,38 @@ function rywalAgo(days){
   return min<2?"przed chwilą":min<60?`${min} min temu`:min<1440?`${Math.round(min/60)} godz. temu`:`${Math.round(min/1440)} dni temu`;
 }
 
+// Polska odmiana: 1 osoba, 2-4 osoby, 5+ osób (z wyjatkiem nastek: 12-14 -> osób).
+function odmianaOsoby(n){
+  if(n===1)return"osoba";
+  const d=n%10, s=n%100;
+  return (d>=2&&d<=4&&!(s>=12&&s<=14))?"osoby":"osób";
+}
+// Pokazuje, ile osob wpisalo Twoj kod i do kiedy masz z tego pelny dostep.
+// Liczbe bierzemy z funkcji moje_polecenia(), a date wygasniecia z wlasnego wiersza entitlements.
+async function odswiezPolecenia(){
+  const el=$("#rywalPolecenia"); if(!el)return;
+  if(!sbSession){el.textContent="";return;}
+  try{
+    const tok=await sbToken(); if(!tok){el.textContent="";return;}
+    const [ileR,entR]=await Promise.all([
+      fetch(`${SB_URL}/rest/v1/rpc/moje_polecenia`,{method:"POST",headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json"},body:"{}"}),
+      fetch(`${SB_URL}/rest/v1/entitlements?select=expires_at`,{headers:{apikey:SB_KEY,Authorization:"Bearer "+tok}})
+    ]);
+    let ile=0; if(ileR.ok){ile=(await ileR.json())||0;}
+    let doKiedy=null, wieczny=false;
+    if(entR.ok){const rows=await entR.json(); if(Array.isArray(rows)&&rows.length){ if(rows[0].expires_at==null)wieczny=true; else doKiedy=rows[0].expires_at; }}
+    const os=odmianaOsoby(ile);
+    if(wieczny){
+      el.innerHTML = ile>0
+        ? `✨ <b>${ile}</b> ${os} wpisało Twój kod. Masz już pełny dostęp na stałe.`
+        : "Masz pełny dostęp. Kod i tak warto wysłać — znajomi dołączą do rywalizacji.";
+    } else if(doKiedy){
+      el.innerHTML = `✨ <b>${ile}</b> ${os} wpisało Twój kod — pełny dostęp masz do <b>${fmtDate(doKiedy.slice(0,10))}</b>. Każda kolejna osoba dokłada 30 dni.`;
+    } else {
+      el.textContent = "Nikt jeszcze nie wpisał Twojego kodu. Każda osoba, która to zrobi, daje Ci 30 dni pełnego dostępu za darmo.";
+    }
+  }catch(e){ el.textContent=""; }
+}
 function renderRywal(){
   const zalogowany=!!sbSession;
   $("#rywalLogin").hidden=zalogowany;
@@ -5696,6 +5731,7 @@ function renderRywal(){
     $("#rywalCode").textContent=rywalProfile.code||"————";
     if(document.activeElement!==$("#rywalName"))$("#rywalName").value=rywalProfile.name||"";
   }
+  odswiezPolecenia();
   const me={name:(rywalProfile&&rywalProfile.name)||"Ty",days:rywalFriends.myDays||{},me:true};
   const wszyscy=[me,...rywalFriends];
   // zakres pojedynku: bieżący tydzień albo wszystko od startu rywalizacji (najstarszej znajomości)

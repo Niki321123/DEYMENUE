@@ -96,7 +96,11 @@ Deno.serve(async (req: Request) => {
     { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
   ).then((r) => (r.ok ? r.json() : []))
    .catch(() => []);
-  if (Array.isArray(istnieje) && istnieje.length && istnieje[0].stripe_session_id !== s.id) {
+  // Podwojna wplata = istnieje juz wiersz z INNEJ sesji STRIPE. Wiersz bez stripe_session_id
+  // (dostep z polecenia albo promo) nie jest podwojna wplata — pozwalamy platnosci go nadpisac,
+  // zeby dostep czasowy zamienil sie na bezterminowy (merge-duplicates + expires_at: null nizej).
+  const poprzedniaSesja = istnieje?.[0]?.stripe_session_id;
+  if (poprzedniaSesja && poprzedniaSesja !== s.id) {
     console.warn(`UWAGA: ${userId} zaplacil ponownie (sesja ${s.id}) — rozwaz zwrot`);
     return new Response(JSON.stringify({ pominieto: "juz ma dostep" }), { status: 200 });
   }
@@ -112,6 +116,10 @@ Deno.serve(async (req: Request) => {
     body: JSON.stringify({
       user_id: userId,
       source: "stripe",
+      // Platnosc = dostep BEZTERMINOWY. Jawnie zerujemy date wygasniecia, bo gdyby uzytkownik
+      // mial wczesniej dostep czasowy z polecenia, "merge-duplicates" bez tego pola zostawilby
+      // stara date i oplacony dostep by wygasl.
+      expires_at: null,
       stripe_session_id: s.id,
       amount_minor: s.amount_total ?? null,
       currency: s.currency ?? null,
