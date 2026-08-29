@@ -165,6 +165,48 @@ h2{font-size:var(--fs-5);line-height:1.2;letter-spacing:-.02em;margin-bottom:var
 .tekst p:last-child{margin-bottom:0}
 .tekst strong{color:var(--text);font-weight:600}
 
+/* ===== PRZYCISKI ZGLOSZEN (przyklejone w rogu) ===== */
+.zgl-rog{position:fixed;right:var(--sp-4);bottom:var(--sp-4);z-index:60;
+  display:flex;flex-direction:column;gap:var(--sp-2);align-items:flex-end}
+.zgl-rog button{display:inline-flex;align-items:center;gap:var(--sp-2);
+  min-height:44px;padding:0 var(--sp-4);border:none;border-radius:99px;
+  font-size:var(--fs-2);font-weight:600;color:#fff;cursor:pointer;
+  box-shadow:0 4px 14px rgba(20,24,33,.25);
+  transition:transform .15s ease-out,filter .15s}
+.zgl-rog button:hover{transform:translateY(-1px);filter:brightness(1.06)}
+.zgl-rog button:active{transform:translateY(0)}
+.zgl-rog .zgl-blad{background:#d24f4f}
+.zgl-rog .zgl-sug{background:var(--primary)}
+.zgl-rog .ikona{font-size:16px;line-height:1}
+@media (max-width:520px){
+  /* na waskim ekranie same ikony, zeby nie zaslanialy tresci */
+  .zgl-rog button span.tekst{display:none}
+  .zgl-rog button{padding:0;width:44px;justify-content:center}
+}
+
+/* ===== OKNO ZGLOSZENIA ===== */
+.zgl-tlo{position:fixed;inset:0;z-index:70;display:none;
+  background:rgba(15,17,24,.55);backdrop-filter:blur(2px);
+  align-items:center;justify-content:center;padding:var(--sp-4)}
+.zgl-tlo.otwarte{display:flex}
+.zgl-okno{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);box-shadow:var(--shadow);
+  width:100%;max-width:440px;padding:var(--sp-5);max-height:90vh;overflow:auto}
+.zgl-okno h2{font-size:var(--fs-4);margin-bottom:var(--sp-1)}
+.zgl-okno .opis{color:var(--text-2);font-size:var(--fs-2);margin-bottom:var(--sp-4)}
+.zgl-okno label{display:block;font-size:var(--fs-1);font-weight:600;
+  color:var(--text-2);margin-bottom:var(--sp-2)}
+.zgl-okno textarea,.zgl-okno input[type=email]{width:100%;background:var(--bg);
+  color:var(--text);border:1px solid var(--border);border-radius:var(--radius-s);
+  padding:var(--sp-3);font-size:var(--fs-2);margin-bottom:var(--sp-4)}
+.zgl-okno textarea{min-height:120px;resize:vertical}
+.zgl-okno .rzad{display:flex;gap:var(--sp-3);justify-content:flex-end;align-items:center}
+.zgl-okno .stan{margin-right:auto;font-size:var(--fs-1);color:var(--text-3)}
+.zgl-okno .stan.blad{color:#d24f4f}
+.zgl-okno .stan.ok{color:var(--good)}
+/* pole-pulapka na boty: niewidoczne i wyjete z nawigacji klawiatura */
+.zgl-hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+
 /* ===== STOPKA ===== */
 footer{border-top:1px solid var(--border);padding:var(--sp-6) 0 var(--sp-7);
   color:var(--text-3);font-size:var(--fs-1)}
@@ -352,7 +394,37 @@ footer .prawa{margin-left:auto}
 
 </main>
 
-<footer>
+<!-- Przyklejone w rogu: zglos blad / sugestia. Otwieraja jedno okno w dwoch wariantach. -->
+<div class="zgl-rog">
+  <button type="button" class="zgl-blad" data-zgl="blad" aria-haspopup="dialog">
+    <span class="ikona" aria-hidden="true">⚠</span><span class="tekst">Zgłoś błąd</span>
+  </button>
+  <button type="button" class="zgl-sug" data-zgl="sugestia" aria-haspopup="dialog">
+    <span class="ikona" aria-hidden="true">💡</span><span class="tekst">Sugestia</span>
+  </button>
+</div>
+
+<div class="zgl-tlo" id="zglTlo" role="dialog" aria-modal="true" aria-labelledby="zglTytul" hidden>
+  <div class="zgl-okno">
+    <h2 id="zglTytul">Zgłoś błąd</h2>
+    <p class="opis" id="zglOpis">Napisz, co się nie zgadza — im więcej szczegółów, tym szybciej to naprawimy.</p>
+    <!-- pole-pulapka: czlowiek go nie widzi ani nie doskoczy tabem; bot wypelnia i wpada -->
+    <div class="zgl-hp" aria-hidden="true">
+      <label>Nie wypełniaj tego pola<input type="text" id="zglHp" tabindex="-1" autocomplete="off"></label>
+    </div>
+    <label for="zglTresc">Treść zgłoszenia</label>
+    <textarea id="zglTresc" maxlength="2000" placeholder="Opisz problem albo pomysł…"></textarea>
+    <label for="zglKontakt">E-mail do odpowiedzi (opcjonalnie)</label>
+    <input type="email" id="zglKontakt" maxlength="200" placeholder="żeby móc do Ciebie wrócić" autocomplete="email">
+    <div class="rzad">
+      <span class="stan" id="zglStan"></span>
+      <button type="button" class="btn drugi" id="zglAnuluj">Anuluj</button>
+      <button type="button" class="btn glowny" id="zglWyslij">Wyślij</button>
+    </div>
+  </div>
+</div>
+
+<footer
   <div class="srodek">
     <nav>
       <a href="/app.html">Otwórz aplikację</a>
@@ -381,6 +453,97 @@ footer .prawa{margin-left:auto}
   if (!sys) return;
   var karta = document.querySelector('[data-sys="' + sys + '"]');
   if (karta) karta.classList.add("twoj");
+})();
+
+/* ---- Zglaszanie bledow i sugestii ----
+   Zapis idzie przez funkcje brzegowa 'feedback' (service_role), a nie wprost do tabeli:
+   tabela nie ma polityk RLS, wiec klient nie moze do niej pisac. Klucz ponizej jest
+   PUBLICZNY (ten sam, ktory aplikacja i tak wysyla) — brama Supabase wymaga go nawet
+   dla funkcji bez logowania. */
+(function(){
+  var FUNKCJA = "https://jkpwboekztpkfxivueql.supabase.co/functions/v1/feedback";
+  var KLUCZ = "sb_publishable_hq2-GCoJtHstXRVSCSh95g_3omuQDCd";
+
+  var tlo = document.getElementById("zglTlo");
+  var okno = tlo.querySelector(".zgl-okno");
+  var tytul = document.getElementById("zglTytul");
+  var opis = document.getElementById("zglOpis");
+  var tresc = document.getElementById("zglTresc");
+  var kontakt = document.getElementById("zglKontakt");
+  var hp = document.getElementById("zglHp");
+  var stan = document.getElementById("zglStan");
+  var btnWyslij = document.getElementById("zglWyslij");
+  var typ = "blad", ostatniFokus = null;
+
+  var TEKSTY = {
+    blad:     { t: "Zgłoś błąd",  o: "Napisz, co się nie zgadza — im więcej szczegółów, tym szybciej to naprawimy." },
+    sugestia: { t: "Sugestia",    o: "Masz pomysł, czego brakuje? Chętnie przeczytamy." }
+  };
+
+  function pokazStan(txt, klasa){ stan.textContent = txt || ""; stan.className = "stan" + (klasa ? " " + klasa : ""); }
+
+  function otworz(rodzaj){
+    typ = rodzaj;
+    tytul.textContent = TEKSTY[rodzaj].t;
+    opis.textContent = TEKSTY[rodzaj].o;
+    pokazStan(""); btnWyslij.disabled = false;
+    ostatniFokus = document.activeElement;
+    tlo.hidden = false; tlo.classList.add("otwarte");
+    tresc.focus();
+  }
+  function zamknij(){
+    tlo.classList.remove("otwarte"); tlo.hidden = true;
+    if (ostatniFokus && ostatniFokus.focus) ostatniFokus.focus();
+  }
+
+  document.querySelectorAll("[data-zgl]").forEach(function(b){
+    b.addEventListener("click", function(){ otworz(b.getAttribute("data-zgl")); });
+  });
+  document.getElementById("zglAnuluj").addEventListener("click", zamknij);
+  tlo.addEventListener("click", function(e){ if (e.target === tlo) zamknij(); });
+  document.addEventListener("keydown", function(e){ if (e.key === "Escape" && !tlo.hidden) zamknij(); });
+
+  // proste utrzymanie fokusu w oknie (dostepnosc): Tab nie ucieka poza dialog
+  tlo.addEventListener("keydown", function(e){
+    if (e.key !== "Tab" || tlo.hidden) return;
+    var pola = okno.querySelectorAll("textarea,input[type=email],button");
+    var lista = Array.prototype.filter.call(pola, function(el){ return !el.disabled && el.offsetParent !== null; });
+    if (!lista.length) return;
+    var pierwszy = lista[0], ostatni = lista[lista.length - 1];
+    if (e.shiftKey && document.activeElement === pierwszy){ e.preventDefault(); ostatni.focus(); }
+    else if (!e.shiftKey && document.activeElement === ostatni){ e.preventDefault(); pierwszy.focus(); }
+  });
+
+  btnWyslij.addEventListener("click", function(){
+    var t = tresc.value.trim();
+    if (t.length < 1){ pokazStan("Napisz kilka słów przed wysłaniem.", "blad"); tresc.focus(); return; }
+    btnWyslij.disabled = true; pokazStan("Wysyłam…");
+    fetch(FUNKCJA, {
+      method: "POST",
+      headers: { "apikey": KLUCZ, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        typ: typ, tresc: t,
+        kontakt: kontakt.value.trim(),
+        hp: hp.value,                 // pulapka na boty
+        url: location.href
+      })
+    })
+    .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(d){ return { ok: r.ok, d: d }; }); })
+    .then(function(res){
+      if (res.ok && res.d.ok){
+        pokazStan("Dzięki! Zapisane.", "ok");
+        tresc.value = ""; kontakt.value = "";
+        setTimeout(zamknij, 1200);
+      } else {
+        pokazStan(res.d.error || "Nie udało się wysłać — spróbuj później.", "blad");
+        btnWyslij.disabled = false;
+      }
+    })
+    .catch(function(){
+      pokazStan("Brak połączenia — spróbuj później.", "blad");
+      btnWyslij.disabled = false;
+    });
+  });
 })();
 </script>
 </body>
