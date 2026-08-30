@@ -90,14 +90,24 @@ img,svg{max-width:100%}
 .marka{display:flex;align-items:center;gap:var(--sp-2);font-weight:700;font-size:var(--fs-3);
   color:var(--text);text-decoration:none;letter-spacing:-.01em}
 .marka svg{width:26px;height:26px;flex:none}
-.menu{display:flex;gap:var(--sp-2);margin-left:auto;align-items:center}
+.menu{display:flex;gap:var(--sp-2);margin-left:auto;align-items:center;flex-wrap:wrap}
 .menu a{color:var(--text-2);text-decoration:none;font-size:var(--fs-2);
   padding:10px var(--sp-3);border-radius:var(--radius-s);transition:color .15s,background .15s}
 .menu a:hover{color:var(--text);background:var(--surface-2)}
-.menu .link-app{display:none}
+/* wyrozniony przycisk "Otwórz aplikację" — wyglada jak przycisk, nie jak kolejny link */
+.menu a.cta{background:var(--primary);color:var(--primary-text);font-weight:600}
+.menu a.cta:hover{background:color-mix(in srgb,var(--primary) 88%,#000);color:var(--primary-text)}
 @media (max-width:719px){
-  .menu .ukryj-mobile{display:none}
-  .menu .link-app{display:inline-flex}
+  /* Telefon: logo w pierwszym rzedzie, PELNE menu zawijane pod nim — wszystkie opcje
+     widoczne od razu, bez chowania pod jeden przycisk. */
+  .pasek .srodek{flex-wrap:wrap;min-height:0;gap:var(--sp-2);
+    padding-top:var(--sp-2);padding-bottom:var(--sp-2)}
+  .marka{width:100%;justify-content:center}
+  .menu{width:100%;margin-left:0;justify-content:center;gap:6px}
+  .menu a{padding:8px 12px;font-size:var(--fs-1)}
+  /* pasek jest tu wyzszy (dwa rzedy), wiec skok z menu musi zostawic wiecej miejsca,
+     inaczej przyklejony pasek zaslania tytul sekcji */
+  section{scroll-margin-top:120px}
 }
 
 /* ===== PRZYCISKI ===== */
@@ -144,6 +154,7 @@ h2{font-size:var(--fs-5);line-height:1.2;letter-spacing:-.02em;margin-bottom:var
 .karta ol li{margin-bottom:var(--sp-2)}
 .karta ol li::marker{color:var(--primary);font-weight:600}
 .karta .uwaga{font-size:var(--fs-1);color:var(--text-3);margin:var(--sp-3) 0 0}
+.karta .opcja{font-weight:600;color:var(--text);margin:var(--sp-3) 0 var(--sp-2)}
 /* znacznik wykrytego systemu; jest zawsze w HTML, tylko niewidoczny, wiec jego
    pojawienie sie nie przesuwa ukladu strony */
 .twoj-sys{position:absolute;top:var(--sp-4);right:var(--sp-4);
@@ -237,12 +248,11 @@ footer .prawa{margin-left:auto}
       Day Menu
     </a>
     <nav class="menu">
-      <a class="ukryj-mobile" href="/funkcje.html">Funkcje</a>
-      <a class="ukryj-mobile" href="#pobierz">Pobierz</a>
-      <a class="ukryj-mobile" href="#cennik">Cennik</a>
-      <a class="ukryj-mobile" href="#o-nas">O nas</a>
-      <a class="link-app" href="/app.html">Otwórz</a>
-      <a class="ukryj-mobile" href="/app.html" style="color:var(--primary);font-weight:600">Otwórz aplikację</a>
+      <a href="/funkcje.html">Funkcje</a>
+      <a href="#pobierz">Pobierz</a>
+      <a href="#cennik">Cennik</a>
+      <a href="#o-nas">O nas</a>
+      <a class="cta" href="/app.html">Otwórz aplikację</a>
     </nav>
   </div>
 </header>
@@ -276,10 +286,17 @@ footer .prawa{margin-left:auto}
         <div class="karta" data-sys="android">
           <span class="twoj-sys">Twój system</span>
           <h3>Android</h3>
-          <p class="waga">Plik APK · około 4 MB</p>
-          <p>Pobierz i otwórz plik. Android poprosi o zgodę na instalację z tego źródła —
+          <p class="waga">Dwie drogi — wybierz jedną</p>
+          <p class="opcja">Opcja 1 · Dodaj do ekranu, bez pobierania</p>
+          <ol>
+            <li>Otwórz <strong>daymenu.pl</strong> w Chrome.</li>
+            <li>Dotknij menu <strong>⋮</strong> w prawym górnym rogu.</li>
+            <li>Wybierz <strong>Zainstaluj aplikację</strong> (albo <strong>Dodaj do ekranu głównego</strong>).</li>
+          </ol>
+          <p class="opcja">Opcja 2 · Pobierz plik</p>
+          <p>Instalacja z pliku APK. Android poprosi o zgodę na instalację z tego źródła —
              to normalne przy aplikacjach spoza sklepu Play.</p>
-          <a class="btn glowny pelny" href="/DayMenu.apk" download>Pobierz na Androida</a>
+          <a class="btn glowny pelny" href="/DayMenu.apk" download>Pobierz APK · ok. 4 MB</a>
           <p class="uwaga"><a href="/DayMenu.apk.sha256">Suma kontrolna</a> pozwala sprawdzić,
              czy pobrany plik nie został po drodze podmieniony.</p>
         </div>
