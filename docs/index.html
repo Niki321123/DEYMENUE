@@ -7,7 +7,16 @@
 <meta name="description" content="Twoja nauka do matury w jednym miejscu: plan na tydzień, uczciwie liczony czas i postępy, które widać. Pobierz na telefon lub komputer albo otwórz w przeglądarce.">
 <link rel="canonical" href="https://daymenu.pl/">
 <meta name="theme-color" content="#2b3950">
+<!-- Ikona i nazwa po dodaniu do ekranu glownego / Docka.
+     iOS bierze ikone z apple-touch-icon (musi byc PNG). macOS "Dodaj do Docka" i Android
+     biora ja z manifestu — bez linku do manifestu Mac pokazywal ogolny obrazek zamiast logo.
+     start_url w manifescie wskazuje /app.html, wiec zainstalowana ikona otwiera aplikacje,
+     a nie te strone. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Day Menu">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Day Menu">
 <meta property="og:title" content="Day Menu — Twój planer nauki">
@@ -354,7 +363,7 @@ footer .prawa{margin-left:auto}
         </div>
 
         <div class="karta platna">
-          <p class="cena">5 złsmall>Jednorazowo, dostęp na stałe</small></p>
+          <p class="cena">5 zł<small>Jednorazowo, dostęp na stałe</small></p>
           <ul class="lista">
             <li>Zapowiedzi sprawdzianów i kartkówek z Librusa</li>
             <li>Frekwencja i oceny z Librusa</li>
