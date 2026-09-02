@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=119">
+<link rel="manifest" href="/manifest.webmanifest?v=120">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -182,6 +182,8 @@ label.fld{display:block;font-size:var(--fs-1);font-weight:600;color:var(--text-2
 .forest-tree.growing{background:var(--warn-soft);animation:forestPulse 1.4s ease-in-out infinite}
 @keyframes forestPulse{0%,100%{opacity:1}50%{opacity:.55}}
 .mat-cell.avail{background:var(--good-soft);border-color:var(--good)}
+/* wszystkie sesje w godzinie zrobione: wyśrodkowany, stonowany ptaszek */
+.mat-cell.avail.done{display:flex;align-items:center;justify-content:center;color:var(--good);font-weight:700;opacity:.75}
 .mat-cell.school{background:var(--primary-soft);border-color:var(--primary)}
 .mat-cell.plan{display:flex;align-items:center;justify-content:center;gap:2px;font-size:10px;font-weight:700;color:var(--good);overflow:hidden;text-align:center;line-height:1.05;padding:1px 3px;white-space:nowrap;text-overflow:ellipsis}
 .mat-cell.plan.done{opacity:.5;text-decoration:line-through}
@@ -1175,7 +1177,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=119;
+const DM_BUILD=120;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -2050,7 +2052,7 @@ function renderMatGrid(){
       const st=S.matura.grid[matKey(d,h)];
       const act=actOf(st);
       let cls=st==="avail"?"avail":st==="school"?"school":"";
-      let inner="",lbl=st==="avail"?"Dostępny":st==="school"?"W szkole":"Niedostępny";
+      let inner="",styleExtra="",lbl=st==="avail"?"Dostępny":st==="school"?"W szkole":"Niedostępny";
       if(act){
         const done=act.kind==="study"&&!!actDoneCells[matKey(d,h)];
         cls="act "+(act.kind==="study"?"act-study":"act-busy")+(done?" done":"");
@@ -2059,17 +2061,18 @@ function renderMatGrid(){
           ? `${act.name} (własna nauka) — ${done?"zrobione (kliknij, aby cofnąć)":"kliknij pędzlem „Dostępny”, aby odhaczyć"}`
           : `${act.name} — zajęte, nauka niemożliwa`;
       }else if(st==="avail"){
-        // W tej godzinie mieści się N sesji pomodoro (szczegóły i Start są na liście „Sesje dnia").
+        // Siatka pokazuje TYLKO dostępność — spokojne bloki. Delikatny pasek koloru = przedmiot
+        // przypisany do sesji w tej godzinie, ✓ = wszystkie sesje zrobione. Szczegóły są na liście.
         const ses=(S.matura.plan||[]).filter(s=>s.day===d&&Math.floor(s.startMin/60)===h);
         if(ses.length){
           const dn=ses.filter(s=>s.doneWeek===wk).length;
-          const zPrzedm=ses.some(s=>s.topicId&&S.matura.topics.some(t=>t.id===s.topicId));
-          cls+=(zPrzedm?" plan":"")+(dn===ses.length?" done":"");
-          inner=`${ses.length}×${dn?` ✓${dn}`:""}`;
-          lbl=`${ses.length} ${matsPlural(ses.length,"sesja","sesje","sesji")} pomodoro${dn?` — ${dn} zrobion${dn===1?"a":"e"}`:""}. Odhaczasz i startujesz na liście „Sesje dnia" pod siatką.`;
+          const subj=ses.find(s=>s.topicId&&S.matura.topics.some(t=>t.id===s.topicId));
+          if(dn===ses.length){cls+=" done";inner="✓";}
+          if(subj)styleExtra=`border-left:3px solid ${matTopicColor(subj.topicId)}`;
+          lbl=`${ses.length} ${matsPlural(ses.length,"sesja","sesje","sesji")} pomodoro${dn?` — ${dn} zrobion${dn===1?"a":"e"}`:""}. Szczegóły i Start na liście „Sesje dnia” pod siatką.`;
         }
       }
-      html+=`<div class="mat-cell ${cls}" data-gd="${d}" data-gh="${h}" title="${lbl}">${inner}</div>`;
+      html+=`<div class="mat-cell ${cls}"${styleExtra?` style="${styleExtra}"`:""} data-gd="${d}" data-gh="${h}" title="${lbl}">${inner}</div>`;
     }
   }
   $("#matGrid").innerHTML=html;
