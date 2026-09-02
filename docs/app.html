@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=118">
+<link rel="manifest" href="/manifest.webmanifest?v=119">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -601,7 +601,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
           <button class="btn ghost small" id="matGridClear">Wyczyść</button>
         </div>
       </div>
-      <p class="muted" style="margin-bottom:var(--sp-3)">Wybierz tryb i zaznacz godziny — ten sam harmonogram obowiązuje co tydzień. Klik nagłówka dnia maluje cały dzień, klik godziny po lewej — cały wiersz. Większy kawałek zamalujesz jednym gestem: <strong>przeciągnij myszą</strong> np. od 12:00 do 17:00, a na telefonie <strong>przytrzymaj palcem pierwszą godzinę i dotknij ostatniej</strong>. Przedmioty w zielonych okienkach rozstawisz sam pędzlem „Przedmiot” albo jednym kliknięciem „Generuj plan”; <strong>kliknij okienko, aby odhaczyć zrobioną godzinę</strong>, a podwójny klik uruchamia pomodoro.</p>
+      <p class="muted" style="margin-bottom:var(--sp-3)">Wybierz tryb i zaznacz godziny — ten sam harmonogram obowiązuje co tydzień. Klik nagłówka dnia maluje cały dzień, klik godziny po lewej — cały wiersz. Większy kawałek zamalujesz jednym gestem: <strong>przeciągnij myszą</strong> np. od 12:00 do 17:00, a na telefonie <strong>przytrzymaj palcem pierwszą godzinę i dotknij ostatniej</strong>. Każde zaznaczone okno dzieli się na sesje pomodoro (wg ustawień pracy i przerwy) — <strong>startujesz je i odhaczasz na liście „Sesje dnia” pod siatką</strong>. Przedmioty przypiszesz pędzlem „Przedmiot”, na liście sesji albo jednym kliknięciem „Ułóż plan automatycznie”.</p>
       <div class="row" style="margin-bottom:var(--sp-3)">
         <div class="mastery-pick" id="matBrush">
           <button data-b="avail" class="on"><span class="brush-dot" style="background:var(--good)"></span>Dostępny</button>
@@ -643,7 +643,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
       </div>
       <p class="muted" id="matPlanHint" style="margin:var(--sp-2) 0 var(--sp-3)"></p>
       <div id="matPlanProg" hidden style="margin-bottom:var(--sp-4)">
-        <div class="row" style="justify-content:space-between;margin-bottom:4px"><strong id="matProgLbl">Zrobione godziny w tym tygodniu</strong><span class="muted" id="matProgPct"></span></div>
+        <div class="row" style="justify-content:space-between;margin-bottom:4px"><strong id="matProgLbl">Zrobione sesje w tym tygodniu</strong><span class="muted" id="matProgPct"></span></div>
         <div class="progress"><div class="g-good" id="matProgBar" style="width:0%"></div></div>
       </div>
       <div class="mat-grid-wrap"><div class="mat-grid" id="matGrid"></div></div>
@@ -654,6 +654,14 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
         <span><i style="background:var(--accent)"></i>Moja aktywność — nauka (odhaczasz)</span>
         <span><i style="background:var(--surface-2);border:1px solid var(--border)"></i>Niedostępny</span>
       </div>
+    </div>
+    <div class="card" id="matSesjeCard">
+      <div class="row" style="justify-content:space-between;margin-bottom:var(--sp-2)">
+        <h2 style="margin:0">Sesje dnia</h2>
+        <div class="mastery-pick" id="matSesDay" style="flex-wrap:wrap"></div>
+      </div>
+      <p class="muted" style="margin-bottom:var(--sp-3)">Każde zaznaczone okno dzieli się na sesje pomodoro wg ustawień pracy i przerwy. Wybierz przedmiot, kliknij <strong>Start</strong>, żeby uruchomić pomodoro tej sesji, albo <strong>✓</strong>, żeby odhaczyć ją ręcznie. Zaliczany jest czas faktycznie przepracowany.</p>
+      <div id="matSesLista"></div>
     </div>
     <div class="card" id="matChatCard" data-ai-only hidden>
       <h2>Czat z AI — zmiany w planie</h2>
@@ -1167,7 +1175,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=118;
+const DM_BUILD=119;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -1737,6 +1745,14 @@ function matMigrate(){
   // własne aktywności użytkownika (definicje) + odhaczenia tych typu "nauka" (reset co tydzień)
   if(!Array.isArray(m.acts)){m.acts=[];ch=true;}
   if(!m.actDone){m.actDone={week:weekId(),cells:{}};ch=true;}
+  // Stary plan trzymał bloki GODZINOWE {day,hour}. Nowy model to SESJE {day,startMin,workMin}
+  // budowane z dostępności. Przenosimy przedmioty ze starych bloków na nowe sesje jednorazowo:
+  // matBuildSessions() poniżej odczyta m._legacy i przypisze przedmiot do sesji w danej godzinie.
+  if(Array.isArray(m.plan)&&m.plan.some(b=>b&&b.hour!=null&&b.startMin==null)){
+    const legacy={};
+    for(const b of m.plan){if(b&&b.hour!=null)legacy[b.day+"_"+b.hour]={topicId:b.topicId,doneWeek:b.doneWeek,sessionId:b.sessionId};}
+    m._legacy=legacy;m.plan=[];ch=true;
+  }
   if(ch)save();
 }
 matMigrate();
@@ -1751,8 +1767,58 @@ function matRecompute(){
     if(v==="unavail")delete g[k];else g[k]=v; // tylko "unavail" kasuje; reszta (avail/school/"a:id") nadpisuje
   }
   m.grid=g;
+  if(typeof matBuildSessions==="function")matBuildSessions();   // sesje zawsze w zgodzie z dostępnością
 }
 matRecompute();
+
+/* ---- SESJE POMODORO z zaznaczonych okien ----
+   Zaznaczone godziny "Dostępny" tworzą ciągłe OKNA. Każde okno dzielimy na sesje pomodoro
+   wg S.matura.pomo (praca+przerwa). 18:00–20:00 przy 25+5 → 4 sesje. Ostatnia sesja bywa
+   krótsza, żeby wypełnić okno (min. 5 min, krótszą resztówkę pomijamy).
+   S.matura.plan przechowuje te sesje: {id:`${day}_${startMin}`, day, startMin, workMin,
+   topicId, doneWeek, sessionId}. Budujemy je ZAWSZE z dostępności, więc malowanie siatki nie
+   musi ręcznie zarządzać planem. Przedmiot (topicId) i odhaczenie (doneWeek) przeżywają
+   przebudowę, bo przenosimy je po stabilnym id. */
+function matSesTime(sm){return String(Math.floor(sm/60)).padStart(2,"0")+":"+String(sm%60).padStart(2,"0");}
+function matSesLabel(s){return matSesTime(s.startMin)+"–"+matSesTime(s.startMin+s.workMin);}
+function matBuildSessions(){
+  const m=S.matura;
+  const work=Math.max(1,(m.pomo&&m.pomo.work)||25);
+  const brk=Math.max(0,(m.pomo&&m.pomo.break)||5);
+  const prev={};for(const s of (m.plan||[]))if(s&&s.id)prev[s.id]=s;   // zachowaj po id
+  const leg=m._legacy||null;
+  const out=[];
+  for(let d=0;d<7;d++){
+    let h=6;
+    while(h<=22){
+      if(m.grid[matKey(d,h)]!=="avail"){h++;continue;}
+      let h2=h;while(h2+1<=22&&m.grid[matKey(d,h2+1)]==="avail")h2++;   // ciągłe okno h..h2
+      const winStart=h*60,winLen=(h2+1-h)*60;
+      let cur=0;const hourTaken={};
+      while(cur<winLen){
+        const wl=Math.min(work,winLen-cur);
+        if(wl<5)break;                                    // resztówka <5 min pomijana
+        const startMin=winStart+cur,id=d+"_"+startMin,hr=Math.floor(startMin/60);
+        const p=prev[id];
+        const sess={id,day:d,startMin,workMin:wl,topicId:p?p.topicId:null};
+        if(p&&p.doneWeek!=null)sess.doneWeek=p.doneWeek;
+        if(p&&p.sessionId!=null)sess.sessionId=p.sessionId;
+        if(leg&&!hourTaken[hr]&&leg[d+"_"+hr]){           // jednorazowe przeniesienie ze starego planu
+          const L=leg[d+"_"+hr];sess.topicId=L.topicId;
+          if(L.doneWeek!=null)sess.doneWeek=L.doneWeek;
+          if(L.sessionId!=null)sess.sessionId=L.sessionId;
+        }
+        hourTaken[hr]=true;
+        out.push(sess);
+        cur+=wl;if(cur<winLen)cur+=Math.min(brk,winLen-cur);
+      }
+      h=h2+1;
+    }
+  }
+  m.plan=out;
+  if(leg)delete m._legacy;
+}
+matRecompute();   // teraz z matBuildSessions w środku — przelicza sesje po pełnym załadowaniu funkcji
 
 /* ---- własne aktywności użytkownika ----
    Definicje siedzą w S.matura.acts, a w siatce komórka trzyma wartość "a:<id>" — czyli
@@ -1841,11 +1907,11 @@ function matFillSubjPick(){
 $("#matSubjPick").onchange=()=>{matSubjSel=$("#matSubjPick").value||null;matSubjDot()};
 // czyści SAM plan (rozstawione przedmioty), zostawiając dostępność godzin — inaczej niż „Wyczyść”
 $("#matPlanClear").onclick=()=>{
-  if(!S.matura.plan.length)return toast("Plan jest już pusty");
-  if(!confirm("Usunąć wszystkie rozstawione przedmioty? Harmonogram dostępności zostaje."))return;
-  S.matura.plan.forEach(matUnmarkDone);
-  S.matura.plan=[];
-  save();renderMatSched();toast("Plan wyczyszczony");
+  const zSubj=(S.matura.plan||[]).filter(s=>s.topicId||s.doneWeek);
+  if(!zSubj.length)return toast("Nie ma rozstawionych przedmiotów");
+  if(!confirm("Usunąć wszystkie rozstawione przedmioty i odhaczenia? Harmonogram dostępności i sesje zostają."))return;
+  for(const s of zSubj){if(s.doneWeek)matUnmarkDone(s);s.topicId=null;}   // sesje zostają, znika przedmiot
+  save();renderMatSched();toast("Przedmioty wyczyszczone");
 };
 $("#matActAdd").onclick=()=>{
   const name=$("#matActName").value.trim();
@@ -1889,9 +1955,10 @@ function matPaint(d,h){
     val=actCell(a);
   }
   if(val!=="avail"){
-    const blk=S.matura.plan.find(b=>b.day===d&&b.hour===h);
-    if(blk){matUnmarkDone(blk);S.matura.plan=S.matura.plan.filter(b=>!(b.day===d&&b.hour===h));}
-    const ad=matActDone();              // odhaczenie własnej nauki traci sens, gdy komórka się zmienia
+    // Sesje w tej godzinie znikną automatycznie przy matRecompute()→matBuildSessions(),
+    // bo godzina przestaje być "avail". Zaliczone minuty w S.matura.sessions zostają (to
+    // rzeczywista, historyczna nauka). Czyścimy tylko odhaczenie własnej nauki tej komórki.
+    const ad=matActDone();
     if(ad.cells[k]){S.matura.sessions=S.matura.sessions.filter(s=>s.id!==ad.cells[k]);delete ad.cells[k];}
   }
   if($("#matOneWeek").checked){
@@ -1910,19 +1977,20 @@ function matPaintSubject(d,h,toggle){
   if(!matSubjSel)return "Najpierw dodaj przedmiot w zakładce „Przedmioty”.";
   const k=matKey(d,h);
   if(actOf(S.matura.grid[k]))return "Ta godzina to Twoja aktywność — zamaluj ją najpierw innym pędzlem.";
-  const blk=S.matura.plan.find(b=>b.day===d&&b.hour===h);
-  if(blk&&blk.topicId===matSubjSel&&toggle){   // drugi klik tym samym przedmiotem = zdejmij
-    matUnmarkDone(blk);
-    S.matura.plan=S.matura.plan.filter(b=>b!==blk);
-    return null;
-  }
+  // Pędzel „Przedmiot" ustawia przedmiot dla WSZYSTKICH sesji w tej godzinie naraz.
+  // Najpierw upewniamy się, że godzina jest dostępna (wtedy powstają sesje).
   if(S.matura.grid[k]!=="avail"){
     if($("#matOneWeek").checked)matOvr().cells[k]="avail";
     else{S.matura.base[k]="avail";delete matOvr().cells[k];}
     matRecompute();
   }
-  if(blk){matUnmarkDone(blk);blk.topicId=matSubjSel;}   // podmiana przedmiotu kasuje odhaczenie
-  else S.matura.plan.push({day:d,hour:h,topicId:matSubjSel});
+  const inHour=(S.matura.plan||[]).filter(s=>s.day===d&&Math.floor(s.startMin/60)===h);
+  if(!inHour.length)return null;
+  const wszystkieTen=inHour.every(s=>s.topicId===matSubjSel);
+  for(const s of inHour){
+    if(toggle&&wszystkieTen){matUnmarkDone(s);s.topicId=null;}     // drugi klik tym samym = zdejmij
+    else{if(s.topicId!==matSubjSel)matUnmarkDone(s);s.topicId=matSubjSel;} // podmiana kasuje odhaczenie
+  }
   return null;
 }
 /* Maluje wskazane komórki bieżącym pędzlem. Pędzel „Przedmiot" wstawia BEZ przełączania,
@@ -1991,13 +2059,14 @@ function renderMatGrid(){
           ? `${act.name} (własna nauka) — ${done?"zrobione (kliknij, aby cofnąć)":"kliknij pędzlem „Dostępny”, aby odhaczyć"}`
           : `${act.name} — zajęte, nauka niemożliwa`;
       }else if(st==="avail"){
-        const blk=S.matura.plan.find(b=>b.day===d&&b.hour===h);
-        const t=blk&&S.matura.topics.find(x=>x.id===blk.topicId);
-        if(t){
-          const done=blk.doneWeek===wk;
-          cls+=" plan"+(done?" done":"");
-          inner=(done?"✓ ":"")+esc(t.name);
-          lbl=`${t.name} — ${done?"zrobione (kliknij, aby cofnąć)":"kliknij, aby odhaczyć • podwójny klik = pomodoro"}`;
+        // W tej godzinie mieści się N sesji pomodoro (szczegóły i Start są na liście „Sesje dnia").
+        const ses=(S.matura.plan||[]).filter(s=>s.day===d&&Math.floor(s.startMin/60)===h);
+        if(ses.length){
+          const dn=ses.filter(s=>s.doneWeek===wk).length;
+          const zPrzedm=ses.some(s=>s.topicId&&S.matura.topics.some(t=>t.id===s.topicId));
+          cls+=(zPrzedm?" plan":"")+(dn===ses.length?" done":"");
+          inner=`${ses.length}×${dn?` ✓${dn}`:""}`;
+          lbl=`${ses.length} ${matsPlural(ses.length,"sesja","sesje","sesji")} pomodoro${dn?` — ${dn} zrobion${dn===1?"a":"e"}`:""}. Odhaczasz i startujesz na liście „Sesje dnia" pod siatką.`;
         }
       }
       html+=`<div class="mat-cell ${cls}" data-gd="${d}" data-gh="${h}" title="${lbl}">${inner}</div>`;
@@ -2036,16 +2105,9 @@ function renderMatGrid(){
       if(matBrush==="avail"&&act&&act.kind==="study"){
         matActToggleDone(d,h,act);save();renderMatSched();return;
       }
-      const planned=st==="avail"&&S.matura.plan.some(b=>b.day===d&&b.hour===h);
-      if(matBrush==="avail"&&planned){
-        clearTimeout(matCellTimer);
-        matCellTimer=setTimeout(()=>{matCellToggleDone(d,h);save();renderMatSched()},220);
-      }else{matPaint(d,h);save();renderMatSched()}
-    };
-    c.ondblclick=()=>{
-      clearTimeout(matCellTimer);
-      const blk=S.matura.plan.find(b=>b.day===d&&b.hour===h);
-      if(blk&&S.matura.grid[matKey(d,h)]==="avail"&&S.matura.topics.some(t=>t.id===blk.topicId))matStartPomo(blk);
+      // Siatka służy TYLKO do malowania dostępności. Odhaczanie i start pojedynczych sesji
+      // przeniesione są na listę „Sesje dnia" pod siatką (godzina mieści kilka sesji).
+      matPaint(d,h);save();renderMatSched();
     };
   });
   // klik nagłówka to ten sam zakres, tylko od razu cała kolumna albo cały wiersz
@@ -2107,10 +2169,11 @@ function renderMatSubjects(){
     </div>`;
   }).join(""):`<div class="empty">Dodaj pierwszy przedmiot, aby zacząć planować naukę.</div>`;
   $$("#matTopicList [data-mtdel]").forEach(b=>b.onclick=()=>{
-    if(!confirm("Usunąć przedmiot wraz z historią sesji i blokami w planie?"))return;
+    if(!confirm("Usunąć przedmiot wraz z historią sesji? Sesje w harmonogramie zostaną, ale bez przypisanego przedmiotu."))return;
     const id=b.dataset.mtdel;
     S.matura.topics=S.matura.topics.filter(t=>t.id!==id);
-    S.matura.plan=S.matura.plan.filter(bl=>bl.topicId!==id);
+    // sesje pochodzą z dostępności — nie kasujemy ich, tylko zdejmujemy usunięty przedmiot
+    for(const s of (S.matura.plan||[]))if(s.topicId===id){if(s.doneWeek)matUnmarkDone(s);s.topicId=null;}
     S.matura.sessions=S.matura.sessions.filter(s=>s.topicId!==id);
     save();renderMatSubjects();renderMatSched();renderMatStats();
   });
@@ -2140,36 +2203,31 @@ function matSchoolSlots(){
   for(let d=0;d<7;d++)for(const h of MAT_HOURS)if(S.matura.grid[matKey(d,h)]==="school")s.push({day:d,hour:h});
   return s;
 }
+// Rozdaje przedmioty na SESJE zbudowane z zaznaczonych okien (proporcjonalnie do priorytetu,
+// z odstępem cooldown między sesjami tego samego przedmiotu). Modyfikuje S.matura.plan w miejscu.
 function matGeneratePlan(){
   const subs=S.matura.topics.filter(t=>(t.percent||0)>0);
-  if(!subs.length)return{blocks:[],msg:"Dodaj przynajmniej jeden przedmiot z priorytetem w zakładce „Przedmioty”."};
-  const slots=matFreeSlots();
-  if(!slots.length)return{blocks:[],msg:"Zaznacz w harmonogramie godziny „Dostępny”."};
+  if(!subs.length)return{n:0,msg:"Dodaj przynajmniej jeden przedmiot z priorytetem w zakładce „Przedmioty”."};
+  const ses=(S.matura.plan||[]).slice().sort((a,b)=>a.day-b.day||a.startMin-b.startMin);
+  if(!ses.length)return{n:0,msg:"Zaznacz w harmonogramie godziny „Dostępny” — z nich powstają sesje."};
   const totalW=subs.reduce((a,t)=>a+t.percent,0);
-  const counts=subs.map(t=>{const exact=t.percent/totalW*slots.length;return{id:t.id,n:Math.floor(exact),rem:exact-Math.floor(exact)}});
-  let remainder=slots.length-counts.reduce((a,c)=>a+c.n,0);
+  const counts=subs.map(t=>{const exact=t.percent/totalW*ses.length;return{id:t.id,n:Math.floor(exact),rem:exact-Math.floor(exact)}});
+  let remainder=ses.length-counts.reduce((a,c)=>a+c.n,0);
   counts.sort((a,b)=>b.rem-a.rem);
   for(let i=0;i<remainder;i++)counts[i%counts.length].n++;
-  const cooldown=Math.max(1,Math.round(slots.length/(subs.length*2))); // min. odstęp między sesjami tego samego przedmiotu
-  const pool=counts.map(c=>({id:c.id,left:c.n}));
-  const lastIdx={};
-  const blocks=[];
+  const cooldown=Math.max(1,Math.round(ses.length/(subs.length*2)));
+  const pool=counts.map(c=>({id:c.id,left:c.n}));const lastIdx={};
   const gapOf=(p,i)=>lastIdx[p.id]===undefined?Infinity:i-lastIdx[p.id];
-  for(let i=0;i<slots.length;i++){
-    const avail=pool.filter(p=>p.left>0);
-    if(!avail.length)break;
-    const strict=avail.filter(p=>gapOf(p,i)>cooldown);
-    const cands=strict.length?strict:avail;
-    cands.sort((a,b)=>(gapOf(b,i)-gapOf(a,i))||(b.left-a.left));
+  for(let i=0;i<ses.length;i++){
+    const av=pool.filter(p=>p.left>0);if(!av.length)break;
+    const strict=av.filter(p=>gapOf(p,i)>cooldown);
+    const cands=(strict.length?strict:av).sort((a,b)=>(gapOf(b,i)-gapOf(a,i))||(b.left-a.left));
     const pick=cands[0];
-    blocks.push({day:slots[i].day,hour:slots[i].hour,topicId:pick.id});
-    pick.left--;lastIdx[pick.id]=i;
+    if(ses[i].doneWeek)matUnmarkDone(ses[i]);   // nowy przedmiot kasuje stare odhaczenie
+    ses[i].topicId=pick.id;pick.left--;lastIdx[pick.id]=i;
   }
-  // "Godzina" w gridzie to godzina zegarowa (slot), ale realny czas nauki w niej to
-  // S.matura.pomo.work minut (pomodoro z przerwami), nie 60 — komunikat musi liczyć
-  // po realnym czasie, inaczej "4h dziennie" w głowie użytkownika ≠ to, co faktycznie ułożono.
-  const realMin=blocks.length*(S.matura.pomo.work||60);
-  return{blocks,msg:`Ułożono ${blocks.length} sesji na ${slots.length} dostępnych godzin w tygodniu — to ${fmtMin(realMin)} realnej nauki (${S.matura.pomo.work} min/sesję).`};
+  const realMin=ses.reduce((a,s)=>a+s.workMin,0);
+  return{n:ses.length,msg:`Rozdano przedmioty na ${ses.length} ${matsPlural(ses.length,"sesję","sesje","sesji")} — ${fmtMin(realMin)} nauki w tygodniu.`};
 }
 /* ---- AI (Haiku 4.5 przez funkcję serwerową — klucz nie opuszcza serwera) ---- */
 async function aiCall(system,messages,maxTokens){
@@ -2364,32 +2422,13 @@ $("#matGen").onclick=async()=>{
   S.matura.prefs=$("#matPrefs").value.trim();save();
   if(!S.matura.topics.some(t=>(t.percent||0)>0)){$("#matPlanHint").textContent="Dodaj przynajmniej jeden przedmiot w zakładce „Przedmioty”.";return}
   $("#matGen").disabled=true;$("#matPlanHint").textContent="Pobieram plan lekcji z Librusa…";
-  // Najpierw odśwież szkielet tygodnia z Librusa (bez AI), potem AI układa naukę.
+  // Najpierw odśwież szkielet tygodnia z Librusa, potem rozdaj przedmioty na sesje z okien.
   try{await librusSyncSchedule(false)}catch(e){}
-  if(!matFreeSlots().length){$("#matPlanHint").textContent="Brak godzin „Dostępny” w harmonogramie (po godzinach szkolnych). Sprawdź plan lekcji lub pomaluj wolne godziny.";$("#matGen").disabled=false;return}
+  if(!matFreeSlots().length){$("#matPlanHint").textContent="Brak godzin „Dostępny” w harmonogramie. Pomaluj wolne godziny pędzlem „Dostępny” — z nich powstaną sesje.";$("#matGen").disabled=false;return}
   try{
-    if(aiAccess){
-      // wersja z AI
-      $("#matPlanHint").textContent="AI układa plan…";
-      try{
-        const{blocks,opis}=await aiPlan(S.matura.prefs);
-        S.matura.plan=blocks;save();
-        const realMin=blocks.length*(S.matura.pomo.work||60);
-        $("#matPlanHint").textContent=`${opis}Plan ma ${blocks.length} ${matsPlural(blocks.length,"sesję","sesje","sesji")} po ${S.matura.pomo.work||60} min — ${fmtMin(realMin)} realnej nauki w tygodniu. Kliknij okienko, aby odhaczyć zrobioną sesję.`;
-        renderMatSched();toast("Plan wygenerowany przez AI ✓");
-      }catch(e){
-        const{blocks,msg}=matGeneratePlan();
-        S.matura.plan=blocks;save();
-        $("#matPlanHint").textContent=msg+" (AI chwilowo niedostępne — użyto planera lokalnego.)";
-        renderMatSched();toast(blocks.length?"Plan wygenerowany ✓":"Nie udało się wygenerować planu");
-      }
-    }else{
-      // wersja bez AI — planer lokalny (proporcjonalny podział czasu wg przedmiotów)
-      const{blocks,msg}=matGeneratePlan();
-      S.matura.plan=blocks;save();
-      $("#matPlanHint").textContent=msg;
-      renderMatSched();toast(blocks.length?"Plan wygenerowany ✓":"Nie udało się wygenerować planu");
-    }
+    const{n,msg}=matGeneratePlan();save();   // rozdaje przedmioty na sesje w miejscu
+    $("#matPlanHint").textContent=msg;
+    renderMatSched();toast(n?"Przedmioty rozdane ✓":"Nie udało się rozdać przedmiotów");
   }finally{$("#matGen").disabled=false}
 };
 
@@ -2443,10 +2482,10 @@ $("#matChatInput").onkeydown=e=>{if(e.key==="Enter")$("#matChatSend").click()};
 function matMarkDone(blk,minutes){
   const wk=weekId();if(blk.doneWeek===wk)return;
   blk.doneWeek=wk;
-  // Ręczne odhaczenie w gridzie (bez podanych minutes) = deklaracja "zrobiłem całą
-  // zaplanowaną godzinę" → 60 min. Odhaczenie przez zakończoną sesję pomodoro podaje
-  // REALNY czas pracy (np. 45 min) — inaczej statystyki zawyżałyby czas nauki.
-  const min=Number.isFinite(minutes)?minutes:60;
+  // Ręczne odhaczenie sesji kliknięciem (bez podanych minutes) = zaliczenie ZAPLANOWANEJ
+  // długości tej sesji (blk.workMin). Odhaczenie przez pomodoro podaje REALNY czas pracy
+  // (z zegara) — inaczej statystyki zawyżałyby czas nauki.
+  const min=Number.isFinite(minutes)?minutes:(blk.workMin||60);
   const s={id:uid(),topicId:blk.topicId,date:today(),minutes:min,completed:true,planned:true};
   blk.sessionId=s.id;S.matura.sessions.push(s);
 }
@@ -2454,8 +2493,12 @@ function matUnmarkDone(blk){
   if(blk.sessionId)S.matura.sessions=S.matura.sessions.filter(s=>s.id!==blk.sessionId);
   delete blk.doneWeek;delete blk.sessionId;
 }
-/* ---- pomodoro powiązane z blokiem z planu (ukończenie pracy odhacza godzinę) ---- */
-let matPomo={topicId:null,day:null,hour:null,mode:"work",left:25*60,total:25*60,running:false,iv:null,treeId:null};
+/* ---- pomodoro dla POJEDYNCZEJ sesji z planu ----
+   sessId = id sesji z S.matura.plan. Czas liczymy z ZEGARA (workedMs), nie z ustawienia:
+   startedAt zapisujemy przy starcie/wznowieniu, a przy pauzie/końcu dodajemy realnie
+   przepracowany odcinek. Dzięki temu 25 min zaliczysz tylko po 25 min faktycznej pracy,
+   a przerwanie w połowie zalicza tyle, ile naprawdę minęło. */
+let matPomo={topicId:null,sessId:null,mode:"work",left:25*60,total:25*60,running:false,iv:null,treeId:null,startedAt:0,workedMs:0};
 function matPomoLen(m){return(m==="work"?S.matura.pomo.work:S.matura.pomo.break)*60}
 function matPomoDraw(){
   const mm=String(Math.floor(matPomo.left/60)).padStart(2,"0"),ss=String(matPomo.left%60).padStart(2,"0");
@@ -2463,36 +2506,47 @@ function matPomoDraw(){
   $("#matPomoPhase").textContent=matPomo.mode==="work"?"Praca":"Przerwa";
 }
 function matPomoStop(){matPomo.running=false;clearInterval(matPomo.iv);if($("#matPomoStart"))$("#matPomoStart").textContent="Start"}
+// Zalicza `min` FAKTYCZNYCH minut sesji (statystyki, rywalizacja przez statsForDate, timelog).
+// Odhacza sesję po jej id; przez matMarkDone zabezpieczone przed podwójnym liczeniem tego tygodnia.
+function matPomoCredit(min){
+  const t=S.matura.topics.find(x=>x.id===matPomo.topicId);
+  const sess=(S.matura.plan||[]).find(x=>x.id===matPomo.sessId);
+  if(sess){if(sess.doneWeek!==weekId())matMarkDone(sess,min);}
+  else S.matura.sessions.push({id:uid(),topicId:matPomo.topicId,date:today(),minutes:min,completed:true});
+  if(t)S.timelog.push({id:uid(),name:"Nauka: "+t.name,category:"Nauka",estimate:null,actual:min,date:today()});
+}
 function matPomoToggle(){
-  if(matPomo.running){matPomoStop();return}
-  matPomo.running=true;$("#matPomoStart").textContent="Pauza";
+  if(matPomo.running){                                   // pauza — domknij przepracowany odcinek
+    matPomo.workedMs+=Date.now()-matPomo.startedAt;matPomoStop();return;
+  }
+  matPomo.running=true;matPomo.startedAt=Date.now();$("#matPomoStart").textContent="Pauza";
   matPomo.iv=setInterval(()=>{
     matPomo.left--;matPomoDraw();
     if(matPomo.left<=0){
-      matPomoStop();beep();
+      matPomo.workedMs+=Date.now()-matPomo.startedAt;matPomoStop();beep();
       const t=S.matura.topics.find(x=>x.id===matPomo.topicId);
       if(matPomo.mode==="work"){
-        const min=Math.round(matPomo.total/60);
-        const blk=matPomo.day!=null?S.matura.plan.find(b=>b.day===matPomo.day&&b.hour===matPomo.hour):null;
-        if(blk){if(blk.doneWeek!==weekId())matMarkDone(blk,min);}
-        else S.matura.sessions.push({id:uid(),topicId:matPomo.topicId,date:today(),minutes:min,completed:true});
-        // Godzina z planu jest odhaczana tylko dla PIERWSZEJ rundy sesji — każda kolejna
-        // (jeśli praca+przerwa akurat trafia w pełną godzinę, np. 45+15=60 min) nie ma już
-        // przypisanego bloku w gridzie, więc licz się dalej jako zwykła sesja (S.matura.sessions),
-        // inaczej czas kolejnych rund ginąłby: trafiałby wciąż w ten sam, już odhaczony blok.
-        matPomo.day=null;matPomo.hour=null;
-        if(t)S.timelog.push({id:uid(),name:"Nauka: "+t.name,category:"Nauka",estimate:null,actual:min,date:today()});
+        const min=Math.max(1,Math.round(matPomo.workedMs/60000));   // FAKTYCZNY czas z zegara
+        matPomoCredit(min);
         if(matPomo.treeId){forestFinish(matPomo.treeId,"alive");matPomo.treeId=null;}
         save();toast("Sesja ukończona! Drzewo wyrosło 🌳");notify("Pomodoro ukończone",t?`${t.name} — dobra robota.`:"Dobra robota — czas na przerwę.");
         renderMatStats();renderMatSched();
-        matPomo.mode="break";matPomo.left=matPomo.total=matPomoLen("break");matPomoDraw();
+        // przerwa (jeśli ustawiona) — po niej sesja się kończy, kolejną odpalasz z listy
+        if((S.matura.pomo.break||0)>0){
+          matPomo.mode="break";matPomo.left=matPomo.total=matPomoLen("break");matPomo.workedMs=0;matPomoDraw();matPomoToggle();
+        }else{matPomoFinishIdle();}
       }else{
-        toast("Przerwa skończona — wróć do nauki!");notify("Koniec przerwy","Wracamy do nauki.");
-        matPomo.mode="work";matPomo.left=matPomo.total=matPomoLen("work");matPomoDraw();
-        matPomo.treeId=forestPlant(matPomo.topicId).id; // nowe drzewo na kolejną rundę pracy
+        toast("Przerwa skończona — dobra robota!");notify("Koniec przerwy","Sesja zakończona.");
+        matPomoFinishIdle();
       }
     }
   },1000);
+}
+// Sprząta po zakończonej sesji i wraca do karty startowej (nie odpala kolejnej automatycznie).
+function matPomoFinishIdle(){
+  matPomoStop();matPomoSetActive(false);
+  matPomo.sessId=null;matPomo.topicId=null;matPomo.treeId=null;matPomo.workedMs=0;
+  lockTaskPin(false);
 }
 /* ---- LAS: gamifikacja pomodoro — jedna ukończona sesja pracy = jedno drzewo ---- */
 function forestPlant(topicId){
@@ -2558,37 +2612,49 @@ function matFillPomoLen(){
 $("#matPomoWorkMin").onchange=()=>{
   const v=Math.round(+$("#matPomoWorkMin").value);
   S.matura.pomo.work=Math.max(1,Math.min(180,Number.isFinite(v)?v:25));
-  $("#matPomoWorkMin").value=S.matura.pomo.work;save();
+  $("#matPomoWorkMin").value=S.matura.pomo.work;
+  matRecompute();save();renderMatSched();   // zmiana długości = nowy podział okien na sesje
 };
 $("#matPomoBreakMin").onchange=()=>{
   const v=Math.round(+$("#matPomoBreakMin").value);
-  S.matura.pomo.break=Math.max(1,Math.min(60,Number.isFinite(v)?v:5));
-  $("#matPomoBreakMin").value=S.matura.pomo.break;save();
+  S.matura.pomo.break=Math.max(0,Math.min(60,Number.isFinite(v)?v:5));
+  $("#matPomoBreakMin").value=S.matura.pomo.break;
+  matRecompute();save();renderMatSched();
 };
-function matStartPomo(blk){
+// Startuje pomodoro dla konkretnej SESJI z planu (sess ma id, day, startMin, workMin, topicId).
+// Dla „szybkiego startu" bez planu przekazujemy tylko {topicId} — wtedy długość = globalna praca.
+function matStartPomo(sess){
   if(matPomo.treeId)forestFinish(matPomo.treeId,"withered"); // porzucona poprzednia sesja
   matPomoStop();
-  matPomo.topicId=blk.topicId;matPomo.day=blk.day;matPomo.hour=blk.hour;matPomo.mode="work";
-  matPomo.left=matPomo.total=matPomoLen("work");
-  matPomo.treeId=forestPlant(blk.topicId).id;
+  matPomo.topicId=sess.topicId||null;
+  matPomo.sessId=sess.id||null;
+  const wm=Number.isFinite(sess.workMin)?sess.workMin:(S.matura.pomo.work||25);
+  matPomo.mode="work";matPomo.total=wm*60;matPomo.left=matPomo.total;
+  matPomo.workedMs=0;matPomo.startedAt=0;
+  matPomo.treeId=forestPlant(matPomo.topicId).id;
   lockTaskPin(true);
-  const t=S.matura.topics.find(x=>x.id===blk.topicId);
-  $("#matPomoTopic").textContent=t?blk.day!=null?`${t.name} — ${MAT_DAYS[blk.day]} ${String(blk.hour).padStart(2,"0")}:00`:t.name:"—";
+  const t=S.matura.topics.find(x=>x.id===matPomo.topicId);
+  const kiedy=sess.id?` — ${MAT_DAYS[sess.day]} ${matSesLabel(sess)}`:"";
+  $("#matPomoTopic").textContent=(t?t.name:"Nauka")+kiedy;
   matPomoSetActive(true);
   matShowTab("forest");
   matPomoDraw();matPomoToggle();
   $("#matPomoCard").scrollIntoView({behavior:"smooth",block:"nearest"});
 }
-$("#matPomoQuickStart").onclick=()=>matStartPomo({topicId:$("#matPomoTopicPick").value||null,day:null,hour:null});
+$("#matPomoQuickStart").onclick=()=>matStartPomo({topicId:$("#matPomoTopicPick").value||null});
 $("#matPomoStart").onclick=matPomoToggle;
 $("#matPomoStop").onclick=()=>{
   if(matPomo.mode==="work"&&matPomo.treeId){
-    if(!confirm("Sesja pomodoro jeszcze trwa — jeśli zakończysz teraz, drzewo uschnie. Na pewno chcesz przerwać?"))return;
+    if(!confirm("Sesja jeszcze trwa. Jeśli zakończysz teraz, zaliczy się tylko czas dotychczas przepracowany, a drzewo uschnie. Przerwać?"))return;
+    if(matPomo.running)matPomo.workedMs+=Date.now()-matPomo.startedAt;   // domknij bieżący odcinek
+    const min=Math.round(matPomo.workedMs/60000);
+    if(min>=1)matPomoCredit(min);                                        // zalicz FAKTYCZNY czas
     forestFinish(matPomo.treeId,"withered");
-    toast("Drzewo uschło 🥀 — następnym razem się uda.");
+    toast(min>=1?`Zaliczono ${min} min faktycznej nauki 🥀`:"Za krótko — nic nie zaliczono 🥀");
   }
-  matPomoStop();matPomoSetActive(false);matPomo.topicId=null;matPomo.day=null;matPomo.hour=null;matPomo.treeId=null;
-  lockTaskPin(false);
+  matPomoStop();matPomoSetActive(false);
+  matPomo.sessId=null;matPomo.topicId=null;matPomo.treeId=null;matPomo.workedMs=0;
+  lockTaskPin(false);save();renderMatStats();renderMatSched();
 };
 
 /* ---- statystyki ---- */
@@ -2603,7 +2669,7 @@ function renderMatStats(){
   const total=S.matura.sessions.reduce((a,s)=>a+s.minutes,0);
   $("#matStatCards").innerHTML=`
     <div class="stat"><div class="v">${fmtMin(total)}</div><div class="l">Łączny czas nauki</div></div>
-    <div class="stat"><div class="v">${S.matura.sessions.length}</div><div class="l">Ukończone godziny</div></div>
+    <div class="stat"><div class="v">${S.matura.sessions.length}</div><div class="l">Ukończone sesje</div></div>
     <div class="stat"><div class="v">${matStreak()}</div><div class="l">Dni z rzędu z nauką</div></div>`;
   const byTopic={};
   S.matura.sessions.forEach(s=>byTopic[s.topicId]=(byTopic[s.topicId]||0)+s.minutes);
@@ -2618,7 +2684,42 @@ function renderMatStats(){
 }
 
 /* ---- zakładki ---- */
-function renderMatSched(){matRecompute();renderMatGrid();renderMatPlanProgress();}
+/* ---- lista „Sesje dnia": zaznaczone okno rozbite na konkretne sesje pomodoro ---- */
+let matSesDay=(new Date().getDay()+6)%7;
+function renderMatSesje(){
+  const dayBar=$("#matSesDay"),lista=$("#matSesLista");
+  if(!dayBar||!lista)return;
+  const wk=weekId();
+  dayBar.innerHTML=MAT_DAYS.map((d,i)=>`<button data-sd="${i}" class="${i===matSesDay?"on":""}">${d}</button>`).join("");
+  dayBar.querySelectorAll("[data-sd]").forEach(b=>b.onclick=()=>{matSesDay=+b.dataset.sd;renderMatSesje();});
+  const ses=(S.matura.plan||[]).filter(s=>s.day===matSesDay).sort((a,b)=>a.startMin-b.startMin);
+  if(!ses.length){lista.innerHTML=`<div class="empty">Brak zaznaczonych godzin nauki w ${MAT_DAYS_FULL[matSesDay]}. Zaznacz je pędzlem „Dostępny” w siatce powyżej — okno podzieli się na sesje.</div>`;return;}
+  const opts=t=>`<option value="">— bez przedmiotu —</option>`+S.matura.topics.map(x=>`<option value="${x.id}"${x.id===t?" selected":""}>${esc(x.name)}</option>`).join("");
+  lista.innerHTML=ses.map((s,i)=>{
+    const done=s.doneWeek===wk;
+    return `<div class="row" style="align-items:center;gap:var(--sp-3);padding:var(--sp-3) 0;border-top:${i?"1px solid var(--border)":"none"};opacity:${done?.6:1}">
+      <span style="font-weight:700;font-variant-numeric:tabular-nums;min-width:112px;flex:none">${done?"✓ ":""}${matSesLabel(s)}</span>
+      <select data-ses-subj="${s.id}" style="flex:1;min-width:120px">${opts(s.topicId)}</select>
+      <button class="btn ghost small" data-ses-start="${s.id}" style="flex:none"${done?" disabled":""}>Start</button>
+      <button class="icon-btn" data-ses-done="${s.id}" title="${done?"Cofnij odhaczenie":"Odhacz ręcznie (zalicza ${s.workMin} min)"}" style="flex:none">${done?"↩":"✓"}</button>
+    </div>`;
+  }).join("");
+  lista.querySelectorAll("[data-ses-subj]").forEach(sel=>sel.onchange=()=>{
+    const s=(S.matura.plan||[]).find(x=>x.id===sel.dataset.sesSubj);if(!s)return;
+    const val=sel.value||null;
+    if(s.topicId!==val&&s.doneWeek)matUnmarkDone(s);   // zmiana przedmiotu kasuje odhaczenie
+    s.topicId=val;save();renderMatSched();
+  });
+  lista.querySelectorAll("[data-ses-start]").forEach(b=>b.onclick=()=>{
+    const s=(S.matura.plan||[]).find(x=>x.id===b.dataset.sesStart);if(s)matStartPomo(s);
+  });
+  lista.querySelectorAll("[data-ses-done]").forEach(b=>b.onclick=()=>{
+    const s=(S.matura.plan||[]).find(x=>x.id===b.dataset.sesDone);if(!s)return;
+    if(s.doneWeek===wk)matUnmarkDone(s);else matMarkDone(s);   // ręczne = zalicza workMin (plan)
+    save();renderMatStats();renderMatSched();
+  });
+}
+function renderMatSched(){matRecompute();renderMatGrid();renderMatPlanProgress();renderMatSesje();}
 function matShowTab(mt){
   $$("#matTabs button").forEach(x=>x.classList.toggle("on",x.dataset.mt===mt));
   $("#matSched").hidden=mt!=="sched";
@@ -2630,7 +2731,7 @@ function matShowTab(mt){
 $$("#matTabs button").forEach(b=>b.onclick=()=>matShowTab(b.dataset.mt));
 function renderMatura(){
   $("#matPrefs").value=S.matura.prefs||"";
-  renderMatGrid();renderMatPlanProgress();renderMatSubjects();renderMatStats();matChatRender();renderForest();matFillPomoLen();
+  renderMatGrid();renderMatPlanProgress();renderMatSesje();renderMatSubjects();renderMatStats();matChatRender();renderForest();matFillPomoLen();
   lekRenderToday();lekRenderPlan(S.matura.lekcjaPlan||null);
 }
 
@@ -2662,9 +2763,9 @@ function lekTaskMats(subj){
 // dzisiejsze bloki z Harmonogramu (S.matura.plan trzyma day 0=Pon, JS getDay ma 0=Nd)
 function lekTodayBlocks(){
   const day=(new Date().getDay()+6)%7;
-  return (S.matura.plan||[]).filter(b=>b.day===day).sort((a,b)=>a.hour-b.hour).map(b=>{
+  return (S.matura.plan||[]).filter(b=>b.topicId).sort((a,b)=>a.startMin-b.startMin).filter(b=>b.day===day).map(b=>{
     const t=(S.matura.topics||[]).find(x=>x.id===b.topicId);
-    return{hour:b.hour,topicId:b.topicId,subject:t?t.name:"(usunięty przedmiot)"};
+    return{hour:Math.floor(b.startMin/60),startMin:b.startMin,workMin:b.workMin,topicId:b.topicId,subject:t?t.name:"(usunięty przedmiot)"};
   });
 }
 // własne aktywności użytkownika zaplanowane na dziś (zajęte godziny + własne formy nauki)
