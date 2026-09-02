@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=120">
+<link rel="manifest" href="/manifest.webmanifest?v=121">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -569,6 +569,12 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
         <select id="matPomoTopicPick"><option value="">— bez przedmiotu —</option></select>
         <button class="btn" id="matPomoQuickStart">Start</button>
       </div>
+      <div class="row" style="margin-top:var(--sp-3);align-items:flex-end;gap:var(--sp-2);border-top:1px solid var(--border);padding-top:var(--sp-3)">
+        <div class="field" style="flex:none;width:130px"><label class="fld">Miniony czas (min)</label><input type="number" id="matManualMin" min="1" max="600" step="1" placeholder="np. 38"></div>
+        <select id="matManualTopic" style="flex:1;min-width:120px"><option value="">— bez przedmiotu —</option></select>
+        <button class="btn ghost" id="matManualAdd" style="flex:none">Zapisz naukę</button>
+      </div>
+      <p class="muted" style="margin-top:var(--sp-2);font-size:var(--fs-1)">Uczyłeś się bez timera? Wpisz, ile minut — doliczy się do dzisiejszych statystyk.</p>
     </div>
 
     <div id="matPomoCard" class="card mat-active-pomo" hidden>
@@ -581,6 +587,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
       </div>
       <div class="row" style="margin-top:var(--sp-3)">
         <button class="btn" id="matPomoStart">Start</button>
+        <button class="btn ghost" id="matPomoPlus1" title="Przedłuż bieżącą sesję o minutę">+1 min</button>
         <button class="btn ghost" id="matPomoStop">Zatrzymaj sesję</button>
       </div>
     </div>
@@ -588,7 +595,10 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
     <div class="card">
       <div class="row" style="justify-content:space-between;margin-bottom:var(--sp-2)">
         <h2 style="margin:0">🌲 Twój las</h2>
-        <p class="muted" id="matForestStats" style="margin:0"></p>
+        <div class="row" style="width:auto;flex:none;gap:var(--sp-3);align-items:center">
+          <p class="muted" id="matForestStats" style="margin:0"></p>
+          <button class="btn ghost small" id="matForestClear" style="flex:none" hidden>Wyczyść uschnięte</button>
+        </div>
       </div>
       <div id="matForestGrid" class="forest-grid"></div>
     </div>
@@ -1177,7 +1187,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=120;
+const DM_BUILD=121;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -2578,6 +2588,7 @@ function renderForest(){
   const alive=trees.filter(t=>t.status==="alive").length;
   const withered=trees.filter(t=>t.status==="withered").length;
   const stats=$("#matForestStats");if(stats)stats.textContent=`🌳 ${alive} 🥀 ${withered}`;
+  const clr=$("#matForestClear");if(clr)clr.hidden=!withered;   // przycisk tylko gdy jest co czyścić
 }
 // Wyjście z apki (Home / przełącznik aplikacji / powiadomienia) w trakcie fazy pracy = uschnięcie.
 // Nie da się tu pokazać blokującego pytania — Android nie pozwala przechwycić tej ścieżki,
@@ -2602,11 +2613,14 @@ function matPomoSetActive(active){
   $("#matPomoIdleCard").hidden=active;
 }
 function matFillPomoTopicPick(){
-  const sel=$("#matPomoTopicPick");if(!sel)return;
-  const prev=sel.value;
-  sel.innerHTML='<option value="">— bez przedmiotu —</option>'+
+  const opcje='<option value="">— bez przedmiotu —</option>'+
     S.matura.topics.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("");
-  if(S.matura.topics.some(t=>t.id===prev))sel.value=prev;
+  for(const id of ["#matPomoTopicPick","#matManualTopic"]){
+    const sel=$(id);if(!sel)continue;
+    const prev=sel.value;
+    sel.innerHTML=opcje;
+    if(S.matura.topics.some(t=>t.id===prev))sel.value=prev;
+  }
 }
 function matFillPomoLen(){
   $("#matPomoWorkMin").value=S.matura.pomo.work;
@@ -2658,6 +2672,34 @@ $("#matPomoStop").onclick=()=>{
   matPomoStop();matPomoSetActive(false);
   matPomo.sessId=null;matPomo.topicId=null;matPomo.treeId=null;matPomo.workedMs=0;
   lockTaskPin(false);save();renderMatStats();renderMatSched();
+};
+// Przedłużenie bieżącej sesji o minutę — dolicza 60 s do odliczania (i do docelowej długości).
+// Uczciwy czas i tak liczy się z zegara, więc wydłużenie = po prostu dłuższa realna praca.
+$("#matPomoPlus1").onclick=()=>{
+  if($("#matPomoCard").hidden)return;                 // tylko przy aktywnej sesji
+  if(matPomo.total>=180*60){toast("Sesja jest już bardzo długa");return}
+  matPomo.left+=60;matPomo.total+=60;matPomoDraw();
+  toast("Dodano minutę do sesji ⏱");
+};
+// Ręczne dopisanie minionego czasu nauki (uczyłeś się bez timera) do dzisiejszych statystyk.
+$("#matManualAdd").onclick=()=>{
+  const min=Math.round(+$("#matManualMin").value);
+  if(!Number.isFinite(min)||min<1)return toast("Wpisz liczbę minut");
+  if(min>600)return toast("Za dużo naraz — maksymalnie 600 min");
+  const tid=$("#matManualTopic").value||null;
+  S.matura.sessions.push({id:uid(),topicId:tid,date:today(),minutes:min,completed:true,manual:true});
+  const t=tid&&S.matura.topics.find(x=>x.id===tid);
+  if(t)S.timelog.push({id:uid(),name:"Nauka: "+t.name,category:"Nauka",estimate:null,actual:min,date:today()});
+  $("#matManualMin").value="";
+  save();renderMatStats();renderDash();toast(`Dopisano ${min} min nauki ✓`);
+};
+// Usunięcie uschniętych drzew (np. po testach) — żywe i rosnące zostają.
+$("#matForestClear").onclick=()=>{
+  const ile=(S.forest||[]).filter(t=>t.status==="withered").length;
+  if(!ile)return;
+  if(!confirm(`Usunąć ${ile} uschniętych ${matsPlural(ile,"drzewo","drzewa","drzew")}? Żywe drzewa zostają.`))return;
+  S.forest=(S.forest||[]).filter(t=>t.status!=="withered");
+  save();renderForest();toast("Uschnięte drzewa usunięte 🧹");
 };
 
 /* ---- statystyki ---- */
