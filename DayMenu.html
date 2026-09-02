@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=122">
+<link rel="manifest" href="/manifest.webmanifest?v=123">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -1178,7 +1178,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=122;
+const DM_BUILD=123;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -2503,13 +2503,32 @@ function matUnmarkDone(blk){
    przepracowany odcinek. Dzięki temu 25 min zaliczysz tylko po 25 min faktycznej pracy,
    a przerwanie w połowie zalicza tyle, ile naprawdę minęło. */
 let matPomo={topicId:null,sessId:null,mode:"work",left:25*60,total:25*60,running:false,iv:null,treeId:null,startedAt:0,workedMs:0};
+const MAT_POMO_KEY="dm_pomo_v1";
 function matPomoLen(m){return(m==="work"?S.matura.pomo.work:S.matura.pomo.break)*60}
 function matPomoDraw(){
-  const mm=String(Math.floor(matPomo.left/60)).padStart(2,"0"),ss=String(matPomo.left%60).padStart(2,"0");
+  const l=Math.max(0,matPomo.left);
+  const mm=String(Math.floor(l/60)).padStart(2,"0"),ss=String(l%60).padStart(2,"0");
   $("#matPomoTime").textContent=`${mm}:${ss}`;
   $("#matPomoPhase").textContent=matPomo.mode==="work"?"Praca":"Przerwa";
 }
-function matPomoStop(){matPomo.running=false;clearInterval(matPomo.iv);if($("#matPomoStart"))$("#matPomoStart").textContent="Start"}
+function matPomoStop(){matPomo.running=false;clearInterval(matPomo.iv);matPomo.iv=null;if($("#matPomoStart"))$("#matPomoStart").textContent="Start"}
+// Realnie przepracowane ms bieżącej fazy: to, co zebrane z poprzednich odcinków, plus trwający.
+function matPomoElapsedMs(){return matPomo.workedMs+(matPomo.running?Date.now()-matPomo.startedAt:0)}
+/* Zapis aktywnej sesji do localStorage. Dzięki temu czas biegnie dalej nawet po zgaszeniu
+   ekranu / zamknięciu apki — po ponownym otwarciu liczymy go z ZEGARA (startedAt), a nie z
+   liczby „tyknięć" (te w tle są wstrzymywane przez system). */
+function matPomoPersist(){
+  try{
+    const card=$("#matPomoCard");
+    if(card&&!card.hidden){
+      localStorage.setItem(MAT_POMO_KEY,JSON.stringify({
+        sessId:matPomo.sessId,topicId:matPomo.topicId,mode:matPomo.mode,total:matPomo.total,
+        startedAt:matPomo.startedAt,workedMs:matPomo.workedMs,running:matPomo.running,
+        treeId:matPomo.treeId,owner:(typeof sbUserId==="function"?sbUserId():null)
+      }));
+    }else localStorage.removeItem(MAT_POMO_KEY);
+  }catch(e){}
+}
 // Zalicza `min` FAKTYCZNYCH minut sesji (statystyki, rywalizacja przez statsForDate, timelog).
 // Odhacza sesję po jej id; przez matMarkDone zabezpieczone przed podwójnym liczeniem tego tygodnia.
 function matPomoCredit(min){
@@ -2520,37 +2539,68 @@ function matPomoCredit(min){
   if(t)S.timelog.push({id:uid(),name:"Nauka: "+t.name,category:"Nauka",estimate:null,actual:min,date:today()});
 }
 function matPomoToggle(){
-  if(matPomo.running){                                   // pauza — domknij przepracowany odcinek
-    matPomo.workedMs+=Date.now()-matPomo.startedAt;matPomoStop();return;
+  if(matPomo.running){                                   // pauza (jawna) — domknij odcinek
+    matPomo.workedMs+=Date.now()-matPomo.startedAt;matPomoStop();matPomoDraw();matPomoPersist();return;
   }
   matPomo.running=true;matPomo.startedAt=Date.now();$("#matPomoStart").textContent="Pauza";
-  matPomo.iv=setInterval(()=>{
-    matPomo.left--;matPomoDraw();
-    if(matPomo.left<=0){
-      matPomo.workedMs+=Date.now()-matPomo.startedAt;matPomoStop();beep();
-      const t=S.matura.topics.find(x=>x.id===matPomo.topicId);
-      if(matPomo.mode==="work"){
-        const min=Math.max(1,Math.round(matPomo.workedMs/60000));   // FAKTYCZNY czas z zegara
-        matPomoCredit(min);
-        if(matPomo.treeId){forestFinish(matPomo.treeId,"alive");matPomo.treeId=null;}
-        save();toast("Sesja ukończona! Drzewo wyrosło 🌳");notify("Pomodoro ukończone",t?`${t.name} — dobra robota.`:"Dobra robota — czas na przerwę.");
-        renderMatStats();renderMatSched();
-        // przerwa (jeśli ustawiona) — po niej sesja się kończy, kolejną odpalasz z listy
-        if((S.matura.pomo.break||0)>0){
-          matPomo.mode="break";matPomo.left=matPomo.total=matPomoLen("break");matPomo.workedMs=0;matPomoDraw();matPomoToggle();
-        }else{matPomoFinishIdle();}
-      }else{
-        toast("Przerwa skończona — dobra robota!");notify("Koniec przerwy","Sesja zakończona.");
-        matPomoFinishIdle();
-      }
-    }
-  },1000);
+  matPomo.iv=setInterval(matPomoTick,1000);
+  matPomoPersist();matPomoTick();
+}
+// Odliczanie z ZEGARA, nie „tyknięciami": czas biegnie też gdy karta w tle albo ekran zgaszony.
+function matPomoTick(){
+  matPomo.left=Math.max(0,matPomo.total-Math.floor(matPomoElapsedMs()/1000));
+  matPomoDraw();
+  if(matPomo.left<=0)matPomoPhaseDone(false);
+}
+// Zamyka bieżącą fazę. reconcile=true przy odtwarzaniu po restarcie apki (pomija auto-przerwę i dźwięk).
+function matPomoPhaseDone(reconcile){
+  matPomo.workedMs=matPomoElapsedMs();matPomoStop();
+  const t=S.matura.topics.find(x=>x.id===matPomo.topicId);
+  if(matPomo.mode==="work"){
+    if(!reconcile)beep();
+    // FAKTYCZNY czas, ale nie więcej niż długość sesji — powrót po czasie nie zawyża.
+    const min=Math.max(1,Math.round(Math.min(matPomo.workedMs,matPomo.total*1000)/60000));
+    matPomoCredit(min);
+    if(matPomo.treeId){forestFinish(matPomo.treeId,"alive");matPomo.treeId=null;}
+    save();toast("Sesja ukończona! Drzewo wyrosło 🌳");notify("Pomodoro ukończone",t?`${t.name} — dobra robota.`:"Dobra robota — czas na przerwę.");
+    renderMatStats();renderMatSched();
+    if(!reconcile&&(S.matura.pomo.break||0)>0){
+      matPomo.mode="break";matPomo.total=matPomoLen("break");matPomo.left=matPomo.total;
+      matPomo.workedMs=0;matPomo.startedAt=Date.now();matPomo.running=true;
+      $("#matPomoStart").textContent="Pauza";matPomo.iv=setInterval(matPomoTick,1000);
+      matPomoDraw();matPomoPersist();
+    }else{matPomoFinishIdle();}
+  }else{
+    if(!reconcile){toast("Przerwa skończona — dobra robota!");notify("Koniec przerwy","Sesja zakończona.");}
+    matPomoFinishIdle();
+  }
 }
 // Sprząta po zakończonej sesji i wraca do karty startowej (nie odpala kolejnej automatycznie).
 function matPomoFinishIdle(){
   matPomoStop();matPomoSetActive(false);
   matPomo.sessId=null;matPomo.topicId=null;matPomo.treeId=null;matPomo.workedMs=0;
-  lockTaskPin(false);
+  lockTaskPin(false);matPomoPersist();
+}
+/* Odtworzenie aktywnej sesji po ponownym otwarciu apki (np. po zgaszeniu telefonu).
+   Czas liczymy z zegara: jeśli sesja zdążyła się skończyć w tle — zaliczamy ją od razu. */
+function matPomoRestore(){
+  let raw;try{raw=localStorage.getItem(MAT_POMO_KEY)}catch(e){return}
+  if(!raw)return;
+  let p;try{p=JSON.parse(raw)}catch(e){try{localStorage.removeItem(MAT_POMO_KEY)}catch(_){}return}
+  const me=(typeof sbUserId==="function"?sbUserId():null);
+  if((p.owner||null)!==(me||null)){try{localStorage.removeItem(MAT_POMO_KEY)}catch(e){}return} // cudza sesja
+  matPomo.sessId=p.sessId||null;matPomo.topicId=p.topicId||null;matPomo.mode=p.mode||"work";
+  matPomo.total=p.total||matPomoLen("work");matPomo.startedAt=p.startedAt||Date.now();
+  matPomo.workedMs=p.workedMs||0;matPomo.treeId=p.treeId||null;matPomo.running=!!p.running;
+  const t=S.matura.topics.find(x=>x.id===matPomo.topicId);
+  if($("#matPomoTopic"))$("#matPomoTopic").textContent=(t?t.name:"Nauka");
+  matPomoSetActive(true);
+  if(matPomo.running){
+    if(Math.floor(matPomoElapsedMs()/1000)>=matPomo.total){matPomoPhaseDone(true);}  // skończyła się w tle
+    else{$("#matPomoStart").textContent="Pauza";matPomo.iv=setInterval(matPomoTick,1000);matPomoTick();}
+  }else{
+    matPomo.left=Math.max(0,matPomo.total-Math.floor(matPomoElapsedMs()/1000));matPomoDraw();
+  }
 }
 /* ---- LAS: gamifikacja pomodoro — jedna ukończona sesja pracy = jedno drzewo ---- */
 function forestPlant(topicId){
@@ -2580,15 +2630,10 @@ function renderForest(){
   const withered=trees.filter(t=>t.status==="withered").length;
   const stats=$("#matForestStats");if(stats)stats.textContent=`🌳 ${alive} 🥀 ${withered}`;
 }
-// Wyjście z apki (Home / przełącznik aplikacji / powiadomienia) w trakcie fazy pracy = uschnięcie.
-// Nie da się tu pokazać blokującego pytania — Android nie pozwala przechwycić tej ścieżki,
-// więc reagujemy po fakcie, a komunikat użytkownik zobaczy po powrocie (uschnięte drzewo w lesie).
+// Zgaszenie ekranu / przełączenie karty NIE przerywa sesji — czas biegnie dalej (liczymy go
+// z zegara). Po powrocie doliczamy czas, który minął w tle, i kończymy sesję, jeśli już czas.
 document.addEventListener("visibilitychange",()=>{
-  if(document.hidden&&matPomo.running&&matPomo.mode==="work"&&matPomo.treeId){
-    forestFinish(matPomo.treeId,"withered");
-    matPomoStop();
-    matPomo.treeId=null;
-  }
+  if(!document.hidden&&matPomo.running)matPomoTick();
 });
 /* ---- przypinanie ekranu (Android Screen Pinning) przez natywną wtyczkę LockTask;
    w przeglądarce/dev brak pluginu = nic się nie dzieje, jak przy DayMenuWidget ---- */
@@ -2651,21 +2696,21 @@ $("#matPomoStop").onclick=()=>{
   if(matPomo.mode==="work"&&matPomo.treeId){
     if(!confirm("Sesja jeszcze trwa. Jeśli zakończysz teraz, zaliczy się tylko czas dotychczas przepracowany, a drzewo uschnie. Przerwać?"))return;
     if(matPomo.running)matPomo.workedMs+=Date.now()-matPomo.startedAt;   // domknij bieżący odcinek
-    const min=Math.round(matPomo.workedMs/60000);
+    const min=Math.round(Math.min(matPomo.workedMs,matPomo.total*1000)/60000);
     if(min>=1)matPomoCredit(min);                                        // zalicz FAKTYCZNY czas
     forestFinish(matPomo.treeId,"withered");
     toast(min>=1?`Zaliczono ${min} min faktycznej nauki 🥀`:"Za krótko — nic nie zaliczono 🥀");
   }
   matPomoStop();matPomoSetActive(false);
   matPomo.sessId=null;matPomo.topicId=null;matPomo.treeId=null;matPomo.workedMs=0;
-  lockTaskPin(false);save();renderMatStats();renderMatSched();
+  lockTaskPin(false);matPomoPersist();save();renderMatStats();renderMatSched();
 };
-// Przedłużenie bieżącej sesji o minutę — dolicza 60 s do odliczania (i do docelowej długości).
+// Przedłużenie bieżącej sesji o minutę — dolicza 60 s do docelowej długości.
 // Uczciwy czas i tak liczy się z zegara, więc wydłużenie = po prostu dłuższa realna praca.
 $("#matPomoPlus1").onclick=()=>{
   if($("#matPomoCard").hidden)return;                 // tylko przy aktywnej sesji
   if(matPomo.total>=180*60){toast("Sesja jest już bardzo długa");return}
-  matPomo.left+=60;matPomo.total+=60;matPomoDraw();
+  matPomo.total+=60;matPomoTick();matPomoPersist();   // przelicz z zegara i zapisz
   toast("Dodano minutę do sesji ⏱");
 };
 
@@ -6952,6 +6997,8 @@ if(new URLSearchParams(location.search).get("zaplacono")==="1"){payOczekuje=true
 // bez czekania na kolejne logowanie.
 if(sbSession&&!dataOwner())setDataOwner(sbUserId());
 if(sbSession)startCloudPolling();
+// Odtworzenie sesji pomodoro, która biegła przy zamknięciu apki (liczymy czas z zegara).
+setTimeout(()=>{try{matPomoRestore()}catch(e){console.error("matPomoRestore:",e)}},300);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)cloudAutoPull()});
 
 /* ============ LIBRUS: powiadomienia o zmianach w planie lekcji ============
