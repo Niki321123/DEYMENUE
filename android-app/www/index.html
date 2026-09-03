@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=124">
+<link rel="manifest" href="/manifest.webmanifest?v=125">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -1168,7 +1168,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=124;
+const DM_BUILD=125;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -5982,9 +5982,16 @@ function pktOblicz(){
     przyznaj(tygodnie,"tyg",PKT_PROG_TYG_MIN,PKT_ZA_TYDZIEN);
     przyznaj(miesiace,"mies",PKT_PROG_MIES_MIN,PKT_ZA_MIESIAC);
   }
-  rywalBets.filter(b=>b.status==="settled"&&b.winner_id).forEach(b=>{
-    const u=osoby.find(x=>x.id===b.winner_id);
-    if(u)u.zaklady+=b.stawka||0;
+  rywalBets.filter(b=>b.status==="settled").forEach(b=>{
+    if(b.split){
+      // remis: pula dzielona po połowie między obu zawodników (7 → 3,5 i 3,5)
+      const ua=osoby.find(x=>x.id===b.a_id),ub=osoby.find(x=>x.id===b.b_id);
+      if(ua)ua.zaklady+=(b.stawka||0)/2;
+      if(ub)ub.zaklady+=(b.stawka||0)/2;
+    }else if(b.winner_id){
+      const u=osoby.find(x=>x.id===b.winner_id);
+      if(u)u.zaklady+=b.stawka||0;
+    }
   });
   shopPurchases.forEach(p=>{const u=osoby.find(x=>x.id===p.buyer_id);if(u)u.wydane+=p.cena||0});
   // razem = zdobyte (to decyduje o koronie), saldo = to, co zostało do wydania w sklepie
@@ -6030,7 +6037,9 @@ function renderPunkty(){
     (${PKT_PROG_TYG_MIN/60} h w tygodniu, ${PKT_PROG_MIES_MIN/60} h w miesiącu) — poniżej progu remis nie punktuje.
     Rozliczono: ${w.tygodni} ${matsPlural(w.tygodni,"tydzień","tygodnie","tygodni")}
     i ${w.miesiecy} ${matsPlural(w.miesiecy,"miesiąc","miesiące","miesięcy")}; bieżący okres doliczy się po zakończeniu.
-    Korona idzie za punkty <em>zdobyte</em> — zakupy w sklepie jej nie zabierają.`;
+    Korona idzie za punkty <em>zdobyte</em> — zakupy w sklepie jej nie zabierają.
+    W zakładach można też uznać <strong>remis</strong> — wtedy pula dzieli się po połowie
+    (np. 7 pkt → po 3,5 dla każdego).`;
 }
 
 /* ---- zakłady ---- */
@@ -6099,17 +6108,25 @@ function renderZaklady(){
     }else if(b.status==="active"){
       stan="zakład trwa";
       akcje=`<button class="btn ghost small" data-bet="wygralem" data-id="${b.id}">Wygrałem</button>
-             <button class="btn ghost small" data-bet="przegralem" data-id="${b.id}">Wygrał ${esc(przeciwnik)}</button>`;
+             <button class="btn ghost small" data-bet="przegralem" data-id="${b.id}">Wygrał ${esc(przeciwnik)}</button>
+             <button class="btn ghost small" data-bet="remis" data-id="${b.id}">Remis — podział pkt</button>`;
     }else if(b.status==="claimed"){
-      const zgloszony=betNazwa(b.winner_id);
-      if(b.claimed_by===ja){stan=`zgłoszono: wygrywa ${esc(zgloszony)} — czeka na potwierdzenie`;}
-      else{
-        stan=`${esc(betNazwa(b.claimed_by))} twierdzi, że wygrywa ${esc(zgloszony)}`;
+      const polowa=(b.stawka||0)/2;
+      if(b.claimed_by===ja){
+        stan=b.split
+          ? `zgłoszono: remis, podział po ${polowa} pkt — czeka na potwierdzenie`
+          : `zgłoszono: wygrywa ${esc(betNazwa(b.winner_id))} — czeka na potwierdzenie`;
+      }else{
+        stan=b.split
+          ? `${esc(betNazwa(b.claimed_by))} proponuje remis (podział po ${polowa} pkt)`
+          : `${esc(betNazwa(b.claimed_by))} twierdzi, że wygrywa ${esc(betNazwa(b.winner_id))}`;
         akcje=`<button class="btn small" data-bet="potwierdz" data-id="${b.id}">Potwierdzam</button>
                <button class="btn ghost small" data-bet="kwestionuj" data-id="${b.id}">Nie zgadzam się</button>`;
       }
     }else if(b.status==="settled"){
-      stan=`rozstrzygnięty — wygrał ${esc(betNazwa(b.winner_id))} (+${b.stawka} pkt)`;
+      stan=b.split
+        ? `rozstrzygnięty — remis, podział po ${(b.stawka||0)/2} pkt`
+        : `rozstrzygnięty — wygrał ${esc(betNazwa(b.winner_id))} (+${b.stawka} pkt)`;
     }else if(b.status==="rejected"){stan="odrzucony";}
     const kolor=b.status==="settled"?"var(--good)":b.status==="rejected"?"var(--text-3)":"var(--text-2)";
     return `<div class="mats-item">
@@ -6136,11 +6153,12 @@ $("#betLista").onclick=async e=>{
       await fetch(`${SB_URL}/rest/v1/bets?id=eq.${id}`,{method:"DELETE",
         headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,Prefer:"return=minimal"}});
     }
-    else if(akcja==="wygralem")   await betsPatch(id,{status:"claimed",claimed_by:ja,winner_id:ja});
-    else if(akcja==="przegralem") await betsPatch(id,{status:"claimed",claimed_by:ja,
+    else if(akcja==="wygralem")   await betsPatch(id,{status:"claimed",claimed_by:ja,winner_id:ja,split:false});
+    else if(akcja==="przegralem") await betsPatch(id,{status:"claimed",claimed_by:ja,split:false,
                                     winner_id:(zaklad.a_id===ja?zaklad.b_id:zaklad.a_id)});
+    else if(akcja==="remis")      await betsPatch(id,{status:"claimed",claimed_by:ja,winner_id:null,split:true});
     else if(akcja==="potwierdz")  await betsPatch(id,{status:"settled",settled_at:new Date().toISOString()});
-    else if(akcja==="kwestionuj") await betsPatch(id,{status:"active",claimed_by:null,winner_id:null});
+    else if(akcja==="kwestionuj") await betsPatch(id,{status:"active",claimed_by:null,winner_id:null,split:false});
     await betsOdswiez();
   }catch(err){toast("Błąd: "+((err&&err.message)||"nieznany"))}
 };
@@ -6277,8 +6295,16 @@ function pktWOkresie(dni){
     przyznaj(pktTygodnieWZakresie(dni),PKT_PROG_TYG_MIN,PKT_ZA_TYDZIEN);
     przyznaj(pktMiesiaceWZakresie(dni),PKT_PROG_MIES_MIN,PKT_ZA_MIESIAC);
   }
-  rywalBets.filter(b=>b.status==="settled"&&b.winner_id&&b.settled_at&&zbior.has(String(b.settled_at).slice(0,10)))
-    .forEach(b=>{const u=osoby.find(x=>x.id===b.winner_id);if(u)u.zdobyte+=b.stawka||0});
+  rywalBets.filter(b=>b.status==="settled"&&b.settled_at&&zbior.has(String(b.settled_at).slice(0,10)))
+    .forEach(b=>{
+      if(b.split){
+        const ua=osoby.find(x=>x.id===b.a_id),ub=osoby.find(x=>x.id===b.b_id);
+        if(ua)ua.zdobyte+=(b.stawka||0)/2;
+        if(ub)ub.zdobyte+=(b.stawka||0)/2;
+      }else if(b.winner_id){
+        const u=osoby.find(x=>x.id===b.winner_id);if(u)u.zdobyte+=b.stawka||0;
+      }
+    });
   shopPurchases.filter(p=>p.created_at&&zbior.has(String(p.created_at).slice(0,10)))
     .forEach(p=>{const u=osoby.find(x=>x.id===p.buyer_id);if(u)u.wydane+=p.cena||0});
   osoby.forEach(u=>{u.zdobyte=Math.round(u.zdobyte*10)/10});
@@ -6304,8 +6330,9 @@ function wrapPojedynek(dni){
   const zaklady=rywalBets.filter(x=>x.status==="settled"&&x.settled_at&&zbior.has(String(x.settled_at).slice(0,10)));
   const mojeId=rywalProfile.user_id;
   return{ja,rywal,pary,
-    zakladyMoje:zaklady.filter(x=>x.winner_id===mojeId).length,
-    zakladyJego:zaklady.filter(x=>x.winner_id&&x.winner_id!==mojeId).length,
+    zakladyMoje:zaklady.filter(x=>!x.split&&x.winner_id===mojeId).length,
+    zakladyJego:zaklady.filter(x=>!x.split&&x.winner_id&&x.winner_id!==mojeId).length,
+    zakladyRemis:zaklady.filter(x=>x.split).length,
     roznicaMin:pary[0].a-pary[0].b};
 }
 function renderWrapped(){
@@ -6337,7 +6364,7 @@ function renderWrapped(){
         </div>
         ${wiersze}
         <div class="wrap-hero" style="font-size:clamp(20px,5vw,28px);letter-spacing:-1px">${podpis}</div>
-        ${(poj.zakladyMoje||poj.zakladyJego)?`<p class="muted">Rozstrzygnięte zakłady: ${poj.zakladyMoje} dla Ciebie, ${poj.zakladyJego} dla ${esc(poj.rywal.name)}.</p>`:`<p class="muted">W tym okresie nie rozstrzygnęliście żadnego zakładu.</p>`}`;
+        ${(poj.zakladyMoje||poj.zakladyJego||poj.zakladyRemis)?`<p class="muted">Rozstrzygnięte zakłady: ${poj.zakladyMoje} dla Ciebie, ${poj.zakladyJego} dla ${esc(poj.rywal.name)}${poj.zakladyRemis?`, ${poj.zakladyRemis} po podziale`:""}.</p>`:`<p class="muted">W tym okresie nie rozstrzygnęliście żadnego zakładu.</p>`}`;
     }
   }else{
     const top=moje.przedmioty.slice(0,3).map(([nazwa,min])=>{
