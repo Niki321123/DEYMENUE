@@ -7,6 +7,13 @@
 <meta name="description" content="Twoja nauka do matury w jednym miejscu: plan na tydzień, uczciwie liczony czas i postępy, które widać. Pobierz na telefon lub komputer albo otwórz w przeglądarce.">
 <link rel="canonical" href="https://daymenu.pl/">
 <meta name="theme-color" content="#2b3950">
+<!-- Ikona karty przegladarki i wynikow Google. Trzy formaty: ICO dla starych przegladarek,
+     SVG dla ostrych kart w kazdej skali, PNG 192 (wielokrotnosc 48) — tego wymaga Google
+     do pokazania ikony przy wyniku wyszukiwania. Wczesniej byl tu tylko apple-touch-icon,
+     wiec karta i wynik Google nie mialy zadnego logo. -->
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192">
 <!-- Ikona i nazwa po dodaniu do ekranu glownego / Docka.
      iOS bierze ikone z apple-touch-icon (musi byc PNG). macOS "Dodaj do Docka" i Android
      biora ja z manifestu — bez linku do manifestu Mac pokazywal ogolny obrazek zamiast logo.
@@ -25,12 +32,26 @@
 <meta property="og:image" content="https://daymenu.pl/podglad.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Logo Day Menu i podpis: planowanie nauki do matury — harmonogram, pomodoro, statystyki, rywalizacja">
 <meta property="og:locale" content="pl_PL">
 <meta name="twitter:card" content="summary_large_image">
-<!-- Nazwa witryny w wynikach Google. Bez tego wyszukiwarka pisze nad tytulem sam adres
-     "daymenu.pl"; z tym pokazuje "Day Menu". To jedyne, do czego sluzy ten fragment. -->
+<meta name="twitter:title" content="Day Menu — Twój planer nauki">
+<meta name="twitter:description" content="Plan na tydzień, uczciwie liczony czas nauki i postępy, które widać. Zaplanuj najbliższe dni.">
+<meta name="twitter:image" content="https://daymenu.pl/podglad.png">
+<!-- Dane strukturalne dla wyszukiwarek. WebSite daje nazwe "Day Menu" nad tytulem wyniku
+     (zamiast golego adresu). SoftwareApplication opisuje, czym jest produkt, na czym dziala
+     i ile kosztuje — ceny sa te same co w sekcji Cennik nizej. Celowo BEZ ocen i recenzji:
+     nie mamy zebranych ocen, a wymyslone Google karze jako spam. -->
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"WebSite","name":"Day Menu","alternateName":"Day Menu — Twój planer nauki","url":"https://daymenu.pl/","inLanguage":"pl-PL"}
+{"@context":"https://schema.org","@graph":[
+ {"@type":"Organization","@id":"https://daymenu.pl/#organization","name":"Day Menu","url":"https://daymenu.pl/","logo":"https://daymenu.pl/icon-512.png","email":"kontakt.daymenu@gmail.com"},
+ {"@type":"WebSite","@id":"https://daymenu.pl/#website","name":"Day Menu","alternateName":"Day Menu — Twój planer nauki","url":"https://daymenu.pl/","inLanguage":"pl-PL","publisher":{"@id":"https://daymenu.pl/#organization"}},
+ {"@type":"SoftwareApplication","@id":"https://daymenu.pl/#app","name":"Day Menu","url":"https://daymenu.pl/","description":"Planer nauki do matury: harmonogram tygodnia, pomodoro z rosnącym lasem, materiały, nawyki, sen, cele, analiza czasu i rywalizacja ze znajomymi.","applicationCategory":"EducationalApplication","operatingSystem":"Android, Windows, Linux, iOS, macOS, przeglądarka","inLanguage":"pl-PL","image":"https://daymenu.pl/podglad.png","screenshot":"https://daymenu.pl/img/funkcje/pulpit.png","downloadUrl":"https://daymenu.pl/DayMenu.apk","installUrl":"https://daymenu.pl/#pobierz","publisher":{"@id":"https://daymenu.pl/#organization"},
+  "offers":[
+   {"@type":"Offer","name":"Wersja darmowa","price":"0","priceCurrency":"PLN","description":"Harmonogram tygodnia, plan lekcji z Librusa, pomodoro z lasem, materiały, nawyki, sen, cele, pulpit i analiza czasu bez wykresów — bez limitu czasu.","availability":"https://schema.org/InStock","url":"https://daymenu.pl/#cennik"},
+   {"@type":"Offer","name":"Pełny dostęp","price":"5","priceCurrency":"PLN","description":"Jednorazowa opłata, dostęp na stałe: sprawdziany, frekwencja i oceny z Librusa, wykresy w analizie czasu, rywalizacja ze znajomymi, podsumowania okresów.","availability":"https://schema.org/InStock","url":"https://daymenu.pl/#cennik"}
+  ]}
+]}
 </script>
 <style>
 /* ===== TOKENY =====
@@ -450,7 +471,7 @@ footer .prawa{margin-left:auto}
   </div>
 </div>
 
-<footer
+<footer>
   <div class="srodek">
     <nav>
       <a href="/app.html">Otwórz aplikację</a>

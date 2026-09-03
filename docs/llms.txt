@@ -1,0 +1,29 @@
+# Day Menu
+
+> Day Menu to polska aplikacja do planowania nauki do matury: harmonogram tygodnia, pomodoro z rosnącym lasem, spis materiałów, nawyki, licznik snu, cele, analiza czasu i rywalizacja ze znajomymi. Działa w przeglądarce pod adresem daymenu.pl, na Androidzie (plik APK), na Windows i Linuksie (aplikacja desktop) oraz jako aplikacja dodana do ekranu początkowego na iOS i macOS.
+
+Kluczowe fakty:
+
+- Trzon aplikacji jest darmowy bez limitu czasu i bez reklam. Pełny dostęp to jednorazowa opłata 5 zł — nie ma abonamentu.
+- Funkcje w pełnym dostępie: zapowiedzi sprawdzianów z Librusa, frekwencja i oceny z Librusa, wykresy w analizie czasu, rywalizacja ze znajomymi (punkty, zakłady, sklep nagród), podsumowania tygodnia, miesiąca i roku.
+- Funkcje darmowe: harmonogram tygodnia, plan lekcji z Librusa, pomodoro z lasem, materiały z odhaczaniem zadań, nawyki, licznik snu, cele, pulpit dnia, analiza czasu bez wykresów.
+- Jedno konto (adres e-mail) synchronizuje dane między telefonem, komputerem i przeglądarką.
+- Kontakt: kontakt.daymenu@gmail.com
+
+## Strony
+
+- [Strona główna](https://daymenu.pl/): czym jest Day Menu, pobieranie na każdy system, cennik, o nas
+- [Funkcje](https://daymenu.pl/funkcje.html): wszystkie funkcje opisane na prawdziwych zrzutach ekranu z aplikacji
+- [Regulamin](https://daymenu.pl/regulamin.html): zasady korzystania, konto, płatności, prawo odstąpienia, reklamacje
+- [Polityka prywatności](https://daymenu.pl/prywatnosc.html): jakie dane zbieramy, po co, jak długo i jakie masz prawa
+
+## Aplikacja
+
+- [Otwórz aplikację](https://daymenu.pl/app.html): wersja w przeglądarce z pełnym zestawem funkcji, bez instalacji
+- [Pobierz na Androida (APK)](https://daymenu.pl/DayMenu.apk): instalacja spoza sklepu Play; suma kontrolna w https://daymenu.pl/DayMenu.apk.sha256
+- [Pobierz na Windows](https://github.com/Niki321123/DEYMENUE/releases/latest/download/DayMenu-Windows.zip): archiwum ZIP, aplikacja aktualizuje się sama
+- [Pobierz na Linuksa](https://github.com/Niki321123/DEYMENUE/releases/latest/download/DayMenu-Linux.zip): wersja przenośna x86-64
+
+## Optional
+
+- [Mapa strony](https://daymenu.pl/sitemap.xml)

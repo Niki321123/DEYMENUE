@@ -135,6 +135,12 @@ em{color:var(--text-2)}
 table{border-collapse:collapse;width:100%;font-size:14px}
 th,td{border:1px solid var(--border);padding:8px 10px;text-align:left;vertical-align:top}
 th{background:var(--surface-2);font-weight:600}
+.okruszki{margin:-8px 0 16px;font-size:13px;color:var(--text-3)}
+.okruszki ol{list-style:none;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;padding:0}
+.okruszki li+li::before{content:"›";margin-right:8px}
+.okruszki a{color:var(--text-2);text-decoration:none}
+.okruszki a:hover{text-decoration:underline}
+.okruszki [aria-current="page"]{color:var(--text);font-weight:600}
 .stopka{margin-top:24px;text-align:center;color:var(--text-3);font-size:13px}
 .stopka a{color:var(--text-3)}
 @media(max-width:600px){.karta{padding:20px 18px}h1{font-size:23px}body{padding:16px 12px 48px}}
@@ -145,6 +151,16 @@ const ZNAK = `<svg class="znak" xmlns="http://www.w3.org/2000/svg" viewBox="-3 -
 let ile = 0;
 for (const s of STRONY) {
   const md = fs.readFileSync(path.join(root, s.zrodlo), "utf8");
+  const adres = `https://daymenu.pl/${s.cel}`;
+  const okruszek = s.tytul.replace(/ — Day Menu$/, "");
+  // Okruszki dla wyszukiwarki + opis strony jako czesci witryny. JSON.stringify, zeby
+  // cudzyslowy i polskie znaki z opisu nie rozbily skryptu.
+  const ld = JSON.stringify({ "@context": "https://schema.org", "@graph": [
+    { "@type": "BreadcrumbList", itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Strona główna", item: "https://daymenu.pl/" },
+      { "@type": "ListItem", position: 2, name: okruszek, item: adres } ] },
+    { "@type": "WebPage", "@id": adres, url: adres, name: s.tytul, description: s.opis,
+      inLanguage: "pl-PL", isPartOf: { "@id": "https://daymenu.pl/#website" } } ] });
   const html = `<!doctype html>
 <html lang="pl">
 <head>
@@ -152,16 +168,38 @@ for (const s of STRONY) {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${s.tytul}</title>
 <meta name="description" content="${s.opis}">
-<link rel="canonical" href="https://daymenu.pl/${s.cel}">
+<link rel="canonical" href="${adres}">
 <meta name="robots" content="index,follow">
 <meta name="theme-color" content="#2b3950">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="/icon-180.png">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Day Menu">
+<meta property="og:title" content="${s.tytul}">
+<meta property="og:description" content="${s.opis}">
+<meta property="og:url" content="${adres}">
+<meta property="og:image" content="https://daymenu.pl/podglad.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Logo Day Menu — planowanie nauki do matury">
+<meta property="og:locale" content="pl_PL">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${s.tytul}">
+<meta name="twitter:description" content="${s.opis}">
+<meta name="twitter:image" content="https://daymenu.pl/podglad.png">
+<script type="application/ld+json">${ld}</script>
 <style>${STYL}</style>
 </head>
 <body>
 <div class="strona">
   <div class="gora">${ZNAK}<span class="marka">Day Menu</span>
     <a class="powrot" href="/app.html">← Wróć do aplikacji</a></div>
+  <nav class="okruszki" aria-label="Ścieżka"><ol>
+    <li><a href="/">Strona główna</a></li>
+    <li aria-current="page">${okruszek}</li>
+  </ol></nav>
   <div class="karta">
 ${md2html(md)}
   </div>

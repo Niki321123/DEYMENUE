@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nie znaleziono strony — Day Menu</title>
+<meta name="description" content="Tej strony nie ma na daymenu.pl. Wróć na stronę główną, zobacz funkcje albo otwórz aplikację.">
+<!-- GitHub Pages podaje ten plik dla kazdego nieistniejacego adresu (ze statusem 404).
+     Adresy sa bezwzgledne (/...), bo strona wyswietla sie pod dowolna sciezka. -->
+<meta name="robots" content="noindex,follow">
+<meta name="theme-color" content="#2b3950">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<style>
+/* Te same tokeny co strona glowna — jeden produkt, jeden wyglad, takze na bledzie. */
+:root{
+  --bg:#f6f7f9; --surface:#ffffff; --surface-2:#eef0f4; --border:#e2e5ea;
+  --text:#1b1f27; --text-2:#5b6472; --text-3:#6b7280;
+  --primary:#4a5ecb; --primary-soft:#e8ebfb; --primary-text:#ffffff;
+  --radius:14px; --radius-s:9px;
+  --shadow:0 1px 3px rgba(20,24,33,.07),0 4px 16px rgba(20,24,33,.05);
+  --fs-1:13px; --fs-2:15px; --fs-3:18px; --fs-4:22px; --fs-5:28px;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
+  --sp-7:48px; --sp-8:64px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#14161c; --surface:#1d2029; --surface-2:#262a35; --border:#323744;
+    --text:#eceef2; --text-2:#a7aeba; --text-3:#868f9e;
+    --primary:#8b9bf5; --primary-soft:#2a3052; --primary-text:#0f1118;
+    --shadow:0 1px 3px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.25);
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:var(--fs-2);
+  line-height:1.6;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased;
+  min-height:100vh;display:flex;flex-direction:column}
+a{color:var(--primary)}
+:focus-visible{outline:2px solid var(--primary);outline-offset:3px;border-radius:4px}
+.pomin{position:absolute;left:-9999px;top:0;background:var(--surface);color:var(--text);
+  padding:var(--sp-3) var(--sp-4);border-radius:var(--radius-s);z-index:100}
+.pomin:focus{left:var(--sp-4);top:var(--sp-4)}
+.srodek{width:100%;max-width:1060px;margin:0 auto;padding:0 var(--sp-5)}
+
+.pasek{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.pasek .srodek{display:flex;align-items:center;gap:var(--sp-4);min-height:64px}
+.marka{display:flex;align-items:center;gap:var(--sp-2);font-weight:700;font-size:var(--fs-3);
+  color:var(--text);text-decoration:none;letter-spacing:-.01em}
+.marka svg{width:26px;height:26px;flex:none}
+.menu{display:flex;gap:var(--sp-2);margin-left:auto;align-items:center;flex-wrap:wrap}
+.menu a{color:var(--text-2);text-decoration:none;font-size:var(--fs-2);
+  padding:10px var(--sp-3);border-radius:var(--radius-s);transition:color .15s,background .15s}
+.menu a:hover{color:var(--text);background:var(--surface-2)}
+.menu a.cta{background:var(--primary);color:var(--primary-text);font-weight:600}
+.menu a.cta:hover{background:color-mix(in srgb,var(--primary) 88%,#000);color:var(--primary-text)}
+@media (max-width:719px){
+  .pasek .srodek{flex-wrap:wrap;min-height:0;gap:var(--sp-2);padding-top:var(--sp-2);padding-bottom:var(--sp-2)}
+  .marka{width:100%;justify-content:center}
+  .menu{width:100%;margin-left:0;justify-content:center;gap:6px}
+  .menu a{padding:8px 12px;font-size:var(--fs-1)}
+}
+
+main{flex:1;display:flex;align-items:center}
+.blad{padding:var(--sp-8) 0;text-align:center;max-width:560px;margin:0 auto}
+.blad .kod{font-size:clamp(64px,14vw,112px);font-weight:700;line-height:1;letter-spacing:-.04em;
+  color:var(--primary);margin-bottom:var(--sp-3)}
+.blad h1{font-size:clamp(24px,5vw,34px);line-height:1.15;letter-spacing:-.02em;
+  margin-bottom:var(--sp-3);text-wrap:balance}
+.blad p{color:var(--text-2);font-size:var(--fs-3);margin-bottom:var(--sp-5)}
+.blad .adres{font-family:ui-monospace,Consolas,monospace;font-size:var(--fs-1);color:var(--text-3);
+  background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-s);
+  padding:6px 10px;display:inline-block;word-break:break-all;margin-bottom:var(--sp-5)}
+.akcje{display:flex;flex-wrap:wrap;gap:var(--sp-3);justify-content:center;margin-bottom:var(--sp-6)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);
+  min-height:48px;padding:0 var(--sp-5);border:1px solid transparent;border-radius:var(--radius-s);
+  font-size:var(--fs-2);font-weight:600;text-decoration:none;cursor:pointer;
+  transition:transform .15s ease-out,background .15s,border-color .15s}
+.btn:hover{transform:translateY(-1px)}
+.btn.glowny{background:var(--primary);color:var(--primary-text)}
+.btn.glowny:hover{background:color-mix(in srgb,var(--primary) 88%,#000)}
+.btn.drugi{background:var(--surface);color:var(--text);border-color:var(--border)}
+.btn.drugi:hover{background:var(--surface-2)}
+.linki{list-style:none;display:flex;flex-wrap:wrap;gap:var(--sp-2) var(--sp-4);justify-content:center;
+  font-size:var(--fs-2)}
+.linki a{color:var(--text-2);text-decoration:none}
+.linki a:hover{color:var(--text);text-decoration:underline}
+
+footer{border-top:1px solid var(--border);padding:var(--sp-6) 0 var(--sp-7);
+  color:var(--text-3);font-size:var(--fs-1)}
+footer .srodek{display:flex;flex-wrap:wrap;gap:var(--sp-3) var(--sp-5);align-items:center}
+footer nav{display:flex;flex-wrap:wrap;gap:var(--sp-3) var(--sp-4)}
+footer a{color:var(--text-2);text-decoration:none}
+footer a:hover{color:var(--text);text-decoration:underline}
+footer .prawa{margin-left:auto}
+@media (max-width:719px){footer .prawa{margin-left:0;width:100%}}
+</style>
+</head>
+<body>
+<a class="pomin" href="#tresc">Przejdź do treści</a>
+
+<header class="pasek">
+  <div class="srodek">
+    <a class="marka" href="/">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 106 106" aria-hidden="true"><rect x="0" y="11.7" width="100" height="88.3" rx="13.5" fill="#2b3950"/><rect x="19.2" y="-2.5" width="14.8" height="29.7" rx="7.4" fill="#fff"/><rect x="66" y="-2.5" width="14.8" height="29.7" rx="7.4" fill="#fff"/><rect x="21.7" y="0" width="9.8" height="24.5" rx="4.9" fill="#2b3950"/><rect x="68.5" y="0" width="9.8" height="24.5" rx="4.9" fill="#2b3950"/><rect x="11.5" y="31.9" width="77" height="62.8" rx="7.5" fill="#fff"/><rect x="15.9" y="44.9" width="28.7" height="6" rx="3" fill="#4a80d4"/><rect x="15.9" y="60.8" width="28.7" height="6" rx="3" fill="#4a9d52"/><rect x="15.9" y="75.7" width="28.7" height="6" rx="3" fill="#7069e6"/><path d="M51.1 64.9 64.1 74.5 82.6 53.2" fill="none" stroke="#2b3950" stroke-width="7.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Day Menu
+    </a>
+    <nav class="menu">
+      <a href="/funkcje.html">Funkcje</a>
+      <a href="/#pobierz">Pobierz</a>
+      <a href="/#cennik">Cennik</a>
+      <a href="/#o-nas">O nas</a>
+      <a class="cta" href="/app.html">Otwórz aplikację</a>
+    </nav>
+  </div>
+</header>
+
+<main id="tresc">
+  <div class="srodek">
+    <div class="blad">
+      <p class="kod" aria-hidden="true">404</p>
+      <h1>Tej strony tu nie ma</h1>
+      <p>Adres mógł się zmienić albo w linku wkradła się literówka. Nic się nie stało —
+         wszystko, czego szukasz, jest o jedno kliknięcie stąd.</p>
+      <code class="adres" id="adres" hidden></code>
+      <div class="akcje">
+        <a class="btn glowny" href="/">Strona główna</a>
+        <a class="btn drugi" href="/app.html">Otwórz aplikację</a>
+      </div>
+      <ul class="linki">
+        <li><a href="/funkcje.html">Funkcje</a></li>
+        <li><a href="/#pobierz">Pobierz</a></li>
+        <li><a href="/#cennik">Cennik</a></li>
+        <li><a href="/regulamin.html">Regulamin</a></li>
+        <li><a href="/prywatnosc.html">Polityka prywatności</a></li>
+        <li><a href="mailto:kontakt.daymenu@gmail.com">Kontakt</a></li>
+      </ul>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="srodek">
+    <nav>
+      <a href="/app.html">Otwórz aplikację</a>
+      <a href="/funkcje.html">Funkcje</a>
+      <a href="/#pobierz">Pobierz</a>
+      <a href="/#cennik">Cennik</a>
+      <a href="/regulamin.html">Regulamin</a>
+      <a href="/prywatnosc.html">Polityka prywatności</a>
+      <a href="mailto:kontakt.daymenu@gmail.com">Kontakt</a>
+    </nav>
+    <span class="prawa">Day Menu · daymenu.pl</span>
+  </div>
+</footer>
+
+<script>
+/* Pokazuje szukany adres, zeby literowka byla widoczna. textContent, nie innerHTML —
+   sciezka pochodzi od odwiedzajacego i nie moze byc wykonana jako HTML. */
+(function(){
+  var el = document.getElementById("adres");
+  var sciezka = location.pathname + location.search;
+  if (sciezka && sciezka !== "/" && sciezka.length < 200) { el.textContent = sciezka; el.hidden = false; }
+})();
+</script>
+</body>
+</html>
