@@ -56,6 +56,25 @@ fs.writeFileSync(path.join(site, "version.json"), `{"build":${build}}`);
 // UWAGA: NIE uzywamy `git add -A` — w rootcie repo lubia pojawiac sie pliki-smieci
 // (artefakty zle wklejonych komend w terminalu, np. `'email')`), a to publiczne repo.
 // Dodajemy tylko sledzone zmiany + konkretne katalogi z ewentualnymi nowymi plikami.
+//
+// Bezpiecznik na docs/: `git add docs` bierze WSZYSTKO z tego katalogu, a w buildzie 126
+// poszedl tak do publicznego repo pusty plik o nazwie ",". Kazdy plik w docs/ musi miec
+// zwykla nazwe (litery, cyfry, kropka, myslnik, podkreslenie) i niezerowy rozmiar —
+// inaczej przerywamy publikacje i pokazujemy, co usunac.
+const smieci = [];
+(function skanuj(dir) {
+  for (const w of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, w.name);
+    if (w.isDirectory()) { skanuj(p); continue; }
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(w.name) || fs.statSync(p).size === 0) smieci.push(p);
+  }
+})(site);
+if (smieci.length) {
+  console.error("\n✖ W docs/ sa pliki, ktore nie wygladaja na czesc strony (dziwna nazwa albo 0 bajtow):");
+  smieci.forEach((p) => console.error("   " + path.relative(root, p)));
+  console.error("Usun je i uruchom publikacje ponownie. Nic nie zostalo wyslane.\n");
+  process.exit(1);
+}
 run("git add -u");
 // PROJECT_NOTES.md celowo poza lista: notatki sa lokalne i ignorowane przez gita,
 // a "git add" na ignorowanym pliku przerwalby publikacje bledem.
