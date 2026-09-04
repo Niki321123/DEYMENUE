@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=127">
+<link rel="manifest" href="/manifest.webmanifest?v=128">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -1167,7 +1167,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=127;
+const DM_BUILD=128;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -2500,12 +2500,23 @@ function matPomoPersist(){
 }
 // Zalicza `min` FAKTYCZNYCH minut: do bloku z planu (godzina) albo jako luźną sesję.
 function matPomoCredit(min){
-  const t=S.matura.topics.find(x=>x.id===matPomo.topicId);
+  if(!(min>0))return;                       // zero minut = nie ma czego zapisywac
   const blk=matPomo.day!=null?S.matura.plan.find(b=>b.day===matPomo.day&&b.hour===matPomo.hour):null;
-  if(blk){if(blk.doneWeek!==weekId())matMarkDone(blk,min);}
-  else S.matura.sessions.push({id:uid(),topicId:matPomo.topicId,date:today(),minutes:min,completed:true});
+  /* Przedmiot bierzemy najpierw z bloku planu, a dopiero potem z sesji. Wczesniej sesja
+     dostawala blk.topicId, a wpis w Analizie czasu szukal nazwy po matPomo.topicId — gdy
+     te dwa sie rozjechaly, wpisu w Analizie czasu nie bylo wcale. */
+  const topicId=(blk?blk.topicId:matPomo.topicId)||null;
+  const t=S.matura.topics.find(x=>x.id===topicId);
+  /* Godzina z planu odhacza sie i tym samym zapisuje sesje. Ale gdy byla juz odhaczona
+     w tym tygodniu, matMarkDone nic nie robi — wtedy minuty MUSZA wejsc jako luzna sesja,
+     inaczej druga sesja na tej samej godzinie przepadala bez sladu. */
+  if(blk&&blk.doneWeek!==weekId())matMarkDone(blk,min);
+  else S.matura.sessions.push({id:uid(),topicId,date:today(),minutes:min,completed:true});
   matPomo.day=null;matPomo.hour=null;
-  if(t)S.timelog.push({id:uid(),name:"Nauka: "+t.name,category:"Nauka",estimate:null,actual:min,date:today()});
+  /* Dziennik ZMIERZONEGO czasu (gorne sekcje Analizy czasu) — ZAWSZE. Wczesniej stalo za
+     `if(t)`, wiec nauka bez wybranego przedmiotu nie trafiala do Analizy czasu w ogole. */
+  S.timelog.push({id:uid(),name:t?"Nauka: "+t.name:"Nauka",category:"Nauka",
+                  estimate:null,actual:min,date:today()});
 }
 function matPomoToggle(){
   if(matPomo.running){matPomo.workedMs+=Date.now()-matPomo.startedAt;matPomoStop();matPomoDraw();matPomoPersist();return;}
