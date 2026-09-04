@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=126">
+<link rel="manifest" href="/manifest.webmanifest?v=127">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -964,7 +964,6 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
           <div class="tabs" id="rywalMetric" style="margin:0">
             <button data-rm="prod" class="on">Produktywność</button>
             <button data-rm="study">Nauka</button>
-            <button data-rm="pomo">Pomodoro</button>
           </div>
           <div class="tabs" id="rywalRange" style="margin:0">
             <button data-rr="7">7 dni</button>
@@ -1168,7 +1167,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=126;
+const DM_BUILD=127;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -5846,7 +5845,6 @@ function renderRywal(){
         <tbody>
           ${wiersz("Średnia produktywność","prod_pct",v=>v+"%")}
           ${wiersz("Godziny nauki","study_min",v=>fmtMin(v))}
-          ${wiersz("Sesje pomodoro","pomo_count",v=>String(v))}
           ${wiersz("Dni z nauką","study_min",()=>"",true)}
         </tbody>
       </table></div>
@@ -5859,7 +5857,7 @@ function renderRywal(){
 
   // ── wykres nałożony ──
   const dates=rywalRange?rywalDates(rywalRange):rywalDatesFrom(rywalFirstDataDate()||today());
-  const key=rywalMetric==="study"?"study_min":rywalMetric==="pomo"?"pomo_count":"prod_pct";
+  const key=rywalMetric==="study"?"study_min":"prod_pct";
   /* Przy roku czy „wszystkim" 365+ punktów zlewa się w jedną kreskę, więc powyżej 90 dni
      sumujemy tygodniami. Sumujemy (a nie uśredniamy), bo to liczniki, nie procenty. */
   const tygodniowo=dates.length>90;
@@ -5872,15 +5870,14 @@ function renderRywal(){
     vals:kubelki.map(k=>rywalAgg(u.days,k,key)),
     suma:rywalAgg(u.days,dates,key)
   }));
-  const fmtWart=v=>rywalMetric==="study"?fmtMin(v):rywalMetric==="prod"?v+"%":String(v);
+  const fmtWart=v=>rywalMetric==="study"?fmtMin(v):v+"%";
   $("#rywalLegend").innerHTML=serie.map(s=>
     `<label><span class="swatch" style="background:${s.color}"></span>${esc(s.name)}
       <span class="cval" style="color:${s.color}">${fmtWart(s.suma)}</span></label>`).join("");
 
   const maxV=Math.max(1,...serie.flatMap(s=>s.vals));
   const maxY=rywalMetric==="study"?Math.ceil(maxV/30)*30
-            :rywalMetric==="prod"?Math.max(100,Math.ceil(maxV/25)*25)
-            :Math.max(2,Math.ceil(maxV));
+            :Math.max(100,Math.ceil(maxV/25)*25);
   const W=720,H=220,PL=34,PR=10,PT=10,PB=10,n=kubelki.length;
   const x=i=>PL+(n>1?i/(n-1):0.5)*(W-PL-PR);
   const y=v=>PT+(1-v/maxY)*(H-PT-PB);
