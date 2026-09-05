@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=128">
+<link rel="manifest" href="/manifest.webmanifest?v=129">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -1167,7 +1167,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=128;
+const DM_BUILD=129;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -7229,7 +7229,12 @@ function librusBladOpis(surowy){
   if(s)console.warn("Librus — pelna tresc bledu:",s);
   const t=s.toLowerCase();
   if(!s)return "";
-  if(t.includes("brak dost")||t.includes("token")||t.includes("wygas")||t.includes("401")||t.includes("403")||t.includes("haslo")||t.includes("hasło"))
+  /* „Brak dostępu” to NIE złe hasło — logowanie przechodzi, tylko konto nie ma wstępu
+     na strony ucznia (typowo: użyty login rodzica, bez końcówki „u”). Sklejenie tych
+     dwóch przypadków wysyłało ludzi w kółko po nowe hasło, które nic nie zmieniało. */
+  if(t.includes("brak dost")||t.includes("widoku ucznia"))
+    return "Librus przyjął logowanie, ale to konto nie ma dostępu do widoku ucznia. Jeśli Twój login nie kończy się na „u”, to konto rodzica — połącz się loginem ucznia.";
+  if(t.includes("token")||t.includes("wygas")||t.includes("401")||t.includes("403")||t.includes("haslo")||t.includes("hasło"))
     return "Librus odrzucił logowanie — najpewniej zmieniło się hasło.";
   if(t.includes("timeout")||t.includes("timed out")||t.includes("etimedout")||t.includes("nie odpowiada")||t.includes("econnrefused")||t.includes("network"))
     return "Librus nie odpowiedział w wyznaczonym czasie.";
@@ -7240,13 +7245,14 @@ async function librusRenderBox(){
   const acc=await librusAccountStatus();
   if(acc){
     const sync=acc.last_sync_at?new Date(acc.last_sync_at).toLocaleString("pl-PL"):"jeszcze nie sprawdzano";
-    const err=acc.status&&acc.status!=="ok"?`<p class="muted" style="color:var(--bad)">${esc(librusBladOpis(acc.last_error||acc.status))} Kliknij „Rozłącz Librus” i połącz ponownie aktualnym hasłem.</p>`:"";
+    const err=acc.status&&acc.status!=="ok"?`<p class="muted" style="color:var(--bad)">${esc(librusBladOpis(acc.last_error||acc.status))} Kliknij „Rozłącz Librus” i połącz ponownie.</p>`:"";
     box.innerHTML=`<div class="row"><span class="badge b-good">Połączono</span><strong>${esc(acc.login)}</strong></div>
       <p class="muted" style="margin:var(--sp-2) 0">Ostatnie sprawdzenie planu: ${sync}</p>${err}
       <button class="btn danger" id="librusDisc">Rozłącz Librus</button>`;
     $("#librusDisc").onclick=librusDisconnect;
   }else{
-    box.innerHTML=`<div class="field"><label class="fld">Login Librus (Synergia)</label><input type="text" id="librusLogin" autocomplete="off"></div>
+    box.innerHTML=`<div class="field"><label class="fld">Login Librus (Synergia)</label><input type="text" id="librusLogin" autocomplete="off">
+      <p class="muted" style="font-size:var(--fs-1);margin-top:4px">Login <strong>ucznia</strong> — zwykle kończy się na „u” (np. 1234567u). Konto rodzica nie ma dostępu do planu, ocen i frekwencji ucznia.</p></div>
       <div class="field"><label class="fld">Hasło Librus</label><input type="password" id="librusPass" autocomplete="off"></div>
       <button class="btn accent" id="librusConn">Połącz z Librusem</button>`;
     $("#librusConn").onclick=librusConnect;
@@ -7264,10 +7270,25 @@ async function librusConnect(){
       body:JSON.stringify({action:"connect",login,password})});
     const j=await r.json().catch(()=>({}));
     if(j.ok){
-      msg.textContent=j.units?`Połączono ✓ Pobrano plan (${j.units} lekcji). Harmonogram zaraz się wypełni.`:"Połączono ✓ Plan pobierze się przy najbliższym sprawdzeniu.";
+      /* Konto rodzica/opiekuna (login bez końcówki „u") loguje się poprawnie, ale nie ma
+         wstępu na strony ucznia, z których czytamy plan, oceny i frekwencję — Librus
+         odpowiada „Brak dostępu". Do tej pory kończyło się to komunikatem „Połączono ✓"
+         i cichą awarią na zawsze. Zero WSZYSTKIEGO tuż po połączeniu to ten przypadek
+         (sam pusty plan bywa normalny w wakacje, ale nie razem z zerem ocen i lekcji). */
+      const nicNiePobrano=!j.units&&!j.exams&&!j.grades&&!j.attendance;
+      msg.textContent=nicNiePobrano
+        ? "Połączono, ale Librus nie udostępnił żadnych danych. Jeśli Twój login nie kończy się na „u”, to konto rodzica — rozłącz i połącz się loginem ucznia (np. 1234567u)."
+        : j.units?`Połączono ✓ Pobrano plan (${j.units} lekcji). Harmonogram zaraz się wypełni.`
+                 :"Połączono ✓ Plan pobierze się przy najbliższym sprawdzeniu.";
       await librusSyncSchedule(true);
       await librusRenderBox();
-    }else if(j.error==="librus_auth"){msg.textContent="Błędny login lub hasło do Librusa.";}
+    }else if(j.error==="librus_auth"){
+      // Konkretny powod z serwera ma pierwszenstwo: konto rodzica wygladalo dotad
+      // jak zle haslo, wiec uzytkownik w kolko wpisywal to samo.
+      msg.textContent=/widoku ucznia|rodzic/i.test(String(j.detail||""))
+        ? "To konto nie ma dostępu do widoku ucznia. Jeśli Twój login nie kończy się na „u”, użyj loginu ucznia (np. 1234567u)."
+        : "Błędny login lub hasło do Librusa.";
+    }
     else if(j.error==="not_configured"){msg.textContent="Funkcja Librus nie jest jeszcze skonfigurowana na serwerze (brak klucza szyfrowania).";}
     else{msg.textContent="Nie udało się połączyć — spróbuj ponownie.";}
   }catch(e){msg.textContent="Błąd sieci — spróbuj ponownie.";}
