@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=131">
+<link rel="manifest" href="/manifest.webmanifest?v=132">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -599,7 +599,8 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
         <h2 style="margin:0">Harmonogram tygodnia</h2>
         <div class="row" style="gap:var(--sp-2);width:auto">
           <button class="btn accent" id="matGen">Ułóż plan automatycznie</button>
-          <button class="btn ghost small" id="matGridClear">Wyczyść</button>
+          <button class="btn ghost small" id="matGridClear" title="Czyści dostępność i plan nauki; godziny szkolne z Librusa zostają">Wyczyść</button>
+          <button class="btn ghost small" id="matGridClearAll" title="Czyści wszystko, także godziny szkolne — pobiorą się na nowo z Librusa">Wyczyść też lekcje</button>
         </div>
       </div>
       <p class="muted" style="margin-bottom:var(--sp-3)">Wybierz tryb i zaznacz godziny — ten sam harmonogram obowiązuje co tydzień. Klik nagłówka dnia maluje cały dzień, klik godziny po lewej — cały wiersz. Większy kawałek zamalujesz jednym gestem: <strong>przeciągnij myszą</strong> np. od 12:00 do 17:00, a na telefonie <strong>przytrzymaj palcem pierwszą godzinę i dotknij ostatniej</strong>. Przedmioty w zielonych okienkach rozstawisz sam pędzlem „Przedmiot” albo jednym kliknięciem „Generuj plan”; <strong>kliknij okienko, aby odhaczyć zrobioną godzinę</strong>, a podwójny klik uruchamia pomodoro.</p>
@@ -1167,7 +1168,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=131;
+const DM_BUILD=132;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -1728,6 +1729,7 @@ function matMigrate(){
   if(!Array.isArray(m.attendanceLessons)){m.attendanceLessons=[];ch=true;}
   if(!m.attendanceFreq||typeof m.attendanceFreq!=="object"){m.attendanceFreq={};ch=true;}
   if(!Array.isArray(m.lessonSubjects)){m.lessonSubjects=[];ch=true;}
+  if(!Array.isArray(m.librusUnits)){m.librusUnits=[];ch=true;}       // kopia planu z Librusa — „Wyczyść” odtwarza z niej lekcje
   if(!Array.isArray(m.grades)){m.grades=[];ch=true;}                                   // oceny z Librusa
   if(!m.gradesSubjects||typeof m.gradesSubjects!=="object"){m.gradesSubjects={};ch=true;} // srednie policzone przez Librusa
   // Dwie warstwy harmonogramu: base = stały szkielet (Librus + ręczny pędzel),
@@ -2098,7 +2100,30 @@ function renderMatPlanProgress(){
   if(total){$("#matPlanProg").hidden=false;$("#matProgPct").textContent=`${done}/${total}`;$("#matProgBar").style.width=(done/total*100)+"%";}
   else $("#matPlanProg").hidden=true;
 }
-$("#matGridClear").onclick=()=>{if(confirm("Wyczyścić cały harmonogram i plan?")){S.matura.base={};S.matura.ovr={week:weekId(),cells:{}};S.matura.plan=[];S.matura.actDone={week:weekId(),cells:{}};matRecompute();save();renderMatSched()}};
+/* „Wyczyść”: dostępność, plan nauki, nadpisania tygodnia i aktywności — ale godziny szkolne
+   z Librusa wracają NATYCHMIAST z lokalnej kopii (S.matura.librusUnits), a gdy jej brak —
+   z chmury. Wcześniej czyściło też lekcje, a klient nakładał Librusa dopiero przy zmianie
+   snapshotu (do godziny), więc plan „znikał” i nie było jak go przywrócić. */
+$("#matGridClear").onclick=()=>{
+  const kopia=Array.isArray(S.matura.librusUnits)?S.matura.librusUnits:[];
+  const maLibrus=kopia.length>0||!!S.matura.librusAppliedAt;
+  if(!confirm(maLibrus?"Wyczyścić dostępność i plan nauki? Godziny szkolne z Librusa zostaną.":"Wyczyścić cały harmonogram i plan?"))return;
+  S.matura.base={};S.matura.ovr={week:weekId(),cells:{}};S.matura.plan=[];S.matura.actDone={week:weekId(),cells:{}};
+  if(kopia.length)librusUnitsToBase(kopia);
+  else if(S.matura.librusAppliedAt)librusSyncSchedule(true);   // brak kopii lokalnej — dociągnij z chmury
+  matRecompute();save();renderMatSched();
+  toast(maLibrus?"Wyczyszczono — godziny szkolne z Librusa zachowane":"Wyczyszczono");
+};
+/* „Wyczyść też lekcje”: pełny reset. Przy połączonym Librusie godziny szkolne pobiorą się
+   na nowo przy najbliższej synchronizacji (≤5 min) — celowo działa jak „zresetuj do stanu
+   z Librusa”; żeby ich nie mieć na stałe, trzeba rozłączyć Librus w zakładce Konto. */
+$("#matGridClearAll").onclick=()=>{
+  const maLibrus=!!S.matura.librusAppliedAt;
+  if(!confirm(maLibrus?"Wyczyścić WSZYSTKO, razem z godzinami szkolnymi? Pobiorą się na nowo z Librusa w ciągu kilku minut (chyba że rozłączysz Librus w zakładce Konto).":"Wyczyścić cały harmonogram i plan?"))return;
+  S.matura.base={};S.matura.ovr={week:weekId(),cells:{}};S.matura.plan=[];S.matura.actDone={week:weekId(),cells:{}};
+  S.matura.librusUnits=[];S.matura.librusUnitsHash=null;S.matura.librusAppliedAt=null; // następne odpytanie nałoży świeży plan
+  matRecompute();save();renderMatSched();toast("Wyczyszczono wszystko");
+};
 
 /* ---- przedmioty z priorytetem procentowym ---- */
 function renderMatSubjects(){
@@ -6989,6 +7014,13 @@ async function librusPollEvents(){
    Reguły: przed pierwszą lekcją = niedostępny, godziny lekcji + 1h na powrót = w szkole,
    reszta dnia po powrocie = dostępny. Nadpisań tygodniowych (ovr, z czatu AI) to nie rusza. */
 function librusToMin(t){const[a,b]=String(t).split(":").map(Number);return a*60+(b||0)}
+/* Odcisk planu lekcji: dzień, godziny, nazwa, sala, info — posortowane, więc niezależny od
+   kolejności w snapshocie. Zmiana czegokolwiek, co wpływa na siatkę, zmienia odcisk. */
+function librusUnitsHash(units){
+  const s=(units||[]).map(u=>[u.date,u.from,u.to,u.name,u.classroom||"",u.info||""].join("|")).sort().join("\n");
+  let x=0;for(let i=0;i<s.length;i++){x=(x*31+s.charCodeAt(i))|0;}
+  return s.length+":"+(x>>>0).toString(36);
+}
 function librusUnitsToBase(units){
   const byDay={};
   for(const u of units){
@@ -7178,9 +7210,16 @@ async function librusSyncSchedule(force){
   librusApplyAttendance(row);         // frekwencja jedzie tym samym snapshotem
   librusApplyGrades(row);             // oceny również
   if(!row||!Array.isArray(row.units))return null;
-  if(!force&&S.matura.librusAppliedAt===row.fetched_at)return {days:0,skipped:true};
+  /* Nakładamy plan tylko gdy Librus FAKTYCZNIE go zmienił (odcisk treści), a nie przy każdym
+     godzinnym odświeżeniu snapshotu — inaczej co godzinę nadpisywalibyśmy ręczne poprawki
+     na dniach szkolnych. Zmiana w Librusie → siatka aktualizuje się sama przy najbliższym
+     odpytaniu (co 5 min, po cronie co godzinę). `force` = po „Wyczyść”, gdy brak kopii. */
+  const hash=librusUnitsHash(row.units);
+  if(!force&&S.matura.librusUnitsHash===hash){S.matura.librusAppliedAt=row.fetched_at;return {days:0,skipped:true};}
   const days=librusUnitsToBase(row.units);
   S.matura.librusAppliedAt=row.fetched_at;
+  S.matura.librusUnits=row.units;      // kopia lokalna — „Wyczyść” odtwarza z niej lekcje bez sieci
+  S.matura.librusUnitsHash=hash;
   // Przedmioty z godzin lekcyjnych (nazwy z planu, nie z zakładki Przedmioty) — gotowe
   // do wykorzystania np. jako podpowiedzi przy dodawaniu przedmiotu do nauki.
   S.matura.lessonSubjects=[...new Set(row.units.map(u=>u.name).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pl"));
@@ -7310,6 +7349,7 @@ async function librusDisconnect(){
     await fetch(LIBRUS_FN,{method:"POST",
       headers:{apikey:SB_KEY,Authorization:"Bearer "+tok,"Content-Type":"application/json"},
       body:JSON.stringify({action:"disconnect"})});
+    S.matura.librusUnits=[];S.matura.librusUnitsHash=null;S.matura.librusAppliedAt=null;save();
     msg.textContent="Rozłączono. Hasło Librusa usunięte.";
   }catch(e){msg.textContent="Błąd — spróbuj ponownie.";}
   await librusRenderBox();
