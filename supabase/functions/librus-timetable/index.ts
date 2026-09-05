@@ -1,7 +1,7 @@
 // Monitor planu lekcji i zapowiedzi sprawdzianow z Librus Synergia.
 //
-// Odtwarza flow biblioteki `librusapi` (github.com/ravensiris/librusapi) w Deno:
-// logowanie OAuth na api.librus.pl -> cookie DZIENNIKSID -> POST przegladaj_plan_lekcji.
+// Przebieg logowania odtworzony 2026-09-05 po zmianie uwierzytelniania Librusa (2026-03-28):
+// logowanie: synergia/loguj/portalRodzina -> OAuth api.librus.pl -> cookie oauth_token na Synergii.
 // Pythona uzyc sie nie da (Edge Runtime to Deno), wiec logika jest przepisana 1:1.
 // W tej samej sesji logowania pobieramy tez terminarz (sprawdziany, kartkowki itp.),
 // zrealizowane lekcje (frekwencja) i oceny (srednia wazona).
@@ -11,12 +11,16 @@
 // .grades_error i w logach.
 
 import { DOMParser, type Element } from "https://deno.land/x/deno_dom@v0.1.45/deno-dom-wasm.ts";
+import { CookieJar } from "npm:tough-cookie@6.0.2";
 
-const UA = "Mozilla/5.0 (Windows NT x.y; Win64; x64; rv:10.0) Gecko/20100101 Firefox/10.0";
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36";
 const API_BASE = "https://api.librus.pl/";
-const HANDSHAKE = `${API_BASE}OAuth/Authorization?client_id=46&response_type=code&scope=mydata`;
 const AUTHORIZE = `${API_BASE}OAuth/Authorization?client_id=46`;
-const INDEX_URL = "https://synergia.librus.pl/uczen/index";
+const SYN_BASE = "https://synergia.librus.pl";
+// Wejscie do logowania OD STRONY SYNERGII. Synergia ustawia tu cookie oauth_state i odsyla
+// do api.librus.pl z parametrem `state`. Bez tego kroku api po Grant wraca do Synergii,
+// a ta — nie znajac stanu — odsyla do Portalu LIBRUS i zadna strona ucznia sie nie otwiera.
+const PORTAL_LOGIN = `${SYN_BASE}/loguj/portalRodzina`;
 const TIMETABLE_URL = "https://synergia.librus.pl/przegladaj_plan_lekcji";
 
 // Rate-limit: nie odpytujemy Librusa czesciej niz raz na godzine.
@@ -48,31 +52,49 @@ const structureError = (m: string) => new LibrusError(m, "structure");
 
 /* ------------------------------ HTTP + cookies ------------------------------ */
 
-/** Plaski cookie jar. Deno fetch nie trzyma ciasteczek, a DZIENNIKSID pojawia
- *  sie dopiero w trakcie przekierowan miedzy api.librus.pl a synergia.librus.pl. */
+/** Sloik ciasteczek zgodny ze specyfikacja (Domain, Path, Expires/Max-Age, kasowanie),
+ *  prowadzony PER DOMENA (tough-cookie — to samo, czego uzywa Python `requests`).
+ *  To istotne: api.librus.pl i synergia.librus.pl uzywaja TYCH SAMYCH nazw ciastek
+ *  (DZIENNIKSID, SDZIENNIKSID). Poprzedni plaski sloik (mapa nazwa->wartosc) nadpisywal
+ *  jedno drugim i Synergia dostawala cudza sesje. Zdiagnozowane 2026-09-05. */
 class Jar {
-  private jar = new Map<string, string>();
-  absorb(res: Response) {
+  private jar = new CookieJar();
+  async absorb(res: Response, url: string) {
     for (const raw of res.headers.getSetCookie()) {
-      const pair = raw.split(";")[0];
-      const eq = pair.indexOf("=");
-      if (eq > 0) this.jar.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim());
+      try { await this.jar.setCookie(raw, url, { ignoreError: true }); } catch { /* jedno zle ciastko nie psuje reszty */ }
     }
   }
-  header() {
-    return [...this.jar].map(([k, v]) => `${k}=${v}`).join("; ");
+  header(url: string): Promise<string> {
+    return this.jar.getCookieString(url);
   }
-  get(name: string) {
-    return this.jar.get(name);
+  async get(name: string, url: string): Promise<string | undefined> {
+    const c = (await this.jar.getCookies(url)).find((x) => x.key === name);
+    return c?.value;
   }
 }
 
-/** fetch z recznym sledzeniem przekierowan, zbierajacy cookies na kazdym hopie. */
+/* Naglowki jak przy nawigacji w przegladarce. Centrum autoryzacji Librusa rozroznia
+   zadania "dokumentowe" od innych — z golym naglowkiem Accept bywalo, ze zamiast
+   przekierowania wracala strona HTML. */
+function navHeaders(referer?: string): Record<string, string> {
+  return {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "pl-PL,pl;q=0.9,en;q=0.8",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": referer ? "same-origin" : "none",
+    ...(referer ? { Referer: referer } : {}),
+  };
+}
+
+/** fetch z recznym sledzeniem przekierowan, zbierajacy cookies na kazdym hopie (per domena).
+ *  Naglowki wywolujacego (opts.headers) maja pierwszenstwo przed domyslnymi nawigacyjnymi. */
 async function hop(jar: Jar, url: string, init: RequestInit = {}, max = 10): Promise<Response> {
   let target = url;
   let opts = init;
   for (let i = 0; i <= max; i++) {
-    const cookie = jar.header();
+    const cookie = await jar.header(target);
     const res = await fetch(target, {
       ...opts,
       redirect: "manual",
@@ -80,15 +102,17 @@ async function hop(jar: Jar, url: string, init: RequestInit = {}, max = 10): Pro
       signal: AbortSignal.timeout(REQ_TIMEOUT_MS),
       headers: {
         "User-Agent": UA,
-        ...(opts.headers ?? {}),
+        ...navHeaders(),
+        ...((opts.headers as Record<string, string> | undefined) ?? {}),
         ...(cookie ? { cookie } : {}),
       },
     });
-    jar.absorb(res);
+    await jar.absorb(res, target);
     const loc = res.headers.get("location");
     if (res.status >= 300 && res.status < 400 && loc) {
       target = new URL(loc, target).toString();
-      opts = { method: "GET" }; // po redirectcie gubimy metode i body, jak przegladarka
+      // po redirectcie gubimy metode i body, jak przegladarka; Referer = strona startowa
+      opts = { method: "GET", headers: { Referer: url } };
       continue;
     }
     return res;
@@ -96,15 +120,50 @@ async function hop(jar: Jar, url: string, init: RequestInit = {}, max = 10): Pro
   throw new LibrusError("Zbyt wiele przekierowan z Librusa", "structure");
 }
 
-/* --------------------------------- logowanie -------------------------------- */
+/* --------------------------------- logowanie --------------------------------
+   Przebieg po zmianie uwierzytelniania Librusa (2026-03-28), sprawdzony lokalnie 2026-09-05:
+   1. GET synergia/loguj/portalRodzina BEZ sledzenia -> Location = adres OAuth ze `state`
+      (Synergia ustawia cookie oauth_state);
+   2. lancuch od tego adresu do strony logowania (ustawia sesje po stronie api);
+   3. POST login jako XHR -> {status:"ok", goTo:"/OAuth/Authorization/2FA?..."};
+   4. lancuch od goTo Z JEGO PARAMETRAMI: 2FA -> PerformLogin -> Grant -> synergia/loguj;
+   5. kryterium sukcesu: cookie oauth_token NA synergia.librus.pl — DZIENNIKSID dostaje
+      kazdy anonim, wiec sprawdzanie go (jak wczesniej) zawsze "przechodzilo".
+   Gdy konto ma "wymagany krok" (requiredActions, np. leakedPasswordChangeAdvised — haslo
+   wycieklo), PerformLogin zwraca 200 ze strona zamiast 302 i grantu NIE ma. Krok da sie
+   przejsc tylko w przegladarce — mowimy to uzytkownikowi wprost. */
 
 async function librusLogin(user: string, pass: string): Promise<Jar> {
   const jar = new Jar();
-  await hop(jar, HANDSHAKE);
 
+  // 1) priming — celowo bez sledzenia: potrzebujemy Location i cookie oauth_state
+  const prime = await fetch(PORTAL_LOGIN, {
+    redirect: "manual",
+    signal: AbortSignal.timeout(REQ_TIMEOUT_MS),
+    headers: { "User-Agent": UA, ...navHeaders() },
+  });
+  await jar.absorb(prime, PORTAL_LOGIN);
+  const oauthLoc = prime.headers.get("location");
+  if (!oauthLoc) throw structureError("Synergia nie przekierowala do OAuth (brak Location) — Librus zmienil wejscie");
+  const oauthUrl = new URL(oauthLoc, PORTAL_LOGIN).toString();
+
+  // 2) do strony logowania
+  const loginPage = await hop(jar, oauthUrl, { headers: navHeaders(PORTAL_LOGIN) });
+  const loginPageUrl = loginPage.url || AUTHORIZE;
+
+  // 3) POST logowania — jak XHR wysylany przez skrypt strony logowania
   const res = await hop(jar, AUTHORIZE, {
     method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
+    headers: {
+      "Accept": "*/*",
+      "Origin": API_BASE.replace(/\/$/, ""),
+      "Referer": loginPageUrl,
+      "X-Requested-With": "XMLHttpRequest",
+      "Sec-Fetch-Dest": "empty",
+      "Sec-Fetch-Mode": "cors",
+      "Sec-Fetch-Site": "same-origin",
+      "content-type": "application/x-www-form-urlencoded",
+    },
     body: new URLSearchParams({ action: "login", login: user, pass }),
   });
 
@@ -114,18 +173,38 @@ async function librusLogin(user: string, pass: string): Promise<Jar> {
   } catch {
     throw authError("Librus nie zwrocil JSON-a przy logowaniu (zly login/haslo?)");
   }
-
   if (json.status === "error") {
     const errs = (json.errors as { message?: string }[] | undefined) ?? [];
     throw authError(errs.map((e) => e.message).filter(Boolean).join("; ") || "Blad logowania");
   }
   if (!json.goTo) throw authError("Brak 'goTo' w odpowiedzi Librusa");
 
-  await hop(jar, new URL(String(json.goTo), API_BASE).toString());
-  await hop(jar, INDEX_URL);
+  // 4) lancuch od goTo (z parametrami!) — przy odblokowanym koncie konczy sie na Synergii
+  const fin = await hop(jar, new URL(String(json.goTo), API_BASE).toString(), {
+    headers: navHeaders(loginPageUrl),
+  });
 
-  if (!jar.get("DZIENNIKSID")) throw authError("Nie dostalismy cookie DZIENNIKSID");
-  return jar;
+  // 5) kryterium sukcesu
+  if (await jar.get("oauth_token", `${SYN_BASE}/`)) return jar;
+
+  // Nie ma tokenu: sprawdz, czy Librus zatrzymal nas na "wymaganym kroku"
+  const html = await fin.text().catch(() => "");
+  const m = html.match(/requiredActions\s*=\s*(\[[\s\S]*?\])/);
+  if (m) {
+    let akcje: { code?: string; message?: string }[] = [];
+    try { akcje = JSON.parse(m[1]); } catch { /* nie-JSON — potraktuj jak brak */ }
+    if (akcje.length) {
+      throw new LibrusError(
+        "Librus wymaga dokonczenia kroku w przegladarce: " +
+          akcje.map((a) => a.message || a.code || "?").join("; ") +
+          ". Zaloguj sie na synergia.librus.pl, przejdz ten krok i polacz ponownie.",
+        "konto",
+      );
+    }
+  }
+  throw authError(
+    `Librus nie wydal dostepu do Synergii (koniec na ${new URL(fin.url).hostname}, HTTP ${fin.status})`,
+  );
 }
 
 /* ------------------------------- plan lekcji -------------------------------- */
