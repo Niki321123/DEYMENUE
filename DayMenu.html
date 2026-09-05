@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=129">
+<link rel="manifest" href="/manifest.webmanifest?v=130">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -1167,7 +1167,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=129;
+const DM_BUILD=130;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -7229,11 +7229,12 @@ function librusBladOpis(surowy){
   if(s)console.warn("Librus — pelna tresc bledu:",s);
   const t=s.toLowerCase();
   if(!s)return "";
-  /* „Brak dostępu” to NIE złe hasło — logowanie przechodzi, tylko konto nie ma wstępu
-     na strony ucznia (typowo: użyty login rodzica, bez końcówki „u”). Sklejenie tych
-     dwóch przypadków wysyłało ludzi w kółko po nowe hasło, które nic nie zmieniało. */
+  /* „Brak dostępu” to NIE złe hasło — logowanie przechodzi, ale Librus nie wydaje dostępu
+     do Synergii, bo na koncie wisi krok do przejścia w przeglądarce (requiredActions, np.
+     zmiana hasła po wycieku). Sklejenie tego z „złym hasłem” wysyłało ludzi w kółko po
+     nowe hasło do apki, co nic nie zmieniało — krok trzeba przejść w samym Librusie. */
   if(t.includes("brak dost")||t.includes("widoku ucznia"))
-    return "Librus przyjął logowanie, ale to konto nie ma dostępu do widoku ucznia. Jeśli Twój login nie kończy się na „u”, to konto rodzica — połącz się loginem ucznia.";
+    return "Librus przyjął logowanie, ale nie wydał dostępu do Synergii — zwykle dlatego, że wymaga dokończenia kroku w przeglądarce (np. zmiany hasła, które wyciekło). Zaloguj się na synergia.librus.pl, przejdź ten krok i połącz Librusa ponownie.";
   if(t.includes("token")||t.includes("wygas")||t.includes("401")||t.includes("403")||t.includes("haslo")||t.includes("hasło"))
     return "Librus odrzucił logowanie — najpewniej zmieniło się hasło.";
   if(t.includes("timeout")||t.includes("timed out")||t.includes("etimedout")||t.includes("nie odpowiada")||t.includes("econnrefused")||t.includes("network"))
@@ -7270,14 +7271,16 @@ async function librusConnect(){
       body:JSON.stringify({action:"connect",login,password})});
     const j=await r.json().catch(()=>({}));
     if(j.ok){
-      /* Konto rodzica/opiekuna (login bez końcówki „u") loguje się poprawnie, ale nie ma
-         wstępu na strony ucznia, z których czytamy plan, oceny i frekwencję — Librus
-         odpowiada „Brak dostępu". Do tej pory kończyło się to komunikatem „Połączono ✓"
-         i cichą awarią na zawsze. Zero WSZYSTKIEGO tuż po połączeniu to ten przypadek
-         (sam pusty plan bywa normalny w wakacje, ale nie razem z zerem ocen i lekcji). */
+      /* Logowanie przechodzi, ale Librus NIE wydaje dostępu do Synergii, gdy na koncie wisi
+         „wymagany krok" (requiredActions w OAuth — np. leakedPasswordChangeAdvised: hasło
+         wyciekło, zmień je). Ten krok da się przejść tylko w przeglądarce; nasz serwer go
+         nie widzi i dostaje „Brak dostępu" na każdej stronie. Do build 129 kończyło się to
+         komunikatem „Połączono ✓" i cichą awarią na zawsze. Zero WSZYSTKIEGO tuż po
+         połączeniu to ten przypadek (sam pusty plan bywa normalny w wakacje, ale nie razem
+         z zerem ocen i lekcji). Zdiagnozowane 2026-09-05 zrzutem strony PerformLogin. */
       const nicNiePobrano=!j.units&&!j.exams&&!j.grades&&!j.attendance;
       msg.textContent=nicNiePobrano
-        ? "Połączono, ale Librus nie udostępnił żadnych danych. Jeśli Twój login nie kończy się na „u”, to konto rodzica — rozłącz i połącz się loginem ucznia (np. 1234567u)."
+        ? "Połączono, ale Librus nie udostępnił żadnych danych. Najczęstszy powód: Librus wymaga dokończenia kroku w przeglądarce (np. zmiany hasła, które wyciekło). Zaloguj się na synergia.librus.pl, przejdź ten krok, a potem rozłącz i połącz ponownie — nowym hasłem, jeśli je zmieniłeś."
         : j.units?`Połączono ✓ Pobrano plan (${j.units} lekcji). Harmonogram zaraz się wypełni.`
                  :"Połączono ✓ Plan pobierze się przy najbliższym sprawdzeniu.";
       await librusSyncSchedule(true);
