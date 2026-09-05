@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=130">
+<link rel="manifest" href="/manifest.webmanifest?v=131">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -1167,7 +1167,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=130;
+const DM_BUILD=131;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -7286,11 +7286,16 @@ async function librusConnect(){
       await librusSyncSchedule(true);
       await librusRenderBox();
     }else if(j.error==="librus_auth"){
-      // Konkretny powod z serwera ma pierwszenstwo: konto rodzica wygladalo dotad
-      // jak zle haslo, wiec uzytkownik w kolko wpisywal to samo.
-      msg.textContent=/widoku ucznia|rodzic/i.test(String(j.detail||""))
-        ? "To konto nie ma dostępu do widoku ucznia. Jeśli Twój login nie kończy się na „u”, użyj loginu ucznia (np. 1234567u)."
-        : "Błędny login lub hasło do Librusa.";
+      // Konkretny powod z serwera ma pierwszenstwo. Od 2026-09-05 funkcja rozpoznaje
+      // "wymagany krok" Librusa (requiredActions, np. haslo wycieklo) — to nie jest zle
+      // haslo i wpisywanie go w kolko nic nie da; krok trzeba przejsc w przegladarce.
+      const d=String(j.detail||"");
+      const krok=d.match(/kroku w przegladarce:s*(.+?).s*Zaloguj/);
+      msg.textContent=/wymaga dokonczenia kroku/i.test(d)
+        ? `Librus wymaga dokończenia kroku w przeglądarce${krok?" („"+krok[1]+"”)":""}. Zaloguj się na synergia.librus.pl, przejdź ten krok i połącz ponownie.`
+        : /nie wydal dostepu/i.test(d)
+          ? "Librus przyjął hasło, ale nie wydał dostępu do Synergii. Zaloguj się na synergia.librus.pl w przeglądarce, sprawdź, czy nie czeka tam jakiś krok, i połącz ponownie."
+          : "Błędny login lub hasło do Librusa.";
     }
     else if(j.error==="not_configured"){msg.textContent="Funkcja Librus nie jest jeszcze skonfigurowana na serwerze (brak klucza szyfrowania).";}
     else{msg.textContent="Nie udało się połączyć — spróbuj ponownie.";}
