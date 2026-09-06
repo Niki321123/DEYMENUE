@@ -75,6 +75,28 @@ if (smieci.length) {
   console.error("Usun je i uruchom publikacje ponownie. Nic nie zostalo wyslane.\n");
   process.exit(1);
 }
+
+// Bezpiecznik na android-app/: to tez cale-katalogowe `git add` (nizej), a build 133 tak
+// wciagnal do publicznego repo dwa puste pliki ("Run", "plugins" — artefakty pomylonej komendy
+// w terminalu). Pytamy gita, co NOWEGO i NIEIGNOROWANEGO faktycznie by dodal (nie skanujemy
+// calego dysku — w android-app/ jest node_modules/build, ktore ma byc pominiete przez .gitignore),
+// i sprawdzamy te pliki tymi samymi regulami co docs/.
+const nowePliki = execSync("git status --porcelain --ignored=no -- android-app", { cwd: root })
+  .toString().split("\n")
+  .filter((l) => l.startsWith("?? "))
+  .map((l) => path.join(root, l.slice(3).trim()));
+const smieciAndroid = [];
+for (const p of nowePliki) {
+  if (!fs.existsSync(p) || fs.statSync(p).isDirectory()) continue;
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(path.basename(p)) || fs.statSync(p).size === 0) smieciAndroid.push(p);
+}
+if (smieciAndroid.length) {
+  console.error("\n✖ W android-app/ sa nowe pliki, ktore nie wygladaja na czesc projektu (dziwna nazwa albo 0 bajtow):");
+  smieciAndroid.forEach((p) => console.error("   " + path.relative(root, p)));
+  console.error("Usun je i uruchom publikacje ponownie. Nic nie zostalo wyslane.\n");
+  process.exit(1);
+}
+
 run("git add -u");
 // PROJECT_NOTES.md celowo poza lista: notatki sa lokalne i ignorowane przez gita,
 // a "git add" na ignorowanym pliku przerwalby publikacje bledem.
