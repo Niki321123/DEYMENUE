@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=133">
+<link rel="manifest" href="/manifest.webmanifest?v=134">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -1168,7 +1168,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=133;
+const DM_BUILD=134;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -6030,6 +6030,10 @@ function pktUczestnicy(){
    nagradzałoby nicnierobienie. */
 const PKT_PROG_TYG_MIN=10*60;     // 10 h nauki w tygodniu
 const PKT_PROG_MIES_MIN=40*60;    // proporcjonalny odpowiednik miesięczny
+// Jednorazowy wyjątek: tydzień 31.08-06.09.2026 zaczął się z opóźnieniem (rywalizacja ruszyła
+// 2 dni w niego), więc miał obiektywnie mniej czasu na naukę — na prośbę użytkownika ten
+// KONKRETNY tydzień nie wymaga progu 10h przy remisie. Kolejne tygodnie liczą się normalnie.
+const PKT_PROG_WYJATEK_TYG=new Set(["2026-08-31"]);
 function pktLiderzy(wartosci,minuty,prog){
   const max=Math.max(...wartosci);
   if(!(max>0))return [];
@@ -6043,15 +6047,16 @@ function pktOblicz(){
   const wszystkieDni=rywalDatesFrom(od);
   osoby.forEach(u=>{u.nauka=Math.round(rywalSum(u.days,wszystkieDni,"study_min")/60*10)/10});
   const przyznaj=(okresy,pole,prog,stawka)=>okresy.forEach(o=>{
+    const p=typeof prog==="function"?prog(o):prog;
     const minuty=osoby.map(u=>rywalSum(u.days,o.dni,"study_min"));
-    pktLiderzy(minuty,minuty,prog).forEach(i=>osoby[i][pole]+=stawka);
+    pktLiderzy(minuty,minuty,p).forEach(i=>osoby[i][pole]+=stawka);
     const prod=osoby.map(u=>rywalAvg(u.days,o.dni,"prod_pct"));
-    pktLiderzy(prod,minuty,prog).forEach(i=>osoby[i][pole]+=stawka);
+    pktLiderzy(prod,minuty,p).forEach(i=>osoby[i][pole]+=stawka);
   });
   const tygodnie=pktPelneTygodnie(od),miesiace=pktPelneMiesiace(od);
   // bonusy mają sens tylko wtedy, gdy jest z kim rywalizować — solo nie ma „lepszego"
   if(osoby.length>1){
-    przyznaj(tygodnie,"tyg",PKT_PROG_TYG_MIN,PKT_ZA_TYDZIEN);
+    przyznaj(tygodnie,"tyg",o=>PKT_PROG_WYJATEK_TYG.has(o.dni[0])?0:PKT_PROG_TYG_MIN,PKT_ZA_TYDZIEN);
     przyznaj(miesiace,"mies",PKT_PROG_MIES_MIN,PKT_ZA_MIESIAC);
   }
   rywalBets.filter(b=>b.status==="settled").forEach(b=>{
