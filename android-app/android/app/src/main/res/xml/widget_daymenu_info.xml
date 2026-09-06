@@ -1,14 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 4 kolumny x 3 rzedy (ekran uzytkownika: siatka 4 kolumn, 9 rzedow).
-     minWidth/minHeight wg wzoru 70*n-30 dla starszych Androidow,
-     targetCellWidth/Height dla Androida 12+. -->
+<!-- Jeden widżet o zmiennym rozmiarze; zawartość zależy od przydzielonego pudełka (WidgetSpec):
+     mały = plan na dziś, średni = wykres + plan, duży = wykres + plan + sprawdziany.
+     Domyślnie 4x3 (siatka użytkownika: 4 kolumny x 9 rzędów); minResize blokuje kształty 1x1.
+     previewLayout = podgląd w wyborze widżetów na Androidzie 12+. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="250dp"
     android:minHeight="180dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="110dp"
     android:targetCellWidth="4"
     android:targetCellHeight="3"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
-    android:initialLayout="@layout/widget_daymenu"
+    android:initialLayout="@layout/widget_daymenu_medium"
+    android:previewLayout="@layout/widget_daymenu_preview"
     android:updatePeriodMillis="1800000"
     android:description="@string/widget_description" />

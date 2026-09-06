@@ -64,6 +64,10 @@ Aplikacja aktualizuje warstwę webową sama przy uruchomieniu, więc nowe funkcj
 się bez pobierania nowego APK. Świeży APK jest potrzebny tylko przy zmianach w części
 natywnej: widżet, przypinanie ekranu, ikony, uprawnienia.
 
+Widżet ekranu głównego (od build 132) jest w całości natywny (trzy warianty rozmiaru,
+`WidgetProvider`/`WidgetPlugin`/`WidgetModel` w `android-app/android`) — kto ma starszy APK,
+musi go raz zainstalować ponownie, zanim widżet się pojawi w wyborze widżetów.
+
 ## Budowanie ze źródeł
 
 ```bash

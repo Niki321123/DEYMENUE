@@ -1,132 +1,157 @@
 package pl.user.daymenu;
 
+import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Paint;
-import android.graphics.RectF;
-import android.graphics.Typeface;
+import android.content.res.Configuration;
+import android.os.Build;
+import android.os.Bundle;
+import android.util.Log;
+import android.util.SizeF;
 import android.widget.RemoteViews;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
- * Widżet ekranu głównego (4 kolumny x 3 rzędy): ile godzin nauki zostało dzisiaj
- * + wykres słupkowy produktywności z ostatnich 7 dni (ta sama metryka co linia
- * "Produktywność" w zakładce Analiza czasu: sen 50% + nauka 50%).
+ * Widżet ekranu głównego o zmiennym rozmiarze: mały = plan nauki na dziś, średni = + wykres
+ * produktywności z 7 dni, duży = + najbliższe sprawdziany. Tap w pole otwiera właściwą zakładkę.
  *
- * Dane przychodzą z aplikacji przez WidgetPlugin (SharedPreferences), więc widżet
- * pokazuje stan z ostatniego uruchomienia apki — kliknięcie otwiera aplikację.
- * Wykres rysujemy na bitmapie, bo RemoteViews nie obsługuje własnych widoków.
+ * Dane przychodzą z aplikacji przez WidgetPlugin (SharedPreferences: JSON + czas zapisu), a to,
+ * co zależy od CZASU (który dzień jest „dziś", ile dni do sprawdzianu, przesunięcie słupków),
+ * liczymy tu przy każdym rysowaniu — widżet jest poprawny rano bez otwierania apki. Do tego
+ * służy niedokładny alarm tuż po północy (bez uprawnień) plus updatePeriodMillis co 30 min.
  */
 public class DayMenuWidgetProvider extends AppWidgetProvider {
 
-    /* kolory zgodne z ciemnym motywem aplikacji */
-    private static final int COL_BAR    = 0xFF2D6CDF; // linia "Produktywność" w apce
-    private static final int COL_TODAY  = 0xFFE8743B; // akcent (dzisiejszy słupek)
-    private static final int COL_EMPTY  = 0xFF3A4150; // dzień bez danych
-    private static final int COL_LABEL  = 0xFF9AA3B2;
+    private static final String TAG = "DayMenuWidget";
+    static final String ACTION_MIDNIGHT = "pl.user.daymenu.WIDGET_MIDNIGHT";
+    private static final int RC_MIDNIGHT = 100;
+
+    @Override
+    public void onReceive(Context ctx, Intent intent) {
+        if (intent != null && ACTION_MIDNIGHT.equals(intent.getAction())) {
+            refresh(ctx);   // refresh() uzbraja alarm na kolejną noc
+            return;
+        }
+        super.onReceive(ctx, intent);
+    }
 
     @Override
     public void onUpdate(Context ctx, AppWidgetManager mgr, int[] ids) {
-        for (int id : ids) mgr.updateAppWidget(id, build(ctx));
+        render(ctx, mgr, ids);
+        armMidnight(ctx);
     }
 
-    /** Woła WidgetPlugin po każdym zapisie danych w aplikacji. */
+    /** Launcher zmienił rozmiar → dobierz wariant na nowo. */
+    @Override
+    public void onAppWidgetOptionsChanged(Context ctx, AppWidgetManager mgr, int id, Bundle newOptions) {
+        render(ctx, mgr, new int[]{ id });
+    }
+
+    @Override public void onEnabled(Context ctx) { armMidnight(ctx); }
+    @Override public void onDisabled(Context ctx) { cancelMidnight(ctx); }
+
+    /** Woła WidgetPlugin po każdym zapisie danych w aplikacji i alarm po północy. */
     static void refresh(Context ctx) {
         AppWidgetManager mgr = AppWidgetManager.getInstance(ctx);
+        if (mgr == null) return;
         int[] ids = mgr.getAppWidgetIds(new ComponentName(ctx, DayMenuWidgetProvider.class));
-        if (ids.length > 0) mgr.updateAppWidget(ids, build(ctx));
+        if (ids.length == 0) return;
+        render(ctx, mgr, ids);
+        armMidnight(ctx);
     }
 
-    private static RemoteViews build(Context ctx) {
-        RemoteViews rv = new RemoteViews(ctx.getPackageName(), R.layout.widget_daymenu);
+    private static void render(Context ctx, AppWidgetManager mgr, int[] ids) {
+        WidgetModel model = loadModel(ctx);
+        Calendar now = Calendar.getInstance();
+        for (int id : ids) {
+            try {
+                mgr.updateAppWidget(id, buildFor(ctx, mgr, id, model, now));
+            } catch (Exception e) {
+                // np. przekroczony limit pamięci bitmap w hoście — widżet nie może wywalić apki
+                Log.w(TAG, "updateAppWidget(" + id + ") failed", e);
+            }
+        }
+    }
 
-        String raw = ctx.getSharedPreferences(WidgetPlugin.PREFS, Context.MODE_PRIVATE)
-                .getString(WidgetPlugin.KEY_DATA, "");
+    static WidgetModel loadModel(Context ctx) {
+        android.content.SharedPreferences sp = ctx.getSharedPreferences(WidgetPlugin.PREFS, Context.MODE_PRIVATE);
+        return WidgetModel.parse(sp.getString(WidgetPlugin.KEY_DATA, ""), sp.getLong(WidgetPlugin.KEY_SAVED_AT, 0L),
+                Calendar.getInstance());
+    }
+
+    /**
+     * API 31+: mapa rozmiar→RemoteViews dla wszystkich rozmiarów zgłoszonych przez launcher (pion/poziom),
+     * host sam wybiera pasujący. Starsze: jeden układ z opcji min/max (pion: minW×maxH, poziom: maxW×minH).
+     */
+    private static RemoteViews buildFor(Context ctx, AppWidgetManager mgr, int id, WidgetModel m, Calendar now) {
+        Bundle opts = mgr.getAppWidgetOptions(id);
+        float fontScale = ctx.getResources().getConfiguration().fontScale;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && opts != null) {
+            ArrayList<SizeF> sizes = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                    ? opts.getParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES, SizeF.class)
+                    : opts.getParcelableArrayList(AppWidgetManager.OPTION_APPWIDGET_SIZES);
+            if (sizes != null && !sizes.isEmpty() && sizes.size() <= 16) {
+                Map<SizeF, RemoteViews> map = new HashMap<>();
+                for (SizeF s : sizes) {
+                    int w = Math.round(s.getWidth()), h = Math.round(s.getHeight());
+                    if (w <= 0 || h <= 0) continue;
+                    map.put(s, WidgetRenderer.build(ctx, m, WidgetSpec.forSize(w, h, fontScale), w, h, now));
+                }
+                if (!map.isEmpty()) return new RemoteViews(map);
+            }
+        }
+
+        int minW = 0, maxW = 0, minH = 0, maxH = 0;
+        if (opts != null) {
+            minW = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0);
+            maxW = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 0);
+            minH = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0);
+            maxH = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0);
+        }
+        boolean landscape = ctx.getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+        int w = landscape ? maxW : minW;
+        int h = landscape ? minH : maxH;
+        if (w <= 0 || h <= 0) { w = 250; h = 180; }   // = minWidth/minHeight z widget_daymenu_info.xml
+        return WidgetRenderer.build(ctx, m, WidgetSpec.forSize(w, h, fontScale), w, h, now);
+    }
+
+    // ---- alarm „po północy": przerysuj, żeby „dziś" i odliczanie były aktualne bez otwierania apki ----
+
+    private static PendingIntent midnightIntent(Context ctx) {
+        Intent i = new Intent(ctx, DayMenuWidgetProvider.class).setAction(ACTION_MIDNIGHT);
+        return PendingIntent.getBroadcast(ctx, RC_MIDNIGHT, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    static void armMidnight(Context ctx) {
         try {
-            JSONObject j = new JSONObject(raw);
-            int total = j.optInt("total", 0);
-            int done = j.optInt("done", 0);
-            int left = Math.max(0, total - done);
-            if (total == 0) {
-                rv.setTextViewText(R.id.widget_hours, "0 h");
-                rv.setTextViewText(R.id.widget_sub, "Brak nauki w planie na dziś");
-            } else {
-                rv.setTextViewText(R.id.widget_hours, left + " h");
-                rv.setTextViewText(R.id.widget_sub,
-                        left == 0 ? "Cała nauka na dziś zrobiona (" + done + "/" + total + ") ✓"
-                                  : "nauki do zrobienia dziś · zrobione " + done + "/" + total);
-            }
-            rv.setImageViewBitmap(R.id.widget_chart, chart(j.optJSONArray("days")));
+            AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+            if (am == null) return;
+            Calendar c = Calendar.getInstance();
+            c.add(Calendar.DAY_OF_MONTH, 1);
+            c.set(Calendar.HOUR_OF_DAY, 0); c.set(Calendar.MINUTE, 2);
+            c.set(Calendar.SECOND, 0); c.set(Calendar.MILLISECOND, 0);
+            // niedokładny (bez SCHEDULE_EXACT_ALARM); w Doze może się przesunąć o kilka minut — nie szkodzi
+            am.setAndAllowWhileIdle(AlarmManager.RTC, c.getTimeInMillis(), midnightIntent(ctx));
         } catch (Exception e) {
-            // brak danych (widżet dodany przed pierwszym uruchomieniem apki) lub zły JSON
-            rv.setTextViewText(R.id.widget_hours, "— h");
-            rv.setTextViewText(R.id.widget_sub, "Otwórz Day Menu, aby wczytać dane");
-            rv.setImageViewBitmap(R.id.widget_chart, chart(null));
+            Log.w(TAG, "armMidnight failed", e);
         }
-
-        Intent open = new Intent(ctx, MainActivity.class);
-        rv.setOnClickPendingIntent(R.id.widget_root, PendingIntent.getActivity(
-                ctx, 0, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
-        return rv;
     }
 
-    /** Słupkowy wykres produktywności (7 dni). value -1 = brak danych tego dnia. */
-    private static Bitmap chart(JSONArray days) {
-        final int W = 640, H = 300, LBL = 44, TOP = 34;
-        Bitmap bmp = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888);
-        Canvas c = new Canvas(bmp);
-
-        Paint bar = new Paint(Paint.ANTI_ALIAS_FLAG);
-        Paint txt = new Paint(Paint.ANTI_ALIAS_FLAG);
-        txt.setTextAlign(Paint.Align.CENTER);
-        txt.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
-
-        int n = days == null ? 7 : days.length();
-        if (n == 0) n = 7;
-        float slot = (float) W / n;
-        float bw = slot * 0.56f;
-
-        // skala: co najmniej 100%, ale rośnie gdy któryś dzień przekracza 100
-        float max = 100f;
-        if (days != null) for (int i = 0; i < days.length(); i++) {
-            float v = (float) days.optJSONObject(i).optDouble("v", -1);
-            if (v > max) max = v;
+    static void cancelMidnight(Context ctx) {
+        try {
+            AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+            if (am != null) am.cancel(midnightIntent(ctx));
+        } catch (Exception e) {
+            Log.w(TAG, "cancelMidnight failed", e);
         }
-
-        float chartH = H - LBL - TOP;
-        for (int i = 0; i < n; i++) {
-            float cx = slot * i + slot / 2f;
-            float v = -1; String label = "";
-            if (days != null && i < days.length()) {
-                JSONObject d = days.optJSONObject(i);
-                v = (float) d.optDouble("v", -1);
-                label = d.optString("l", "");
-            }
-            boolean isToday = (i == n - 1);
-            if (v < 0) {
-                // brak danych — niski "pieniek", żeby oś była ciągła
-                bar.setColor(COL_EMPTY);
-                c.drawRoundRect(new RectF(cx - bw / 2, H - LBL - 8, cx + bw / 2, H - LBL), 6, 6, bar);
-            } else {
-                float h = Math.max(8f, v / max * chartH);
-                bar.setColor(isToday ? COL_TODAY : COL_BAR);
-                c.drawRoundRect(new RectF(cx - bw / 2, H - LBL - h, cx + bw / 2, H - LBL), 10, 10, bar);
-                txt.setColor(isToday ? COL_TODAY : COL_LABEL);
-                txt.setTextSize(24);
-                c.drawText(Math.round(v) + "%", cx, H - LBL - h - 10, txt);
-            }
-            txt.setColor(isToday ? 0xFFECEFF4 : COL_LABEL);
-            txt.setTextSize(26);
-            c.drawText(label, cx, H - 12, txt);
-        }
-        return bmp;
     }
 }

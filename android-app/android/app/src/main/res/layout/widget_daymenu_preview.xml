@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PODGLĄD w wyborze widżetów (android:previewLayout, Android 12+): statyczna kopia dużego
+     układu z przykładowymi tekstami. Osobny plik, żeby przykłady nie wyciekły do runtime. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="@drawable/widget_bg" android:padding="12dp">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="@color/widget_accent" android:textSize="28sp" android:textStyle="bold" android:text="@string/widget_pv_hours" />
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp"
+            android:textColor="@color/widget_text_2" android:textSize="12sp" android:maxLines="2" android:text="@string/widget_pv_sub" />
+    </LinearLayout>
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp"
+        android:textColor="@color/widget_text_3" android:textSize="12sp" android:text="@string/widget_pv_school" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp"
+        android:textColor="@color/widget_done" android:textSize="13sp" android:text="@string/widget_pv_row1" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp"
+        android:textColor="@color/widget_text" android:textSize="13sp" android:text="@string/widget_pv_row2" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp"
+        android:textColor="@color/widget_text" android:textSize="13sp" android:text="@string/widget_pv_row3" />
+
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp"
+        android:textColor="@color/widget_text_3" android:textSize="11sp" android:text="@string/widget_chart_title" />
+    <ImageView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="2dp"
+        android:scaleType="fitCenter" android:src="@drawable/widget_chart_preview" android:contentDescription="@string/widget_chart_title" />
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp"
+        android:orientation="vertical" android:background="@drawable/widget_inner_bg" android:padding="10dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="@color/widget_text_3" android:textSize="11sp" android:text="@string/widget_exams_title" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp"
+            android:textColor="@color/widget_text" android:textSize="12sp" android:text="@string/widget_pv_exam1" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp"
+            android:textColor="@color/widget_text" android:textSize="12sp" android:text="@string/widget_pv_exam2" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp"
+            android:textColor="@color/widget_text" android:textSize="12sp" android:text="@string/widget_pv_exam3" />
+    </LinearLayout>
+</LinearLayout>

@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=132">
+<link rel="manifest" href="/manifest.webmanifest?v=133">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -1168,7 +1168,7 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=132;
+const DM_BUILD=133;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -1266,30 +1266,67 @@ function save(){
   widgetQueuePush();
   return true;
 }
-/* ---- widżet Androida: godziny nauki na dziś + produktywność 7 dni ----
-   Działa tylko w apce Capacitor (plugin DayMenuWidget z WidgetPlugin.java);
-   na desktopie/web brak pluginu = funkcja nic nie robi. Dane liczymy tu w JS
-   (te same wzory co w Analizie czasu) i wysyłamy gotowe do natywnego widżetu. */
+/* Ramka auto-aktualizacji (bootCached → <iframe srcdoc>) NIE dostaje mostka Capacitora —
+   Capacitor wstrzykuje window.Capacitor tylko do dokumentu głównego. Ramka jest same-origin,
+   więc pożyczamy obiekt od rodzica; bez tego widżet i przypinanie ekranu milczą u każdego,
+   kto ma starszy APK niż bieżący build HTML. */
+if(!window.Capacitor){try{if(window.parent!==window&&window.parent.Capacitor)window.Capacitor=window.parent.Capacitor}catch(e){}}
+
+/* ---- widżet Androida: plan nauki na dziś + produktywność 7 dni + sprawdziany ----
+   Działa tylko w apce Capacitor (plugin DayMenuWidget z WidgetPlugin.java); na desktopie/web
+   brak pluginu = funkcja nic nie robi. Wysyłamy CAŁY TYDZIEŃ (plan, lekcje, sprawdziany) —
+   natywny widżet sam wybiera „dziś" i liczy „za N dni", więc jest poprawny rano bez otwierania
+   apki. Pola total/done/days zostają jak w v1: starszy APK (sprzed tego buildu) czyta tylko je. */
+const WIDGET_DL=["Pn","Wt","Śr","Cz","Pt","So","Nd"];
+const wCut=(s,n)=>{s=String(s==null?"":s);return s.length>n?s.slice(0,n-1)+"…":s};
+const ymdLocal=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+function widgetPayload(){
+  const m=S.matura,wk=weekId(),dow=(new Date().getDay()+6)%7;
+  // v1 — liczone identycznie jak dawniej (czyta je stary WidgetProvider)
+  const blocks=(m.plan||[]).filter(b=>b.day===dow),done=blocks.filter(b=>b.doneWeek===wk).length;
+  const days=[];
+  for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const ds=ymdLocal(d);const v=pctProd(ds);days.push({l:WIDGET_DL[(d.getDay()+6)%7],v:v==null?-1:Math.round(v),d:ds});}
+  // v2 — plan całego tygodnia (bloki planu + własne aktywności typu nauka z siatki)
+  const plan={},lessons={},school={};
+  for(let d=0;d<7;d++){plan[d]=[];lessons[d]=[];}
+  for(const b of m.plan||[])if(b.day>=0&&b.day<7)plan[b.day].push({h:b.hour,name:wCut(matEntityName(b.topicId)||"Nauka",40),done:b.doneWeek===wk});
+  const actDone=(m.actDone&&m.actDone.week===wk&&m.actDone.cells)||{};
+  for(const k in (m.grid||{})){const a=actOf(m.grid[k]);if(!a||a.kind!=="study")continue;const p=k.split("_"),d=+p[0],h=+p[1];if(d>=0&&d<7)plan[d].push({h,name:wCut(a.name,40),done:!!actDone[k],act:true});}
+  for(let d=0;d<7;d++)plan[d].sort((a,b)=>a.h-b.h);
+  for(const u of m.librusUnits||[]){if(!u||!u.date||!u.from||!u.to)continue;const d=(new Date(u.date+"T00:00:00").getDay()+6)%7;if(lessons[d].length<16)lessons[d].push({from:u.from,to:u.to,name:wCut(u.name||"Lekcja",40)});}
+  for(let d=0;d<7;d++){lessons[d].sort((a,b)=>a.from.localeCompare(b.from));if(lessons[d].length)school[d]={from:lessons[d][0].from,to:lessons[d].reduce((x,l)=>l.to>x?l.to:x,"")};}
+  // sprawdziany (exam!==false, od dziś) + umówione poprawy z S.exams.retakes
+  const t=today(),items=exItems(),byKey={};items.forEach(x=>{byKey[exKey(x)]=x});
+  const exams=items.filter(x=>x.exam&&isYmd(x.date)&&x.date>=t).map(x=>({date:x.date,time:x.time||"",subject:wCut(x.subject||x.type||"Sprawdzian",40),type:wCut(x.type||"Sprawdzian",24)}));
+  for(const k in (S.exams.retakes||{})){const r=S.exams.retakes[k];if(!r||r.done||!isYmd(r.date)||r.date<t)continue;const x=byKey[k];exams.push({date:r.date,time:r.time||"",subject:wCut(x?(x.subject||x.type||"Sprawdzian"):"Poprawa",40),type:"Poprawa",retake:true});}
+  exams.sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+  const mon=new Date();mon.setHours(0,0,0,0);mon.setDate(mon.getDate()-((mon.getDay()+6)%7));
+  return {total:blocks.length,done,days,v:2,updatedAt:Date.now(),weekId:wk,weekStart:ymdLocal(mon),plan,lessons,school,exams:exams.slice(0,10)};
+}
 let widgetPushTimer=null;
 function widgetQueuePush(){clearTimeout(widgetPushTimer);widgetPushTimer=setTimeout(widgetPush,1200)}
 function widgetPush(){
   try{
     const P=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.DayMenuWidget;
     if(!P)return;
-    const dow=(new Date().getDay()+6)%7,wk=weekId();
-    const blocks=S.matura.plan.filter(b=>b.day===dow);
-    const done=blocks.filter(b=>b.doneWeek===wk).length;
-    const DL=["Pn","Wt","Śr","Cz","Pt","So","Nd"];
-    const days=[];
-    for(let i=6;i>=0;i--){
-      const d=new Date();d.setDate(d.getDate()-i);
-      const v=pctProd(d.toISOString().slice(0,10));
-      days.push({l:DL[(d.getDay()+6)%7],v:v==null?-1:Math.round(v)});
-    }
-    P.update({data:JSON.stringify({total:blocks.length,done,days})});
+    const r=P.update({data:JSON.stringify(widgetPayload())});
+    if(r&&r.catch)r.catch(e=>console.error("widgetPush:",e));
   }catch(e){console.error("widgetPush:",e)}
 }
+/* widżet → zakładka: natywna strona wkłada dm_tab w intencję; zimny start czytamy przez
+   getLaunchTab(), ciepły przez zdarzenie launchTab. Stary APK nie ma tych metod → typeof-guard. */
+const WIDGET_TABS={matura:"matura",time:"time",analiza:"time",exams:"exams"};
+function widgetOpenTab(tab){const v=WIDGET_TABS[tab];if(!v)return;try{show(v);menuBoczne(false)}catch(e){console.error("widgetOpenTab:",e)}}
+function widgetLaunchTabInit(){
+  try{
+    const P=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.DayMenuWidget;
+    if(!P)return;
+    if(typeof P.getLaunchTab==="function")P.getLaunchTab().then(r=>{if(r&&r.tab)widgetOpenTab(r.tab)}).catch(e=>console.error("getLaunchTab:",e));
+    if(typeof P.addListener==="function")P.addListener("launchTab",r=>{if(r&&r.tab)widgetOpenTab(r.tab)});
+  }catch(e){console.error("widgetLaunchTabInit:",e)}
+}
 setTimeout(widgetPush,3500); // stan na start (gdy user nic nie zmienia, widżet i tak dostaje świeże dane)
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)widgetQueuePush()}); // wyrównanie słupka „dziś" po zmianie doby
 const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -5272,6 +5309,7 @@ function applyCloud(row,goAccount){
   localStorage.setItem(KEY,JSON.stringify(S));
   setDataOwner(sbUserId());
   matMigrate();matRecompute();
+  widgetQueuePush();   // pobranie z chmury omija save() → widżet inaczej nie dostałby świeżych danych
   applyTheme();renderDash();przerysujAktywny();
   if(goAccount)show("account");
 }
@@ -5289,6 +5327,7 @@ function resetLocalData(){
   S=kopiaDefaults();
   matMigrate();matRecompute();
   localStorage.setItem(KEY,JSON.stringify(S));
+  widgetQueuePush();   // wylogowanie ma wyczyścić widżet, nie zostawić planu poprzedniego konta
   applyTheme();renderDash();
   przerysujAktywny();   // bez tego otwarta zakladka pokazuje dane poprzedniego konta do czasu przelaczenia
 }
@@ -7500,6 +7539,7 @@ function allDates(){
 renderDash();
 /* showLogin() usuniete razem z lokalnym logowaniem */
 if(pendingAccountView)show("account");
+widgetLaunchTabInit();   // otwarcie z widżetu → od razu właściwa zakładka (po ustawieniu DOM i renderDash)
 </script>
 </body>
 </html>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Motyw CIEMNY (te same wartości co [data-theme="dark"] w aplikacji). -->
+<resources>
+    <color name="widget_bg">#F21B1F27</color>
+    <color name="widget_surface">#FF262A35</color>
+    <color name="widget_text">#FFECEFF4</color>
+    <color name="widget_text_2">#FFA7AEBA</color>
+    <color name="widget_text_3">#FF868F9E</color>
+    <color name="widget_accent">#FFF08C57</color>
+    <color name="widget_bar">#FF4A80D4</color>
+    <color name="widget_bar_empty">#FF3A4150</color>
+    <color name="widget_done">#FF8A93A3</color>
+</resources>

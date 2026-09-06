@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Przykładowy wykres 7 słupków do PODGLĄDU w wyborze widżetów (widget_daymenu_preview.xml).
+     Ostatni słupek w kolorze akcentu = „dziś". Runtime rysuje prawdziwy wykres bitmapą. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="280dp" android:height="96dp" android:viewportWidth="280" android:viewportHeight="96">
+    <path android:fillColor="@color/widget_bar" android:pathData="M6,56 h28 v40 h-28 z" />
+    <path android:fillColor="@color/widget_bar" android:pathData="M46,40 h28 v56 h-28 z" />
+    <path android:fillColor="@color/widget_bar" android:pathData="M86,64 h28 v32 h-28 z" />
+    <path android:fillColor="@color/widget_bar" android:pathData="M126,28 h28 v68 h-28 z" />
+    <path android:fillColor="@color/widget_bar" android:pathData="M166,48 h28 v48 h-28 z" />
+    <path android:fillColor="@color/widget_bar" android:pathData="M206,20 h28 v76 h-28 z" />
+    <path android:fillColor="@color/widget_accent" android:pathData="M246,36 h28 v60 h-28 z" />
+</vector>

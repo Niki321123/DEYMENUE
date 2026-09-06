@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Kolory widżetu — motyw JASNY (paleta z tokenów CSS aplikacji). Wariant ciemny w values-night,
+     a Material You (Android 12+) w values-v31 / values-night-v31. Host przemalowuje widok przy
+     zmianie trybu, bo wszystkie odwołania idą przez @color. -->
+<resources>
+    <color name="widget_bg">#F2FFFFFF</color>
+    <color name="widget_surface">#FFEEF0F4</color>
+    <color name="widget_text">#FF1B1F27</color>
+    <color name="widget_text_2">#FF5B6472</color>
+    <color name="widget_text_3">#FF6B7280</color>
+    <color name="widget_accent">#FFC85A24</color>
+    <color name="widget_bar">#FF2D6CDF</color>
+    <color name="widget_bar_empty">#FFD5D9E0</color>
+    <color name="widget_done">#FF8A93A3</color>
+</resources>

@@ -27,7 +27,7 @@
         <receiver
             android:name=".DayMenuWidgetProvider"
             android:exported="true"
-            android:label="Day Menu — nauka i produktywność">
+            android:label="@string/widget_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

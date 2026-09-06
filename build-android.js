@@ -10,6 +10,25 @@ const www = path.join(root, "android-app", "www");
 fs.mkdirSync(www, { recursive: true });
 fs.copyFileSync(path.join(root, "DayMenu.html"), path.join(www, "index.html"));
 
+// 1b) versionCode/versionName APK = DM_BUILD z HTML. Android pozwala zainstalowac APK "po" starym
+// tylko gdy versionCode nie maleje (i ten sam applicationId + ten sam klucz podpisu), a na sztywno
+// wpisane 1/"1.0" nie mowilo tez, ktora wersja natywna siedzi na telefonie. publish.js podbija
+// DM_BUILD PRZED tym skryptem, wiec numer w APK zawsze zgadza sie z numerem HTML w srodku.
+const html = fs.readFileSync(path.join(root, "DayMenu.html"), "utf8");
+const mb = html.match(/const DM_BUILD=(\d+);/);
+if (!mb) { console.error("Nie znaleziono DM_BUILD w DayMenu.html"); process.exit(1); }
+const build = Number(mb[1]);
+const gradleFile = path.join(root, "android-app", "android", "app", "build.gradle");
+let gradle = fs.readFileSync(gradleFile, "utf8");
+const gradle2 = gradle
+  .replace(/^(\s*)versionCode \d+\s*$/m, `$1versionCode ${build}`)
+  .replace(/^(\s*)versionName "[^"]*"\s*$/m, `$1versionName "1.${build}"`);
+if (!/versionCode \d+/.test(gradle2) || !/versionName "1\.\d+"/.test(gradle2)) {
+  console.error("Nie udalo sie ustawic versionCode/versionName w app/build.gradle"); process.exit(1);
+}
+if (gradle2 !== gradle) fs.writeFileSync(gradleFile, gradle2);
+console.log(`APK versionCode=${build} versionName=1.${build}`);
+
 // 2) synchronizacja Capacitora i budowa APK
 const sdkDir = path.join(process.env.LOCALAPPDATA, "Android", "Sdk");
 const env = { ...process.env, ANDROID_HOME: sdkDir };

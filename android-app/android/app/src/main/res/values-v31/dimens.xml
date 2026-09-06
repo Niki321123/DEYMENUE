@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ ma własny promień tła widżetu — używamy go, żeby rogi zgadzały się z resztą
+     ekranu głównego. Wewnętrzny promień dla kart w środku widżetu. -->
+<resources>
+    <dimen name="widget_corner_radius">@android:dimen/system_app_widget_background_radius</dimen>
+    <dimen name="widget_inner_radius">@android:dimen/system_app_widget_inner_radius</dimen>
+</resources>

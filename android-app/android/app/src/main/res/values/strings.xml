@@ -4,5 +4,22 @@
     <string name="title_activity_main">Day Menu</string>
     <string name="package_name">pl.user.daymenu</string>
     <string name="custom_url_scheme">pl.user.daymenu</string>
-    <string name="widget_description">Godziny nauki na dziś i wykres produktywności z 7 dni</string>
+
+    <!-- Widżet ekranu głównego -->
+    <string name="widget_label">Day Menu — plan nauki</string>
+    <string name="widget_description">Plan nauki na dziś, produktywność z 7 dni i najbliższe sprawdziany. Powiększ, aby zobaczyć więcej.</string>
+    <string name="widget_chart_title">Produktywność — 7 dni</string>
+    <string name="widget_exams_title">Sprawdziany</string>
+    <string name="widget_exams_empty">Brak zapowiedzianych sprawdzianów</string>
+
+    <!-- Teksty przykładowe TYLKO do podglądu w wyborze widżetów (widget_daymenu_preview.xml) -->
+    <string name="widget_pv_hours">2 h</string>
+    <string name="widget_pv_sub">Do zrobienia · zrobione 1/3</string>
+    <string name="widget_pv_school">Szkoła 8:00–14:35 · 7 lekcji</string>
+    <string name="widget_pv_row1">16:00  Matematyka</string>
+    <string name="widget_pv_row2">17:00  Fizyka</string>
+    <string name="widget_pv_row3">19:00  Angielski</string>
+    <string name="widget_pv_exam1">Matematyka · Sprawdzian · za 3 dni</string>
+    <string name="widget_pv_exam2">Fizyka · Kartkówka · jutro</string>
+    <string name="widget_pv_exam3">Polski · Sprawdzian · za 9 dni</string>
 </resources>

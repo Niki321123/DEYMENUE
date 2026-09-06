@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MAŁY: tylko plan nauki na dziś. Wszystkie 6 wierszy planu są w każdym układzie (renderer
+     chowa nadmiar) — dzięki temu WidgetRenderer nigdy nie dotyka nieistniejącego id. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="@drawable/widget_bg" android:padding="12dp">
+
+    <LinearLayout android:id="@+id/widget_plan_box"
+        android:layout_width="match_parent" android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical">
+            <TextView android:id="@+id/widget_hours" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="@color/widget_accent" android:textSize="24sp" android:textStyle="bold" android:text="— h" />
+            <TextView android:id="@+id/widget_sub" android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:layout_marginStart="8dp" android:textColor="@color/widget_text_2"
+                android:textSize="12sp" android:maxLines="2" android:ellipsize="end" android:text="" />
+        </LinearLayout>
+
+        <TextView android:id="@+id/widget_school" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="2dp" android:textColor="@color/widget_text_3" android:textSize="12sp"
+            android:maxLines="1" android:ellipsize="end" android:visibility="gone" android:text="" />
+
+        <TextView android:id="@+id/widget_plan_0" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:textColor="@color/widget_text" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+        <TextView android:id="@+id/widget_plan_1" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="@color/widget_text" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+        <TextView android:id="@+id/widget_plan_2" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="@color/widget_text" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+        <TextView android:id="@+id/widget_plan_3" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="@color/widget_text" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+        <TextView android:id="@+id/widget_plan_4" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="@color/widget_text" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+        <TextView android:id="@+id/widget_plan_5" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="@color/widget_text" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+        <TextView android:id="@+id/widget_plan_more" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="@color/widget_text_3" android:textSize="12sp" android:maxLines="1" android:visibility="gone" />
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DUŻY: wykres produktywności + plan na dziś + najbliższe sprawdziany. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="@drawable/widget_bg" android:padding="12dp">
+
+    <LinearLayout android:id="@+id/widget_plan_box"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical">
+            <TextView android:id="@+id/widget_hours" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="@color/widget_accent" android:textSize="28sp" android:textStyle="bold" android:text="— h" />
+            <TextView android:id="@+id/widget_sub" android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:layout_marginStart="10dp" android:textColor="@color/widget_text_2"
+                android:textSize="12sp" android:maxLines="2" android:ellipsize="end" android:text="" />
+        </LinearLayout>
+
+        <TextView android:id="@+id/widget_school" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="2dp" android:textColor="@color/widget_text_3" android:textSize="12sp"
+            android:maxLines="1" android:ellipsize="end" android:visibility="gone" android:text="" />
+
+        <TextView android:id="@+id/widget_plan_0" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:textColor="@color/widget_text" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+        <TextView android:id="@+id/widget_plan_1" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="@color/widget_text" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+        <TextView android:id="@+id/widget_plan_2" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="@color/widget_text" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+        <TextView android:id="@+id/widget_plan_3" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="@color/widget_text" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+        <TextView android:id="@+id/widget_plan_4" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="@color/widget_text" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+        <TextView android:id="@+id/widget_plan_5" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="@color/widget_text" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+        <TextView android:id="@+id/widget_plan_more" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="@color/widget_text_3" android:textSize="12sp" android:maxLines="1" android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout android:id="@+id/widget_chart_box"
+        android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+        android:layout_marginTop="6dp" android:orientation="vertical">
+        <TextView android:id="@+id/widget_chart_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="@color/widget_text_3" android:textSize="11sp" android:text="@string/widget_chart_title" />
+        <ImageView android:id="@+id/widget_chart" android:layout_width="match_parent" android:layout_height="0dp"
+            android:layout_weight="1" android:layout_marginTop="2dp" android:minHeight="40dp"
+            android:scaleType="fitCenter" android:contentDescription="@string/widget_chart_title" />
+    </LinearLayout>
+
+    <LinearLayout android:id="@+id/widget_exams_box"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:orientation="vertical"
+        android:background="@drawable/widget_inner_bg" android:padding="10dp">
+        <TextView android:id="@+id/widget_exams_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="@color/widget_text_3" android:textSize="11sp" android:text="@string/widget_exams_title" />
+        <TextView android:id="@+id/widget_exam_0" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:textColor="@color/widget_text" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+        <TextView android:id="@+id/widget_exam_1" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textColor="@color/widget_text" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+        <TextView android:id="@+id/widget_exam_2" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textColor="@color/widget_text" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone" />
+        <TextView android:id="@+id/widget_exams_empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:textColor="@color/widget_text_3" android:textSize="12sp" android:text="@string/widget_exams_empty" android:visibility="gone" />
+    </LinearLayout>
+</LinearLayout>
