@@ -400,6 +400,11 @@ body.has-bg .list-item{background:color-mix(in srgb,var(--surface) 80%,transpare
    MathML (wygenerowany raz przez Temml), więc renderują się bez sieci i bez biblioteki:
    aplikacja ma działać offline, a doładowywanie MathJaksa z CDN by to psuło. */
 .wz-doc{max-width:900px}
+/* Dokument ma ~170 000 px wysokosci i 1000+ wzorow MathML. Bez tego przegladarka
+   liczy uklad i maluje calosc naraz przy otwarciu — content-visibility ogranicza to
+   do okolic ekranu. contain-intrinsic-size trzyma sensowny pasek przewijania. */
+.wz-doc section{content-visibility:auto;contain-intrinsic-size:auto 1400px}
+.wz-wz{content-visibility:auto;contain-intrinsic-size:auto 260px}
 .wz-doc section{padding-top:var(--sp-6);scroll-margin-top:var(--sp-3)}
 .wz-doc section:first-of-type{padding-top:var(--sp-4)}
 .wz-sec-head{border-bottom:2px solid var(--text);padding-bottom:var(--sp-2)}
@@ -1233,6 +1238,8 @@ body {
   <p class="sub">Wszystkie wzory z maturalnej karty CKE (strony 16–20), rozpisane symbol po symbolu — co znaczy każde oznaczenie, kiedy wolno wzoru użyć i gdzie najłatwiej stracić punkty. Dział 00 tłumaczy sam zapis: sumy, wektory, delty i litery greckie.</p>
   <div class="wz-doc">
     <nav class="wz-spis" id="wzorySpis"></nav>
+    <div id="wzoryTresc"></div>
+    <template id="wzoryZrodlo">
 <section id="wzd-notacja">
   <div class="wz-sec-head"><p class="wz-eyebrow">Dział 00 · jak czytać wzór</p><h2>Znaki i oznaczenia</h2></div>
   <p class="wz-sec-note">Zanim zaczniesz podstawiać liczby, musisz umieć przeczytać sam zapis. Te znaki wracają w każdym dziale i karta CKE nigdzie ich nie tłumaczy — zakłada, że je znasz. Tu masz je wszystkie w jednym miejscu.</p>
@@ -3716,6 +3723,7 @@ body {
   </article>
 </section>
     <p class="muted" style="margin-top:var(--sp-6);padding-top:var(--sp-4);border-top:1px solid var(--border)">Źródło wzorów: Centralna Komisja Egzaminacyjna, „Wybrane wzory i stałe fizykochemiczne na egzamin maturalny z biologii, chemii i fizyki” (wydanie 2023), strony 16–20. Opisy oznaczeń i komentarze są dodane poza kartą — sama karta zawiera wyłącznie wzory.</p>
+    </template>
   </div>
 </section>
 
@@ -4283,7 +4291,7 @@ $("#themeBtn").onclick=()=>{
 applyTheme();loadBg();
 
 /* ================= NAV ================= */
-const renderers={wzory:wzorySpisBuild,dash:renderDash,mood:renderMood,goals:renderGoals,books:renderBooks,time:renderTime,sleep:renderSleep,look:renderLook,habits:renderHabits,account:renderAccount,matura:renderMatura,exams:renderExams,wymagania:renderWymagania,mats:renderMats,frekwencja:renderFrekwencja,rywal:renderRywal,profil:renderProfil};
+const renderers={wzory:wzoryWidokBuild,dash:renderDash,mood:renderMood,goals:renderGoals,books:renderBooks,time:renderTime,sleep:renderSleep,look:renderLook,habits:renderHabits,account:renderAccount,matura:renderMatura,exams:renderExams,wymagania:renderWymagania,mats:renderMats,frekwencja:renderFrekwencja,rywal:renderRywal,profil:renderProfil};
 /* Panel boczny na telefonie. Na desktopie te reguły CSS nie działają, więc klasa
    "sidebar-open" nic tam nie zmienia — logika może być wspólna. */
 function menuBoczne(otwarty){
@@ -7462,8 +7470,17 @@ function wzoryKarta(){
   </div>`:"";
   if(wzoryDostep)$("#wzoryOpen").onclick=wzoryOtworz;
 }
-// spis działów na górze karty — budowany z nagłówków, żeby nie dublować listy w dwóch miejscach
-function wzorySpisBuild(){
+/* Tresc karty lezy w <template>, wiec przy starcie aplikacji nie ma jej w drzewie
+   renderowania — inaczej 11 tys. elementow kosztowaloby kazdego uzytkownika, takze tych,
+   ktorzy karty nie widza. Klonujemy ja raz, przy pierwszym otwarciu widoku, i od razu
+   zwalniamy szablon. Spis dzialow budujemy z naglowkow, zeby nie dublowac listy. */
+function wzoryWidokBuild(){
+  const cel=$("#wzoryTresc"),zrodlo=$("#wzoryZrodlo");
+  if(cel&&zrodlo&&!cel.dataset.gotowy){
+    cel.appendChild(zrodlo.content.cloneNode(true));
+    cel.dataset.gotowy="1";
+    zrodlo.remove();
+  }
   const nav=$("#wzorySpis");if(!nav||nav.dataset.gotowy)return;
   nav.innerHTML=$$("#view-wzory .wz-doc section").map(s=>{
     const h=s.querySelector("h2");
