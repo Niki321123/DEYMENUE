@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=140">
+<link rel="manifest" href="/manifest.webmanifest?v=141">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -854,6 +854,7 @@ body {
   <div class="nav-group"><h3>Produktywność</h3>
     <button class="nav-btn" data-view="rywal">Rywalizacja</button>
     <button class="nav-btn" data-view="time">Analiza czasu</button>
+    <button class="nav-btn" data-view="asystent" data-ai-only hidden>Asystent AI</button>
   </div>
   <div class="nav-group"><h3>Ustawienia</h3>
     <button class="nav-btn" data-view="profil">Profil</button>
@@ -3985,6 +3986,25 @@ body {
   </div>
 </section>
 
+<!-- ============ ASYSTENT AI ============ -->
+<section class="view" id="view-asystent">
+  <h1>Asystent AI</h1>
+  <p class="sub">Czat z AI, które zna tę aplikację i widzi Twoje dane: naukę, sen, produktywność, plan,
+    sprawdziany, materiały, frekwencję i całą rywalizację ze znajomym. Pytaj o wnioski, nie o same liczby —
+    np. „kiedy uczę się najskuteczniej?", „dlaczego przegrywam ten tydzień?", „co poprawić przed maturą?".</p>
+  <div class="card">
+    <div class="chat-log" id="asChatLog"></div>
+    <div class="row">
+      <input type="text" id="asChatInput" class="field" placeholder="Zapytaj o swoje dane…">
+      <button class="btn" id="asChatSend">Wyślij</button>
+    </div>
+    <div class="row" style="justify-content:space-between;align-items:center;margin-top:var(--sp-3)">
+      <span class="muted" style="font-size:var(--fs-1)" id="asChatInfo"></span>
+      <button class="btn small ghost" id="asChatClear">Wyczyść rozmowę</button>
+    </div>
+  </div>
+</section>
+
 <!-- ============ WYGLĄD ============ -->
 <!-- ============ PROFIL ============ -->
 <section class="view" id="view-profil">
@@ -4112,7 +4132,7 @@ body {
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=140;
+const DM_BUILD=141;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -4341,7 +4361,7 @@ $("#themeBtn").onclick=()=>{
 applyTheme();loadBg();
 
 /* ================= NAV ================= */
-const renderers={wzory:wzoryWidokBuild,dash:renderDash,mood:renderMood,goals:renderGoals,books:renderBooks,time:renderTime,sleep:renderSleep,look:renderLook,habits:renderHabits,account:renderAccount,matura:renderMatura,exams:renderExams,wymagania:renderWymagania,mats:renderMats,frekwencja:renderFrekwencja,rywal:renderRywal,profil:renderProfil};
+const renderers={wzory:wzoryWidokBuild,dash:renderDash,mood:renderMood,goals:renderGoals,books:renderBooks,time:renderTime,sleep:renderSleep,look:renderLook,habits:renderHabits,account:renderAccount,matura:renderMatura,exams:renderExams,wymagania:renderWymagania,mats:renderMats,frekwencja:renderFrekwencja,rywal:renderRywal,profil:renderProfil,asystent:renderAsystent};
 /* Panel boczny na telefonie. Na desktopie te reguły CSS nie działają, więc klasa
    "sidebar-open" nic tam nie zmienia — logika może być wspólna. */
 function menuBoczne(otwarty){
@@ -4367,7 +4387,7 @@ function show(v){
   // od rana) — checkAiAccess() normalnie leci tylko przy logowaniu, więc tutaj
   // doświeżamy go przy każdym wejściu w zakładkę korzystającą z AI, żeby nowo
   // nadany dostęp pojawił się bez konieczności wylogowania.
-  if((v==="books"||v==="matura"||v==="wymagania")&&typeof checkAiAccess==="function")checkAiAccess().then(()=>renderers[v]&&renderers[v]());
+  if((v==="books"||v==="matura"||v==="wymagania"||v==="asystent")&&typeof checkAiAccess==="function")checkAiAccess().then(()=>renderers[v]&&renderers[v]());
   // dostep bywa kupiony w trakcie dzialania apki — odswiezamy przy kazdym wejsciu
   if(PAY_WIDOKI[v]&&typeof sprawdzOplate==="function")sprawdzOplate();
   renderers[v]&&renderers[v]();
@@ -8787,6 +8807,126 @@ async function payDopytaj(){
 }
 window.addEventListener("focus",()=>{if(payOczekuje)payDopytaj()});
 
+/* ================= ASYSTENT AI =================
+   Czat, który zna aplikację i widzi WSZYSTKIE dane: własne i rywalizacji. Kontekst budujemy
+   jako AGREGATY (dzienne serie + podsumowania), nie surowe tablice — inaczej przy dłuższej
+   historii prompt puchnie, a Haiku i tak nie potrzebuje każdego rekordu z osobna.
+   Kontekst idzie w "system" przy KAŻDEJ wiadomości, bo dane zmieniają się w trakcie rozmowy
+   (odhaczona sesja, nowy wpis snu), a model nie ma pamięci między wywołaniami. */
+const AS_OPIS_APKI=`Day Menu to osobisty panel ucznia przygotowującego się do matury 2027. Zakładki: Pulpit, Nawyki, Licznik snu, Cele, Nauka (harmonogram tygodnia + pomodoro + przedmioty z priorytetami procentowymi), Sprawdziany, Materiały (spis materiałów z odhaczaniem zadań), Frekwencja (obecności i oceny z Librusa), Rywalizacja (porównanie ze znajomym, punkty, zakłady, sklep z nagrodami, czat), Analiza czasu (wykres produktywności), Profil, Wygląd, Konto.
+ZASADY LICZENIA, których musisz się trzymać:
+- Produktywność dnia = średnia z dwóch połówek: sen 50% i nauka 50%. Nauka: 3 h = 100% (6 h = 200%). Sen: tabela procentów, 8-9 h = 100%, mniej spada (6 h = 60%, 5 h = 40%), powyżej 10 h spada o 10% za każdą godzinę.
+- Punkty w rywalizacji: 1 godzina nauki = 1 pkt. Za każdy ZAKOŃCZONY tydzień (pon-nd) i każdy zakończony miesiąc jest do zdobycia po 5 pkt: 2,5 pkt za więcej godzin i 2,5 pkt za wyższą średnią produktywność. Bieżący, trwający okres jeszcze się nie liczy. Przy remisie punkty dostają obaj, ale tylko jeśli każdy przekroczył próg (10 h w tygodniu, 40 h w miesiącu). Do tego wygrane zakłady (1-7 pkt, przy remisie pula dzieli się po połowie). Korona idzie za punkty ZDOBYTE, zakupy w sklepie jej nie zabierają.
+- Blok w harmonogramie to godzina zegarowa startu, a realna nauka w bloku to długość sesji pomodoro (pole pomoWorkMin), nie zawsze 60 minut.
+JAK ODPOWIADASZ: po polsku, zwięźle, konkretnie. Opierasz się WYŁĄCZNIE na danych z kontekstu — nie zmyślasz liczb ani wydarzeń. Gdy czegoś w danych nie ma, mów wprost, że tego nie widzisz, i powiedz, co użytkownik musiałby zapisywać, żeby odpowiedź była możliwa. Nie wypisujesz surowych tabel, tylko wnioski z liczbami na poparcie. Nie doradzasz w sprawach zdrowia poza oczywistą higieną snu i nauki. Zwracasz zwykły tekst, bez markdown i bez JSON.`;
+function asSeria(dni){
+  return dni.map(ds=>{
+    const sl=slOf(ds),p=pctProd(ds);
+    return{d:ds,min:Math.round(studyHours(ds)*60),senH:sl?Math.round(sleepMin(sl)/60*10)/10:null,
+      prod:p==null?null:Math.round(p),pomo:(S.forest||[]).filter(t=>t.date===ds&&t.status==="alive").length};
+  });
+}
+function asSrednia(tab){const n=tab.filter(x=>x!=null);return n.length?Math.round(n.reduce((a,x)=>a+x,0)/n.length*10)/10:null}
+function asystentKontekst(){
+  const dni30=rywalDates(30),dzis=today();
+  const moja=asSeria(dni30);
+  const przedmioty=(S.matura.topics||[]).map(t=>({nazwa:t.name,procent:t.percent||0}));
+  const planPoPrzedmiocie={};
+  (S.matura.plan||[]).forEach(b=>{
+    const t=(S.matura.topics||[]).find(x=>x.id===b.topicId);
+    const k=t?t.name:"(bez przedmiotu)";planPoPrzedmiocie[k]=(planPoPrzedmiocie[k]||0)+1;
+  });
+  const sprawdziany=exItems().filter(e=>e.exam).map(e=>({data:e.date,przedmiot:e.subject,typ:e.type,zaDni:exDaysTo(e.date)}))
+    .filter(e=>e.zaDni==null||e.zaDni>=-7).sort((a,b)=>String(a.data).localeCompare(String(b.data))).slice(0,12);
+  const freq=S.matura.attendanceFreq||{};
+  const frekwencja=Object.keys(freq).map(s=>({przedmiot:s,obecnosci:freq[s].present||0,nieobecnosci:freq[s].absent||0,
+    procent:frekPct(freq[s])})).sort((a,b)=>(a.procent||0)-(b.procent||0));
+  const materialy=(typeof matsList==="function"?matsList():[]).map(m=>({przedmiot:m.subject,nazwa:m.name,
+    zrobione:(m.done||[]).length,zadan:(m.tasks||[]).length}));
+  const nawyki=(S.habits||[]).map(h=>({nazwa:h.name,zrobioneW30dniach:dni30.filter(ds=>h.days&&h.days[ds]).length}));
+  const ctx={
+    dzis,godzina:new Date().getHours(),
+    ja:{imie:(rywalProfile&&rywalProfile.name)||"użytkownik"},
+    nauka:{
+      ostatnie30dni:moja,
+      sredniaMinNaDzien:asSrednia(moja.map(x=>x.min)),
+      sredniProcentProduktywnosci:asSrednia(moja.map(x=>x.prod)),
+      sredniSenH:asSrednia(moja.map(x=>x.senH)),
+      dniBezZapisanegoSnu:moja.filter(x=>x.senH==null).length,
+      lacznieSesjiWHistorii:(S.matura.sessions||[]).length,
+      przedmioty,pomoWorkMin:(S.matura.pomo&&S.matura.pomo.work)||60,
+      blokowWPlanieTygodnia:(S.matura.plan||[]).length,planPoPrzedmiocie,
+      preferencjeDoPlanu:S.matura.prefs||null
+    },
+    sprawdziany,frekwencja,
+    sredniaOcen:(typeof gradeAvg==="function"&&typeof gradeScope==="function")?gradeAvg(gradeScope()):null,
+    materialy,nawyki,cele:S.goals||[]
+  };
+  // Rywalizacja: punkty liczy ta sama funkcja co zakładka, więc model widzi dokładnie to, co użytkownik.
+  try{
+    if(rywalFriends&&rywalFriends.length){
+      const w=pktOblicz();
+      ctx.rywalizacja={
+        startRywalizacji:w.od,rozliczoneTygodnie:w.tygodni,rozliczoneMiesiace:w.miesiecy,
+        gracze:w.osoby.map(u=>({imie:u.name,toJa:!!u.me,punktyRazem:u.razem,zNauki:u.nauka,
+          zTygodni:u.tyg,zMiesiecy:u.mies,zZakladow:u.zaklady,wydaneWSklepie:u.wydane,saldo:u.saldo})),
+        ostatnie30dni:[{imie:"ja",dane:moja.map(x=>({d:x.d,min:x.min,prod:x.prod}))}].concat(
+          rywalFriends.map(f=>({imie:f.name,dane:dni30.map(ds=>({d:ds,
+            min:(f.days&&f.days[ds]&&f.days[ds].study_min)||0,
+            prod:(f.days&&f.days[ds]&&f.days[ds].prod_pct)!=null?f.days[ds].prod_pct:null}))}))),
+        zaklady:(rywalBets||[]).map(b=>({opis:b.opis,stawka:b.stawka,status:b.status,
+          remis:!!b.split,wygral:b.winner_id?betNazwa(b.winner_id):null})),
+        sklep:(shopItems||[]).map(i=>({nazwa:i.name||i.nazwa,cena:i.cena||i.price}))
+      };
+    }else ctx.rywalizacja=null;
+  }catch(e){ctx.rywalizacja=null}
+  return ctx;
+}
+let asChat=[];
+$("#asChatSend").onclick=()=>asChatWyslij();
+$("#asChatInput").onkeydown=e=>{if(e.key==="Enter")asChatWyslij()};
+$("#asChatClear").onclick=()=>{asChat=[];asChatRender()};
+function asChatRender(){
+  const log=$("#asChatLog");
+  log.innerHTML=asChat.length
+    ? asChat.map(m=>`<div class="chat-msg ${m.role==="user"?"me":"ai"}">${esc(m.text)}</div>`).join("")
+    : `<div class="empty">Zacznij rozmowę — AI ma już wgląd w Twoje dane i w rywalizację.</div>`;
+  log.scrollTop=1e9;
+}
+function renderAsystent(){
+  asChatRender();
+  const k=asystentKontekst();
+  const ileSpr=`${k.sprawdziany.length} ${matsPlural(k.sprawdziany.length,"sprawdzian","sprawdziany","sprawdzianów")}`;
+  $("#asChatInfo").textContent=k.rywalizacja
+    ? `Widzi: ${k.nauka.ostatnie30dni.length} dni nauki i snu, ${ileSpr}, rywalizację (${k.rywalizacja.gracze.length} ${matsPlural(k.rywalizacja.gracze.length,"gracz","graczy","graczy")}).`
+    : `Widzi: ${k.nauka.ostatnie30dni.length} dni nauki i snu, ${ileSpr}. Rywalizacja: brak znajomego.`;
+}
+async function asChatWyslij(){
+  const inp=$("#asChatInput"),msg=inp.value.trim();
+  if(!msg)return;
+  inp.value="";$("#asChatSend").disabled=true;
+  asChat.push({role:"user",text:msg});
+  asChat.push({role:"ai",text:"…"});asChatRender();
+  try{
+    const sys=AS_OPIS_APKI+"\n\nDANE UŻYTKOWNIKA (JSON, stan na teraz):\n"+JSON.stringify(asystentKontekst());
+    // komunikaty o błędach (m.err) zostają na ekranie, ale NIE idą do modelu — inaczej
+    // „Zaloguj się…" trafiałoby do historii jako wypowiedź asystenta
+    const hist=asChat.filter(m=>m.text!=="…"&&!m.err).slice(-10).map(m=>({role:m.role==="user"?"user":"assistant",content:m.text}));
+    while(hist.length&&hist[0].role!=="user")hist.shift();
+    const text=await aiCall(sys,hist,1500);
+    asChat[asChat.length-1]={role:"ai",text:text||"(pusta odpowiedź)"};
+  }catch(e){
+    const m=(e&&e.message)||"";
+    asChat[asChat.length-1]={role:"ai",err:true,text:
+      m==="NO_AI_ACCESS"?"To konto nie ma dostępu do AI."
+      :m==="NOLOGIN"?"Zaloguj się do konta w chmurze — bez tego AI nie zadziała."
+      :/missing_api_key_secret/.test(m)?"Brakuje klucza API po stronie serwera (ANTHROPIC_API_KEY w sekretach Supabase)."
+      :"Nie udało się pobrać odpowiedzi: "+(m||"błąd")};
+  }finally{
+    $("#asChatSend").disabled=false;asChatRender();
+  }
+}
+
 /* ---- dostęp do AI (allowlista maili w tabeli ai_access, egzekwowana też w funkcji
    serwerowej daymenu-ai) — wersja bez dostępu nie widzi funkcji AI i nie może ich wołać.
    Nowe funkcje AI: oznacz element atrybutem data-ai-only (auto-ukrywanie) i wołaj przez
@@ -8796,7 +8936,7 @@ window.addEventListener("focus",()=>{if(payOczekuje)payDopytaj()});
    checkAiAccess zwraca od razu brak dostepu, wiec applyAiGating chowa KAZDY element
    z data-ai-only, a aiCall rzuca NO_AI_ACCESS. Zeby wrocic do AI, wystarczy zmienic
    te stala na true — nic wiecej. */
-const AI_WLACZONE=false;
+const AI_WLACZONE=true;   // AI wraca 2026-10-26, ale tylko dla kont z wiersza w ai_access
 let aiAccess=false;
 function applyAiGating(){
   document.querySelectorAll("[data-ai-only]").forEach(el=>{el.hidden=!aiAccess});
@@ -8805,6 +8945,16 @@ function applyAiGating(){
   // dostępu — np. przy wylogowaniu — cofamy się ręcznie na Harmonogram.
   const lek=$("#matLekcjaView");
   if(!aiAccess&&lek&&!lek.hidden)matShowTab("sched");
+  /* Asystent to osobny widok — gdy dostęp zniknie (wylogowanie), nie zostawiaj go otwartego.
+     Przełączamy sekcje RĘCZNIE, bez show(): show() woła checkAiAccess(), czyli tę samą ścieżkę,
+     z której tu jesteśmy — wejście rekurencyjne renderowało obcy widok w środku bramkowania. */
+  const as=$("#view-asystent");
+  if(!aiAccess&&as&&as.classList.contains("active")){
+    as.classList.remove("active");
+    const dash=$("#view-dash");
+    if(dash)dash.classList.add("active");
+    $$(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.view==="dash"));
+  }
 }
 async function checkAiAccess(){
   aiAccess=false;
