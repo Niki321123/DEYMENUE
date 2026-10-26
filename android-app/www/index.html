@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=137">
+<link rel="manifest" href="/manifest.webmanifest?v=138">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -216,6 +216,15 @@ label.fld{display:block;font-size:var(--fs-1);font-weight:600;color:var(--text-2
 .prod-chg.up{color:var(--good)}
 .prod-chg.down{color:var(--bad)}
 #mainChart svg{width:100%;height:auto;display:block}
+/* pan-y: w pionie strona dalej się przewija, w poziomie przeciąganie przesuwa wykres */
+.chart-box{position:relative;touch-action:pan-y}
+.chart-box svg{cursor:grab}
+.chart-box.drag svg{cursor:grabbing}
+.chart-tip{position:absolute;top:2px;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-s);padding:6px 9px;font-size:var(--fs-1);line-height:1.6;white-space:nowrap;
+  box-shadow:var(--shadow);pointer-events:none;z-index:2}
+.chart-tip .swatch{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:5px}
+.chart-hint{font-size:var(--fs-1);color:var(--text-3)}
 .chart-legend{display:flex;flex-wrap:wrap;gap:var(--sp-2) var(--sp-3)}
 .chart-legend label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-2);user-select:none;padding:4px 10px;border-radius:999px;border:1px solid var(--border);transition:background .15s,opacity .15s}
 .chart-legend label.off{opacity:.45}
@@ -4062,7 +4071,7 @@ body {
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=137;
+const DM_BUILD=138;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -7850,8 +7859,48 @@ function renderChartLegend(pts){
     chartOn[l.dataset.sid]=l.querySelector("input").checked;renderMainChart();
   });
 }
+/* Dzień bez wpisu nie przerywa linii — wartość bierzemy liniowo z sąsiednich znanych dni
+   (dzień w środku luki dostaje dokładnie ich średnią). Luki na początku i na końcu zakresu
+   zostają puste: tam nie ma z czego interpolować, a dorysowywanie byłoby zmyślaniem danych.
+   Uzupełniamy TYLKO na wykresie — pctProd() leci do stats_daily i rywalizacji, więc jego
+   wyniku nie ruszamy. */
+function chartFill(vals){
+  const out=vals.slice();
+  let prev=-1;
+  for(let i=0;i<out.length;i++){
+    if(out[i]==null)continue;
+    if(prev>=0&&i-prev>1){
+      const a=out[prev],b=out[i];
+      for(let k=prev+1;k<i;k++)out[k]=a+(b-a)*((k-prev)/(i-prev));
+    }
+    prev=i;
+  }
+  return out;
+}
+const CH_W=720,CH_H=220,CH_PL=28,CH_PR=10,CH_PT=10,CH_PB=10,CH_MIN=2;
+let chartWin=null;     // widoczny wycinek {i0,i1}; null = cały zakres
+let chartHover=null;   // indeks dnia pod kursorem (liczony w całym zakresie)
+let chartPtsLen=0;     // ile punktów ma pełny zakres — potrzebne przy przeciąganiu
+function chartWinClamp(n){
+  if(!chartWin||n<=CH_MIN)return{i0:0,i1:Math.max(0,n-1)};
+  const m=Math.min(n,Math.max(CH_MIN,chartWin.i1-chartWin.i0+1));
+  const i0=Math.max(0,Math.min(chartWin.i0,n-m));
+  return{i0,i1:i0+m-1};
+}
+function chartZoom(f){
+  if(!chartPtsLen)return;
+  const w=chartWinClamp(chartPtsLen),m0=w.i1-w.i0+1;
+  let m=Math.round(m0*f);
+  m=Math.max(CH_MIN,Math.min(chartPtsLen,m));
+  if(m===m0)m=f>1?Math.min(chartPtsLen,m0+1):Math.max(CH_MIN,m0-1);
+  const srodek=(w.i0+w.i1)/2;
+  const i0=Math.max(0,Math.min(chartPtsLen-m,Math.round(srodek-m/2)));
+  chartWin=m>=chartPtsLen?null:{i0,i1:i0+m-1};
+}
 function renderMainChart(){
-  const pts=chartData();
+  const all=chartData();
+  chartPtsLen=all.length;
+  const win=chartWinClamp(all.length),pts=all.slice(win.i0,win.i1+1);
   renderChartLegend(pts);
   const active=CHART_SERIES.filter(s=>chartOn[s.id]);
   const anyData=active.some(s=>pts.some(p=>p.v[s.id]!=null));
@@ -7859,10 +7908,31 @@ function renderMainChart(){
     $("#mainChart").innerHTML=`<div class="empty">${!active.length?"Zaznacz przynajmniej jedną linię powyżej.":"Brak danych w tym zakresie — zapisuj sen i naukę."}</div>`;
     return;
   }
+  /* Sen i Nauka: uzupełniamy luki. Produktywność liczymy NA NOWO z tych uzupełnionych linii,
+     bo pctProd() liczy brakujący sen jako zero — linia nie urywała się, tylko spadała o połowę
+     w każdy dzień bez wpisu. Gdy znamy tylko jedną składową, bierzemy ją zamiast dzielić przez 2. */
+  const pelne={};
+  ["sen","nauka"].forEach(id=>pelne[id]=chartFill(pts.map(p=>p.v[id])));
+  const seria={},realne={};
+  active.forEach(s=>{
+    if(s.id==="prod"){
+      seria.prod=pts.map((p,i)=>{
+        const a=pelne.sen[i],b=pelne.nauka[i];
+        if(a==null&&b==null)return null;
+        if(a==null)return b;
+        if(b==null)return a;
+        return (a+b)/2;
+      });
+      realne.prod=pts.map(p=>p.v.sen!=null&&p.v.nauka!=null);
+    }else{
+      seria[s.id]=pelne[s.id];
+      realne[s.id]=pts.map(p=>p.v[s.id]!=null);
+    }
+  });
   let maxV=100;
-  active.forEach(s=>pts.forEach(p=>{if(p.v[s.id]!=null)maxV=Math.max(maxV,p.v[s.id])}));
+  active.forEach(s=>seria[s.id].forEach(v=>{if(v!=null)maxV=Math.max(maxV,v)}));
   const maxY=Math.ceil(maxV/50)*50;
-  const W=720,H=220,PL=28,PR=10,PT=10,PB=10,n=pts.length;
+  const W=CH_W,H=CH_H,PL=CH_PL,PR=CH_PR,PT=CH_PT,PB=CH_PB,n=pts.length;
   const x=i=>PL+(n>1?i/(n-1):0.5)*(W-PL-PR);
   const y=v=>PT+(1-v/maxY)*(H-PT-PB);
   const step=maxY<=100?25:50;
@@ -7870,18 +7940,117 @@ function renderMainChart(){
   for(let v=0;v<=maxY;v+=step)grid+=`<line x1="${PL}" x2="${W-PR}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border)" stroke-dasharray="3 5" stroke-width="1"/><text x="${PL-4}" y="${y(v)+3}" text-anchor="end" font-size="10" fill="var(--text-3)">${v}</text>`;
   let lines="";
   active.forEach(s=>{
+    const vals=seria[s.id];
     let path="",started=false,last=null;
-    pts.forEach((p,i)=>{const v=p.v[s.id];if(v==null){started=false;return;}path+=`${started?"L":"M"}${x(i).toFixed(1)},${y(v).toFixed(1)} `;started=true;last={i,v};});
+    vals.forEach((v,i)=>{if(v==null){started=false;return;}path+=`${started?"L":"M"}${x(i).toFixed(1)},${y(v).toFixed(1)} `;started=true;last={i,v};});
     if(path)lines+=`<path d="${path}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
     if(last)lines+=`<circle cx="${x(last.i)}" cy="${y(last.v)}" r="3.5" fill="${s.color}"/>`;
   });
+  // pionowy kursor + dymek z wartościami dnia; „~" = wartość uzupełniona, nie zapisana
+  let kursor="",tip="";
+  const hi=chartHover==null?null:chartHover-win.i0;
+  if(hi!=null&&hi>=0&&hi<n){
+    const px=x(hi);
+    kursor=`<line x1="${px.toFixed(1)}" x2="${px.toFixed(1)}" y1="${PT}" y2="${H-PB}" stroke="var(--text-3)" stroke-dasharray="3 4" stroke-width="1"/>`;
+    active.forEach(s=>{const v=seria[s.id][hi];if(v!=null)kursor+=`<circle cx="${px.toFixed(1)}" cy="${y(v).toFixed(1)}" r="3" fill="${s.color}"/>`});
+    const wiersze=active.map(s=>{
+      const v=seria[s.id][hi],zapisane=realne[s.id][hi];
+      return `<div><span class="swatch" style="background:${s.color}"></span>${s.label}: <strong>${v==null?"—":(zapisane?"":"~")+Math.round(v)+"%"}</strong></div>`;
+    }).join("");
+    const lewo=Math.min(90,Math.max(10,px/W*100));
+    tip=`<div class="chart-tip" style="left:${lewo.toFixed(1)}%"><div class="muted">${fmtDate(pts[hi].ds)}</div>${wiersze}</div>`;
+  }
   $("#mainChart").innerHTML=`
-    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Wykres wskaźników">
-      ${grid}${lines}
-    </svg>
-    <div class="row" style="justify-content:space-between"><span class="muted">${fmtDate(pts[0].ds)}</span><span class="muted">${fmtDate(pts[pts.length-1].ds)}</span></div>`;
+    <div class="chart-box">
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Wykres wskaźników">
+        ${grid}${lines}${kursor}
+      </svg>
+      ${tip}
+    </div>
+    <div class="row" style="justify-content:space-between"><span class="muted">${fmtDate(pts[0].ds)}</span><span class="muted">${fmtDate(pts[n-1].ds)}</span></div>
+    <div class="row" style="justify-content:space-between;align-items:center;margin-top:var(--sp-2)">
+      <span class="chart-hint">Przeciągnij, żeby przesunąć · kółko myszy lub przyciski = przybliżenie</span>
+      <span class="row" style="gap:var(--sp-1);margin:0">
+        <button class="btn small ghost" id="chartZoomOut" title="Oddal">−</button>
+        <button class="btn small ghost" id="chartZoomIn" title="Przybliż">+</button>
+        ${chartWin?`<button class="btn small ghost" id="chartReset">Cały zakres</button>`:""}
+      </span>
+    </div>`;
 }
-$$("#chartTabs button").forEach(b=>b.onclick=()=>{chartRange=+b.dataset.pr;$$("#chartTabs button").forEach(x=>x.classList.toggle("on",x===b));renderMainChart();});
+$$("#chartTabs button").forEach(b=>b.onclick=()=>{
+  chartRange=+b.dataset.pr;chartWin=null;chartHover=null;
+  $$("#chartTabs button").forEach(x=>x.classList.toggle("on",x===b));renderMainChart();
+});
+/* Interakcja wykresu. Słuchacze wiszą na #mainChart, a nie na samym SVG, bo SVG jest
+   podmieniany przez innerHTML przy każdym przerysowaniu. */
+(function chartInteract(){
+  const box=$("#mainChart");
+  if(!box)return;
+  const ptrs=new Map();
+  let pan=null,pinch=null,raf=0;
+  const przerysuj=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;renderMainChart()})};
+  const svgX=e=>{const r=box.getBoundingClientRect();return r.width?(e.clientX-r.left)/r.width*CH_W:0};
+  const szer=()=>CH_W-CH_PL-CH_PR;
+  const chartDragKlasa=wl=>{const b=box.querySelector(".chart-box");if(b)b.classList.toggle("drag",wl)};
+  box.addEventListener("pointerdown",e=>{
+    if(e.target.closest("button"))return;
+    ptrs.set(e.pointerId,{x:e.clientX});
+    try{box.setPointerCapture(e.pointerId)}catch(err){}
+    const w=chartWinClamp(chartPtsLen);
+    if(ptrs.size===1){pan={x:svgX(e),i0:w.i0,i1:w.i1};chartDragKlasa(true)}
+    else if(ptrs.size===2){const a=[...ptrs.values()];pinch={d:Math.abs(a[0].x-a[1].x)||1,i0:w.i0,i1:w.i1};pan=null}
+  });
+  box.addEventListener("pointermove",e=>{
+    if(ptrs.has(e.pointerId))ptrs.set(e.pointerId,{x:e.clientX});
+    if(pinch&&ptrs.size>=2){
+      const a=[...ptrs.values()],d=Math.abs(a[0].x-a[1].x)||1,m0=pinch.i1-pinch.i0+1;
+      let m=Math.round(m0*pinch.d/d);
+      m=Math.max(CH_MIN,Math.min(chartPtsLen,m));
+      const srodek=(pinch.i0+pinch.i1)/2;
+      const i0=Math.max(0,Math.min(chartPtsLen-m,Math.round(srodek-m/2)));
+      chartWin=m>=chartPtsLen?null:{i0,i1:i0+m-1};
+      przerysuj();return;
+    }
+    if(pan&&ptrs.size===1){
+      const m0=pan.i1-pan.i0+1,pxPt=szer()/Math.max(1,m0-1);
+      const i0=Math.max(0,Math.min(chartPtsLen-m0,pan.i0+Math.round((pan.x-svgX(e))/pxPt)));
+      if(!chartWin||chartWin.i0!==i0){chartWin={i0,i1:i0+m0-1};przerysuj()}
+      return;
+    }
+    if(!ptrs.size&&chartPtsLen){   // sam podgląd dnia (mysz)
+      const w=chartWinClamp(chartPtsLen),m0=w.i1-w.i0+1;
+      const t=Math.max(0,Math.min(1,(svgX(e)-CH_PL)/szer()));
+      const idx=w.i0+Math.round(t*(m0-1));
+      if(idx!==chartHover){chartHover=idx;przerysuj()}
+    }
+  });
+  const koniec=e=>{
+    ptrs.delete(e.pointerId);
+    if(ptrs.size<2)pinch=null;
+    if(!ptrs.size){pan=null;chartDragKlasa(false)}
+  };
+  box.addEventListener("pointerup",koniec);
+  box.addEventListener("pointercancel",koniec);
+  box.addEventListener("pointerleave",()=>{if(chartHover!=null){chartHover=null;przerysuj()}});
+  box.addEventListener("wheel",e=>{
+    if(!chartPtsLen)return;
+    e.preventDefault();
+    const w=chartWinClamp(chartPtsLen),m0=w.i1-w.i0+1;
+    let m=Math.round(m0*(e.deltaY>0?1.2:1/1.2));
+    m=Math.max(CH_MIN,Math.min(chartPtsLen,m));
+    if(m===m0)m=e.deltaY>0?Math.min(chartPtsLen,m0+1):Math.max(CH_MIN,m0-1);
+    const podKursorem=w.i0+(svgX(e)-CH_PL)/(szer()/Math.max(1,m0-1));
+    const i0=Math.max(0,Math.min(chartPtsLen-m,Math.round(podKursorem-(podKursorem-w.i0)*m/m0)));
+    chartWin=m>=chartPtsLen?null:{i0,i1:i0+m-1};
+    przerysuj();
+  },{passive:false});
+  box.addEventListener("dblclick",()=>{chartWin=null;przerysuj()});
+  box.addEventListener("click",e=>{
+    if(e.target.closest("#chartReset")){chartWin=null;przerysuj()}
+    else if(e.target.closest("#chartZoomIn")){chartZoom(1/1.4);przerysuj()}
+    else if(e.target.closest("#chartZoomOut")){chartZoom(1.4);przerysuj()}
+  });
+})();
 $("#chartAiBtn").onclick=async()=>{
   const pts=chartData();
   if(!pts.some(p=>CHART_SERIES.some(s=>p.v[s.id]!=null)))return toast("Brak danych do analizy");
