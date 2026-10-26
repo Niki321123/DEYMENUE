@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=142">
+<link rel="manifest" href="/manifest.webmanifest?v=143">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -225,6 +225,12 @@ label.fld{display:block;font-size:var(--fs-1);font-weight:600;color:var(--text-2
   box-shadow:var(--shadow);pointer-events:none;z-index:2}
 .chart-tip .swatch{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:5px}
 .chart-hint{font-size:var(--fs-1);color:var(--text-3)}
+/* ostrzeżenia asystenta */
+.as-alert{display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-3);margin-bottom:var(--sp-2);
+  border:1px solid var(--border);border-left-width:4px;border-radius:var(--radius-s);background:var(--surface);font-size:var(--fs-2)}
+.as-alert.pilne{border-left-color:var(--bad)}
+.as-alert.uwaga{border-left-color:var(--warn)}
+.as-alert.info{border-left-color:var(--text-3)}
 .chart-legend{display:flex;flex-wrap:wrap;gap:var(--sp-2) var(--sp-3)}
 .chart-legend label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-2);user-select:none;padding:4px 10px;border-radius:999px;border:1px solid var(--border);transition:background .15s,opacity .15s}
 .chart-legend label.off{opacity:.45}
@@ -3992,6 +3998,7 @@ body {
   <p class="sub">Czat z AI, które zna tę aplikację i widzi Twoje dane: naukę, sen, produktywność, plan,
     sprawdziany, materiały, frekwencję i całą rywalizację ze znajomym. Pytaj o wnioski, nie o same liczby —
     np. „kiedy uczę się najskuteczniej?", „dlaczego przegrywam ten tydzień?", „co poprawić przed maturą?".</p>
+  <div id="asAlerty"></div>
   <div class="card">
     <div class="chat-log" id="asChatLog"></div>
     <div class="row">
@@ -4132,7 +4139,7 @@ body {
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=142;
+const DM_BUILD=143;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -8996,13 +9003,15 @@ $("#asChatClear").onclick=()=>{
 function asChatRender(){
   const log=$("#asChatLog");
   const chat=asChatHist();
-  log.innerHTML=chat.length
-    ? chat.map(m=>`<div class="chat-msg ${m.role==="user"?"me":"ai"}">${esc(m.text)}</div>`).join("")
+  const widoczne=chat.filter(m=>!m.ukryta);
+  log.innerHTML=widoczne.length
+    ? widoczne.map(m=>`<div class="chat-msg ${m.role==="user"?"me":"ai"}">${esc(m.text)}</div>`).join("")
     : `<div class="empty">Zacznij rozmowę — AI ma już wgląd w Twoje dane i w rywalizację.</div>`;
   log.scrollTop=1e9;
 }
 function renderAsystent(){
-  asChatRender();
+  asChatRender();asRenderAlerty();asOdswiezPlakietke();
+  asRaportTygodnia();   // raz na tydzien, znacznik w S.asystentRaport pilnuje powtorzen
   const k=asystentKontekst();
   const h=k.calaHistoria;
   const czesci=[`całą historię od ${fmtDate(k.odKiedy)} (${k.dniOdStartu} ${matsPlural(k.dniOdStartu,"dzień","dni","dni")}, ${h.godzinNauki} h nauki)`];
@@ -9073,9 +9082,161 @@ async function asChatWyslij(){
       :/missing_api_key_secret/.test(m)?"Brakuje klucza API po stronie serwera (ANTHROPIC_API_KEY w sekretach Supabase)."
       :"Nie udało się pobrać odpowiedzi: "+(m||"błąd")};
   }finally{
-    $("#asChatSend").disabled=false;asChatZapisz();asChatRender();
+    $("#asChatSend").disabled=false;asChatZapisz();asChatRender();asRenderAlerty();asOdswiezPlakietke();
   }
 }
+
+/* ---- OSTRZEŻENIA ASYSTENTA ----
+   Liczone LOKALNIE, bez AI: to proste reguły na danych, więc nie ma po co płacić za tokeny
+   ani czekać na sieć. AI wchodzi dopiero, gdy użytkownik kliknie „Zapytaj" przy ostrzeżeniu. */
+const AS_UKRYTE_MAX=200;
+function asNorm(s){return String(s||"").toLowerCase().replace(/[ąàâ]/g,"a").replace(/[ćç]/g,"c").replace(/[ęèé]/g,"e")
+  .replace(/ł/g,"l").replace(/ń/g,"n").replace(/[óô]/g,"o").replace(/ś/g,"s").replace(/[żź]/g,"z").replace(/[^a-z0-9]/g,"")}
+function asPodobne(a,b){const x=asNorm(a),y=asNorm(b);return !!x&&!!y&&(x===y||x.includes(y)||y.includes(x))}
+function asUkryte(){if(!S.asystentUkryte||typeof S.asystentUkryte!=="object")S.asystentUkryte={};return S.asystentUkryte}
+function asUkryj(id){
+  const u=asUkryte();u[id]=today();
+  const k=Object.keys(u);
+  if(k.length>AS_UKRYTE_MAX)k.sort((a,b)=>String(u[a]).localeCompare(String(u[b]))).slice(0,k.length-AS_UKRYTE_MAX).forEach(x=>delete u[x]);
+  save();
+}
+function asAlerty(){
+  const out=[];
+  try{
+    const idx=asIndeks(),{dni,rek}=asRekordy(idx);
+    if(!dni.length)return out;
+    const dzisDs=dni[dni.length-1];
+    const topics=S.matura.topics||[];
+
+    // 1. sprawdzian w ciągu 7 dni, a przedmiot leży odłogiem
+    exItems().filter(e=>e.exam).forEach(e=>{
+      const zaDni=exDaysTo(e.date);
+      if(zaDni==null||zaDni<0||zaDni>7)return;
+      const nazwa=(e.subject||"").trim();if(!nazwa)return;
+      const t=topics.find(x=>asPodobne(x.name,nazwa));
+      if(!t)return;                                   // przedmiotu nie ma w Nauce — nie wiemy, czy się uczył
+      const ostatnia=(S.matura.sessions||[]).filter(s=>s.topicId===t.id&&isYmd(s.date)).map(s=>s.date).sort().pop();
+      const odDni=ostatnia?Math.round((new Date(dzisDs+"T00:00")-new Date(ostatnia+"T00:00"))/86400000):null;
+      if(odDni!=null&&odDni<5)return;                 // uczył się niedawno — cisza
+      const kiedy=zaDni===0?"Dziś":zaDni===1?"Jutro":"Za "+zaDni+" dni";
+      out.push({id:"spr:"+e.date+":"+asNorm(nazwa),waga:"pilne",
+        tekst:`${kiedy} ${(e.type||"sprawdzian").toLowerCase()} — ${nazwa}. ${odDni==null?"Nie masz ani jednej zapisanej sesji z tego przedmiotu":"Ostatnia sesja z tego przedmiotu była "+odDni+" dni temu"}.`,
+        pytanie:`${kiedy} mam ${(e.type||"sprawdzian").toLowerCase()}, przedmiot: ${nazwa}. Rozpisz mi, co powtórzyć do tego czasu.`});
+    });
+
+    // 2. trzy ostatnie ZAPISANE noce poniżej 6 h
+    const noce=dni.slice(-6).map(ds=>rek[ds]).filter(x=>x.senH!=null).slice(-3);
+    if(noce.length===3&&noce.every(x=>x.senH<6))
+      out.push({id:"sen:"+dzisDs,waga:"pilne",
+        tekst:`Trzecia noc z rzędu poniżej 6 h snu (${noce.map(x=>x.senH+" h").join(", ")}). Sen to połowa wzoru na produktywność, więc ciągnie ją w dół niezależnie od nauki.`,
+        pytanie:"Trzecią noc śpię poniżej 6 h. Jak to odbija się na mojej nauce według moich danych?"});
+
+    // 3. przerwa w nauce (liczona do wczoraj — dziś jeszcze trwa)
+    const doWczoraj=dni.slice(0,-1);
+    let luka=0;
+    for(let i=doWczoraj.length-1;i>=0;i--){if(rek[doWczoraj[i]].min===0)luka++;else break}
+    if(luka>=3)out.push({id:"przerwa:"+dzisDs,waga:"uwaga",
+      tekst:`${luka} dni z rzędu bez zapisanej nauki. Najdłuższa Twoja seria to ${asSerie(dni,rek).najdluzszaSeriaDniZNauka} dni.`,
+      pytanie:`Od ${luka} dni nie uczyłem się w ogóle. Od czego najlepiej wrócić?`});
+
+    // 4. przedmiot dostaje dużo mniej czasu, niż wynika z jego priorytetu
+    const okno=dni.slice(-30);
+    const minPrzedmiot={};let suma=0;
+    (S.matura.sessions||[]).forEach(s=>{
+      if(!okno.includes(s.date))return;
+      minPrzedmiot[s.topicId]=(minPrzedmiot[s.topicId]||0)+(s.minutes||0);suma+=s.minutes||0;
+    });
+    if(suma>=300)topics.filter(t=>(t.percent||0)>=25).forEach(t=>{
+      const udzial=(minPrzedmiot[t.id]||0)/suma*100,cel=t.percent;
+      if(udzial<cel/2)out.push({id:"przedmiot:"+t.id+":"+dzisDs.slice(0,7),waga:"uwaga",
+        tekst:`Przedmiot ${t.name} ma priorytet ${cel}%, a przez ostatnie 30 dni poszło na niego ${Math.round(udzial)}% Twojego czasu nauki.`,
+        pytanie:`Na przedmiot ${t.name} idzie dużo mniej czasu, niż wynika z jego priorytetu. Jak przestawić plan, żeby to wyrównać?`});
+    });
+
+    // 5. frekwencja pod 75% na przedmiocie
+    const freq=S.matura.attendanceFreq||{};
+    Object.keys(freq).forEach(s=>{
+      const p=frekPct(freq[s]);
+      if(p!=null&&p<75&&(freq[s].total||0)>=10)out.push({id:"frek:"+asNorm(s)+":"+dzisDs.slice(0,7),waga:"uwaga",
+        tekst:`Frekwencja na przedmiocie ${s}: ${p}% (${freq[s].absent} nieobecności na ${freq[s].total} lekcji).`,
+        pytanie:`Mam ${p}% frekwencji na przedmiocie ${s}. Czy widać w danych, żeby to szło w parze ze słabszymi ocenami?`});
+    });
+
+    // 6. brak wpisów snu psuje liczenie produktywności
+    const bezSnu=dni.slice(-7).filter(ds=>rek[ds].senH==null).length;
+    if(bezSnu>=5)out.push({id:"braksnu:"+dzisDs,waga:"info",
+      tekst:`${bezSnu} z ostatnich 7 dni bez zapisanego snu. Produktywność liczy się wtedy z samej nauki, więc wychodzi zaniżona.`,
+      pytanie:"Nie zapisuję snu. Jak bardzo zaniża mi to produktywność?"});
+  }catch(e){}
+  const u=asUkryte();
+  return out.filter(a=>!u[a.id]);
+}
+function asOdswiezPlakietke(){
+  const btn=document.querySelector('[data-view="asystent"]');
+  if(!btn)return;
+  const stara=btn.querySelector(".pill");
+  if(stara)stara.remove();
+  if(!aiAccess)return;
+  const n=asAlerty().length;
+  if(n)btn.insertAdjacentHTML("beforeend",`<span class="pill">${n}</span>`);
+}
+function asRenderAlerty(){
+  const box=$("#asAlerty");if(!box)return;
+  const lista=asAlerty();
+  box.innerHTML=lista.length?lista.map(a=>`
+    <div class="as-alert ${a.waga}">
+      <div style="flex:1;min-width:0">${esc(a.tekst)}</div>
+      <button class="btn small ghost" data-as-pytaj="${esc(a.id)}">Zapytaj</button>
+      <button class="btn small ghost" data-as-ukryj="${esc(a.id)}" title="Ukryj">×</button>
+    </div>`).join(""):"";
+  box.querySelectorAll("[data-as-ukryj]").forEach(b=>b.onclick=()=>{asUkryj(b.dataset.asUkryj);asRenderAlerty();asOdswiezPlakietke()});
+  box.querySelectorAll("[data-as-pytaj]").forEach(b=>b.onclick=()=>{
+    const a=lista.find(x=>x.id===b.dataset.asPytaj);if(!a)return;
+    $("#asChatInput").value=a.pytanie;asChatWyslij();
+  });
+}
+
+/* ---- COTYGODNIOWE PODSUMOWANIE ----
+   Raz na tydzień, bez pytania: asystent sam ocenia zakończony tydzień. Znacznik to data
+   poniedziałku podsumowywanego tygodnia, więc raport nie powtórzy się przy każdym otwarciu. */
+function asPoprzedniTydzien(){
+  const pon=new Date();pon.setHours(0,0,0,0);pon.setDate(pon.getDate()-((pon.getDay()+6)%7));
+  const nd=new Date(pon);nd.setDate(nd.getDate()-1);
+  const start=new Date(pon);start.setDate(start.getDate()-7);
+  return{od:dsLok(start),doD:dsLok(nd)};
+}
+async function asRaportTygodnia(){
+  if(!aiAccess||asRaportTrwa)return;
+  const{od,doD}=asPoprzedniTydzien();
+  if(S.asystentRaport===od)return;
+  const idx=asIndeks();
+  let min=0,nocy=0;
+  for(const ds of Object.keys(idx.nauka))if(ds>=od&&ds<=doD)min+=idx.nauka[ds];
+  for(const ds of Object.keys(idx.sen))if(ds>=od&&ds<=doD)nocy++;
+  if(!min&&!nocy){S.asystentRaport=od;save();return}   // pusty tydzień — nie ma czego podsumowywać
+  asRaportTrwa=true;
+  try{
+    const chat=asChatHist();
+    const polecenie=`Podsumuj mój zakończony tydzień ${od} – ${doD}. Maksymalnie 5 zdań: co wyszło, co nie wyszło, i JEDNA konkretna rzecz do poprawy w tym tygodniu. Porównaj ten tydzień z moją wcześniejszą średnią. Zacznij od linijki "Podsumowanie tygodnia ${od} – ${doD}:".`;
+    chat.push({role:"user",text:polecenie,ukryta:true});
+    const{blok,aktualizacja}=asPrefiks();
+    const hist=chat.filter(m=>m.text!=="…"&&!m.err).map(m=>({role:m.role==="user"?"user":"assistant",content:m.text}));
+    const wiad=[{role:"user",content:[{type:"text",text:blok,cache_control:{type:"ephemeral"}}]},
+                {role:"assistant",content:"Mam komplet danych i reguł. Pytaj."}].concat(hist);
+    if(aktualizacja)wiad[wiad.length-1]={role:"user",content:"AKTUALIZACJA DANYCH:\n"+aktualizacja+"\n\n"+polecenie};
+    const text=await aiCall(AS_SYSTEM_KROTKI,wiad,900);
+    chat.push({role:"ai",text:text||"(pusta odpowiedź)",raport:true});
+    S.asystentRaport=od;
+    asChatZapisz();asChatRender();
+    toast("Asystent podsumował miniony tydzień");
+  }catch(e){
+    const chat=asChatHist();
+    const i=chat.findIndex(m=>m.ukryta&&m.text&&m.text.indexOf("Podsumuj mój zakończony tydzień "+od)===0);
+    if(i>=0)chat.splice(i,1);     // nie zostawiaj sierotki w historii — spróbujemy następnym razem
+    asChatZapisz();
+  }finally{asRaportTrwa=false}
+}
+let asRaportTrwa=false;
 
 /* ---- dostęp do AI (allowlista maili w tabeli ai_access, egzekwowana też w funkcji
    serwerowej daymenu-ai) — wersja bez dostępu nie widzi funkcji AI i nie może ich wołać.
@@ -9120,6 +9281,9 @@ async function checkAiAccess(){
     }catch(e){}
   }
   applyAiGating();
+  if(typeof asOdswiezPlakietke==="function")asOdswiezPlakietke();
+  // raport „sam z siebie": po starcie, z opoznieniem, zeby nie wpadac w sztorm zapytan przy logowaniu
+  if(aiAccess&&typeof asRaportTygodnia==="function")setTimeout(asRaportTygodnia,6000);
 }
 /* ================= RYWALIZACJA ZE ZNAJOMYMI =================
    Prywatny blob (daymenu_data) nigdy nie opuszcza właściciela. Znajomym udostępniamy
