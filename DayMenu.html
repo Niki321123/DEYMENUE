@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=143">
+<link rel="manifest" href="/manifest.webmanifest?v=144">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -231,6 +231,8 @@ label.fld{display:block;font-size:var(--fs-1);font-weight:600;color:var(--text-2
 .as-alert.pilne{border-left-color:var(--bad)}
 .as-alert.uwaga{border-left-color:var(--warn)}
 .as-alert.info{border-left-color:var(--text-3)}
+#asMik{flex:none}
+#asMik.on{background:var(--bad);color:#fff;border-color:transparent}
 .chart-legend{display:flex;flex-wrap:wrap;gap:var(--sp-2) var(--sp-3)}
 .chart-legend label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--fs-2);user-select:none;padding:4px 10px;border-radius:999px;border:1px solid var(--border);transition:background .15s,opacity .15s}
 .chart-legend label.off{opacity:.45}
@@ -3999,10 +4001,12 @@ body {
     sprawdziany, materiały, frekwencję i całą rywalizację ze znajomym. Pytaj o wnioski, nie o same liczby —
     np. „kiedy uczę się najskuteczniej?", „dlaczego przegrywam ten tydzień?", „co poprawić przed maturą?".</p>
   <div id="asAlerty"></div>
+  <div id="asSprawdziany"></div>
   <div class="card">
     <div class="chat-log" id="asChatLog"></div>
     <div class="row">
       <input type="text" id="asChatInput" class="field" placeholder="Zapytaj o swoje dane…">
+      <button class="btn ghost" id="asMik" title="Zadaj pytanie głosem" hidden>🎤</button>
       <button class="btn" id="asChatSend">Wyślij</button>
     </div>
     <div class="row" style="justify-content:space-between;align-items:center;margin-top:var(--sp-3)">
@@ -4139,7 +4143,7 @@ body {
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=143;
+const DM_BUILD=144;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -8950,6 +8954,8 @@ function asystentKontekst(){
       .sort((a,b)=>(a.procent||0)-(b.procent||0)),
     materialy:(typeof matsList==="function"?matsList():[]).map(m=>({przedmiot:m.subject,nazwa:m.name,zrobione:(m.done||[]).length,zadan:(m.tasks||[]).length})),
     nawyki:(S.habits||[]).map(h=>({nazwa:h.name,zrobionychDni:Object.keys(h.days||{}).filter(ds=>h.days[ds]).length})),
+    analizyPoSprawdzianach:Object.values(S.asystentAnalizy||{}).filter(a=>a&&a.wniosek)
+      .map(a=>({data:a.data,przedmiot:a.przedmiot,ocena:a.ocena,wniosek:a.wniosek})),
     cele:(S.goals||[]).map(g=>({nazwa:g.name||g.text||"(cel)",krokiZrobione:(g.steps||[]).filter(s=>s.done).length,krokiLacznie:(g.steps||[]).length}))
   };
   /* Rywalizacja: punkty liczy TA SAMA pktOblicz() co zakładka, więc model widzi dokładnie to,
@@ -8994,6 +9000,7 @@ function asChatZapisz(){
   save();
 }
 $("#asChatSend").onclick=()=>asChatWyslij();
+$("#asMik").onclick=()=>asDyktuj();
 $("#asChatInput").onkeydown=e=>{if(e.key==="Enter")asChatWyslij()};
 $("#asChatClear").onclick=()=>{
   if(!asChatHist().length)return;
@@ -9010,7 +9017,7 @@ function asChatRender(){
   log.scrollTop=1e9;
 }
 function renderAsystent(){
-  asChatRender();asRenderAlerty();asOdswiezPlakietke();
+  asChatRender();asRenderAlerty();asRenderSprawdziany();asOdswiezPlakietke();asPokazMik();
   asRaportTygodnia();   // raz na tydzien, znacznik w S.asystentRaport pilnuje powtorzen
   const k=asystentKontekst();
   const h=k.calaHistoria;
@@ -9177,7 +9184,7 @@ function asOdswiezPlakietke(){
   const stara=btn.querySelector(".pill");
   if(stara)stara.remove();
   if(!aiAccess)return;
-  const n=asAlerty().length;
+  const n=asAlerty().length+asSprawdzianyDoAnalizy().length;
   if(n)btn.insertAdjacentHTML("beforeend",`<span class="pill">${n}</span>`);
 }
 function asRenderAlerty(){
@@ -9237,6 +9244,154 @@ async function asRaportTygodnia(){
   }finally{asRaportTrwa=false}
 }
 let asRaportTrwa=false;
+
+/* ---- ANALIZA PO SPRAWDZIANIE ----
+   Zamyka pętlę: uczyłeś się tyle i wtedy → dostałeś taką ocenę → wniosek na następny raz.
+   Wnioski zostają w S.asystentAnalizy i wracają do kontekstu, więc asystent pamięta, co już
+   raz zadziałało (albo nie), zamiast odkrywać to od nowa przy każdym sprawdzianie. */
+function asKluczSpr(e){return e.src+":"+e.id}
+function asAnalizy(){if(!S.asystentAnalizy||typeof S.asystentAnalizy!=="object")S.asystentAnalizy={};return S.asystentAnalizy}
+function asSprawdzianyDoAnalizy(){
+  const an=asAnalizy();
+  return exItems().filter(e=>e.exam&&isYmd(e.date))
+    .map(e=>({e,dni:exDaysTo(e.date)}))
+    .filter(x=>x.dni!=null&&x.dni<0&&x.dni>=-21&&!an[asKluczSpr(x.e)])
+    .sort((a,b)=>b.dni-a.dni).slice(0,3);
+}
+/* Ocena z Librusa wpada sama kilka dni po sprawdzianie — jeśli jest, podpowiadamy ją w polu,
+   żeby nie kazać przepisywać ręcznie tego, co apka już wie. */
+function asOcenaDoSprawdzianu(e){
+  const g=(Array.isArray(S.matura.grades)?S.matura.grades:[]).filter(x=>x&&x.subject&&asPodobne(x.subject,e.subject||""));
+  const po=g.filter(x=>isYmd(x.date)&&x.date>=e.date&&exDaysTo(x.date)>=exDaysTo(e.date)-14);
+  const kand=po.sort((a,b)=>String(a.date).localeCompare(String(b.date)))[0];
+  return kand?String(kand.raw||kand.value||""):"";
+}
+function asKontekstSprawdzianu(e,ocena){
+  const t=(S.matura.topics||[]).find(x=>asPodobne(x.name,e.subject||""));
+  const przed=n=>{const d=new Date(e.date+"T00:00");d.setDate(d.getDate()-n);return dsLok(d)};
+  const sesje=(S.matura.sessions||[]).filter(s=>isYmd(s.date)&&s.date<=e.date);
+  const tego=s=>!t||s.topicId===t.id;
+  const suma=(n,filtr)=>sesje.filter(s=>s.date>=przed(n)&&filtr(s)).reduce((a,s)=>a+(s.minutes||0),0);
+  const ostatnia=sesje.filter(tego).map(s=>s.date).sort().pop()||null;
+  const senNoc=(S.sleep||[]).find(s=>s.date===e.date);          // wpis pod datą dnia = noc przed nim
+  const idx=asIndeks(),{dni,rek}=asRekordy(idx);
+  const dniPrzed=[];
+  for(let i=13;i>=0;i--){const ds=przed(i);if(rek[ds])dniPrzed.push({d:ds,minPrzedmiotu:sesje.filter(s=>s.date===ds&&tego(s)).reduce((a,s)=>a+(s.minutes||0),0),minLacznie:rek[ds].min,senH:rek[ds].senH});}
+  return{
+    sprawdzian:{data:e.date,przedmiot:e.subject,typ:e.type||"sprawdzian",opis:e.desc||null},
+    ocena:ocena||null,
+    przedmiotRozpoznanyWNauce:!!t,
+    minutyTegoPrzedmiotu:{przed3dniami:suma(3,tego),przed7dniami:suma(7,tego),przed14dniami:suma(14,tego)},
+    minutyLacznie:{przed7dniami:suma(7,()=>true),przed14dniami:suma(14,()=>true)},
+    ostatniaSesjaTegoPrzedmiotu:ostatnia,
+    dniOdOstatniejSesjiDoSprawdzianu:ostatnia?Math.round((new Date(e.date+"T00:00")-new Date(ostatnia+"T00:00"))/86400000):null,
+    senNocPrzed:senNoc?Math.round(sleepMin(senNoc)/60*10)/10:null,
+    mojaSredniaMinNaDzien:Math.round(asSrednia(dni.map(ds=>rek[ds].min))||0),
+    czternascieDniPrzed:dniPrzed,
+    wczesniejszeOcenyZPrzedmiotu:(Array.isArray(S.matura.grades)?S.matura.grades:[]).filter(g=>g&&asPodobne(g.subject,e.subject||"")&&(!isYmd(g.date)||g.date<e.date))
+      .map(g=>({ocena:g.raw,waga:g.weight,kategoria:g.category,data:g.date})),
+    poprzednieWnioski:Object.values(asAnalizy()).filter(a=>a&&a.wniosek&&asPodobne(a.przedmiot,e.subject||""))
+      .map(a=>({data:a.data,ocena:a.ocena,wniosek:a.wniosek}))
+  };
+}
+async function asAnalizujSprawdzian(e,ocena){
+  const klucz=asKluczSpr(e);
+  const an=asAnalizy();
+  if(!aiAccess)return toast("Brak dostępu do AI");
+  const chat=asChatHist();
+  const polecenie="ANALIZA PO SPRAWDZIANIE. Oto dane o jednym sprawdzianie i o tym, jak wyglądała nauka przed nim:\n"
+    +JSON.stringify(asKontekstSprawdzianu(e,ocena))
+    +"\nOceń w maksymalnie 4 zdaniach: co zadziałało, co nie, i JEDNA konkretna rzecz do zrobienia inaczej przed następnym sprawdzianem z tego przedmiotu. Jeśli widzisz, że to powtórka wcześniejszego błędu z pola poprzednieWnioski, powiedz to wprost. Zacznij od linijki \"Po sprawdzianie — "+(e.subject||"")+", "+e.date+(ocena?", ocena "+ocena:"")+":\".";
+  chat.push({role:"user",text:polecenie,ukryta:true});
+  chat.push({role:"ai",text:"…"});asChatRender();
+  try{
+    const{blok,aktualizacja}=asPrefiks();
+    const hist=chat.filter(m=>m.text!=="…"&&!m.err).map(m=>({role:m.role==="user"?"user":"assistant",content:m.text}));
+    const wiad=[{role:"user",content:[{type:"text",text:blok,cache_control:{type:"ephemeral"}}]},
+                {role:"assistant",content:"Mam komplet danych i reguł. Pytaj."}].concat(hist);
+    if(aktualizacja)wiad[wiad.length-1]={role:"user",content:"AKTUALIZACJA DANYCH:\n"+aktualizacja+"\n\n"+polecenie};
+    const text=await aiCall(AS_SYSTEM_KROTKI,wiad,800);
+    chat[chat.length-1]={role:"ai",text:text||"(pusta odpowiedź)"};
+    an[klucz]={data:e.date,przedmiot:e.subject||"",ocena:ocena||null,wniosek:text||"",kiedy:today()};
+  }catch(err){
+    chat[chat.length-1]={role:"ai",err:true,text:"Nie udało się zrobić analizy: "+((err&&err.message)||"błąd")};
+  }finally{
+    asChatZapisz();asChatRender();asRenderSprawdziany();asOdswiezPlakietke();
+  }
+}
+function asRenderSprawdziany(){
+  const box=$("#asSprawdziany");if(!box)return;
+  const lista=asSprawdzianyDoAnalizy();
+  box.innerHTML=lista.length?lista.map(({e,dni})=>{
+    const k=esc(asKluczSpr(e));
+    const kiedy=dni===-1?"wczoraj":Math.abs(dni)+" dni temu";
+    return `<div class="as-alert info">
+      <div style="flex:1;min-width:0">${esc(e.type||"Sprawdzian")} — ${esc(e.subject||"?")}, ${kiedy}. Jaka ocena?</div>
+      <input class="field" style="width:84px;flex:none" data-as-ocena="${k}" value="${esc(asOcenaDoSprawdzianu(e))}" placeholder="np. 4">
+      <button class="btn small" data-as-analiza="${k}">Przeanalizuj</button>
+      <button class="btn small ghost" data-as-pomin="${k}" title="Pomiń">×</button>
+    </div>`;
+  }).join(""):"";
+  box.querySelectorAll("[data-as-pomin]").forEach(b=>b.onclick=()=>{
+    asAnalizy()[b.dataset.asPomin]={pominiete:true,kiedy:today()};save();asRenderSprawdziany();asOdswiezPlakietke();
+  });
+  box.querySelectorAll("[data-as-analiza]").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.asAnaliza,poz=lista.find(x=>asKluczSpr(x.e)===k);
+    if(!poz)return;
+    const pole=box.querySelector(`[data-as-ocena="${CSS.escape(k)}"]`);
+    asAnalizujSprawdzian(poz.e,pole?pole.value.trim():"");
+  });
+}
+
+/* ---- DYKTOWANIE PYTAŃ ----
+   Dwie ścieżki, bo przeglądarkowe API mowy NIE działa w Android WebView: w APK idziemy przez
+   natywny plugin (systemowe okno dyktowania), poza APK przez Web Speech API. Gdy nie ma ani
+   jednego (np. Firefox), przycisk się nie pokazuje — zamiast udawać, że działa. */
+function asPluginMowy(){
+  try{const P=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.DayMenuSpeech;
+    return P&&typeof P.listen==="function"?P:null;}catch(e){return null}
+}
+function asWebMowa(){return window.SpeechRecognition||window.webkitSpeechRecognition||null}
+let asRec=null,asSlucha=false;
+function asMikStan(wl){
+  asSlucha=wl;
+  const b=$("#asMik");if(!b)return;
+  b.textContent=wl?"Słucham…":"🎤";
+  b.classList.toggle("on",wl);
+  $("#asChatInput").placeholder=wl?"Mów…":"Zapytaj o swoje dane…";
+}
+async function asDyktuj(){
+  const P=asPluginMowy();
+  if(P){
+    asMikStan(true);
+    try{
+      const r=await P.listen({prompt:"Zadaj pytanie asystentowi"});
+      if(r&&r.text){$("#asChatInput").value=r.text;asChatWyslij()}
+    }catch(e){toast("Dyktowanie niedostępne na tym telefonie")}
+    finally{asMikStan(false)}
+    return;
+  }
+  const SR=asWebMowa();
+  if(!SR)return;
+  if(asSlucha&&asRec){try{asRec.stop()}catch(e){}return}
+  asRec=new SR();
+  asRec.lang="pl-PL";asRec.interimResults=false;asRec.maxAlternatives=1;
+  asRec.onresult=e=>{
+    const t=e.results&&e.results[0]&&e.results[0][0]?e.results[0][0].transcript:"";
+    if(t){$("#asChatInput").value=t;asChatWyslij()}
+  };
+  asRec.onerror=e=>{
+    asMikStan(false);
+    if(e&&e.error==="not-allowed")toast("Brak zgody na mikrofon");
+    else if(e&&e.error!=="aborted"&&e.error!=="no-speech")toast("Nie udało się nagrać pytania");
+  };
+  asRec.onend=()=>asMikStan(false);
+  try{asRec.start();asMikStan(true)}catch(e){asMikStan(false)}
+}
+function asPokazMik(){
+  const b=$("#asMik");if(!b)return;
+  b.hidden=!(asPluginMowy()||asWebMowa());
+}
 
 /* ---- dostęp do AI (allowlista maili w tabeli ai_access, egzekwowana też w funkcji
    serwerowej daymenu-ai) — wersja bez dostępu nie widzi funkcji AI i nie może ich wołać.

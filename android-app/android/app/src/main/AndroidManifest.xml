@@ -57,4 +57,12 @@
          dzwiek i zadnego uprawnienia nie wymaga. RECORD_AUDIO dokladal tez implikowana funkcje
          android.hardware.microphone. Gdyby kiedys doszlo nagrywanie, trzeba je dopisac z powrotem
          i poprosic o zgode w czasie dzialania (Capacitor Permissions API). -->
+
+    <!-- widocznosc aplikacji rozpoznajacej mowe (Android 11+ filtruje pakiety); samo nagrywanie
+         robi aplikacja systemowa, wiec NIE potrzebujemy uprawnienia RECORD_AUDIO -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
 </manifest>

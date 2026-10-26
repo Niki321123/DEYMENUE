@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
         // rejestracja PRZED super.onCreate — inaczej Capacitor nie wystawi pluginu do JS
         registerPlugin(WidgetPlugin.class);
         registerPlugin(LockTaskPlugin.class);
+        registerPlugin(SpeechPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
