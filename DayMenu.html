@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=141">
+<link rel="manifest" href="/manifest.webmanifest?v=142">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -4132,7 +4132,7 @@ body {
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=141;
+const DM_BUILD=142;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -8818,112 +8818,262 @@ ZASADY LICZENIA, których musisz się trzymać:
 - Produktywność dnia = średnia z dwóch połówek: sen 50% i nauka 50%. Nauka: 3 h = 100% (6 h = 200%). Sen: tabela procentów, 8-9 h = 100%, mniej spada (6 h = 60%, 5 h = 40%), powyżej 10 h spada o 10% za każdą godzinę.
 - Punkty w rywalizacji: 1 godzina nauki = 1 pkt. Za każdy ZAKOŃCZONY tydzień (pon-nd) i każdy zakończony miesiąc jest do zdobycia po 5 pkt: 2,5 pkt za więcej godzin i 2,5 pkt za wyższą średnią produktywność. Bieżący, trwający okres jeszcze się nie liczy. Przy remisie punkty dostają obaj, ale tylko jeśli każdy przekroczył próg (10 h w tygodniu, 40 h w miesiącu). Do tego wygrane zakłady (1-7 pkt, przy remisie pula dzieli się po połowie). Korona idzie za punkty ZDOBYTE, zakupy w sklepie jej nie zabierają.
 - Blok w harmonogramie to godzina zegarowa startu, a realna nauka w bloku to długość sesji pomodoro (pole pomoWorkMin), nie zawsze 60 minut.
-JAK ODPOWIADASZ: po polsku, zwięźle, konkretnie. Opierasz się WYŁĄCZNIE na danych z kontekstu — nie zmyślasz liczb ani wydarzeń. Gdy czegoś w danych nie ma, mów wprost, że tego nie widzisz, i powiedz, co użytkownik musiałby zapisywać, żeby odpowiedź była możliwa. Nie wypisujesz surowych tabel, tylko wnioski z liczbami na poparcie. Nie doradzasz w sprawach zdrowia poza oczywistą higieną snu i nauki. Zwracasz zwykły tekst, bez markdown i bez JSON.`;
-function asSeria(dni){
-  return dni.map(ds=>{
-    const sl=slOf(ds),p=pctProd(ds);
-    return{d:ds,min:Math.round(studyHours(ds)*60),senH:sl?Math.round(sleepMin(sl)/60*10)/10:null,
-      prod:p==null?null:Math.round(p),pomo:(S.forest||[]).filter(t=>t.date===ds&&t.status==="alive").length};
-  });
-}
+JAK ANALIZUJESZ: masz pełną historię od pierwszego dnia korzystania z aplikacji. Zanim odpowiesz, porównaj okresy (ostatnie 7 dni vs 30 dni vs całość z pola "porownanieOkresow") i poszukaj wzorców w "wgDniaTygodnia", "korelacjaSenNauka", "porySnu", "wgPrzedmiotu" i "poTygodniach". Szukaj rzeczy, których użytkownik sam nie zauważy: który dzień tygodnia regularnie wypada najsłabiej, czy produktywność rośnie czy spada w trendzie tygodniowym, czy któryś przedmiot dostaje dużo mniej czasu niż wynika z jego priorytetu, czy przed sprawdzianami pojawia się nauka tego przedmiotu, czy krótki sen realnie zbija mu naukę, czy nie ma przedmiotu z niską frekwencją i słabą średnią naraz. Odnoś się do liczb z danych, podawaj je w odpowiedzi jako dowód.
+JAK ODPOWIADASZ: po polsku, zwięźle, bez lania wody. Najpierw odpowiedź na pytanie, potem najwyżej 2-3 konkretne, wykonalne rady (co zrobić w tym tygodniu, nie ogólniki typu „ucz się więcej"). Opierasz się WYŁĄCZNIE na danych z kontekstu — nie zmyślasz liczb ani wydarzeń. Gdy wniosek opiera się na małej próbce (kilka dni, kilka ocen), powiedz to wprost zamiast udawać pewność. Gdy czegoś w danych nie ma, powiedz, czego nie widzisz i co użytkownik musiałby zapisywać, żeby odpowiedź była możliwa. Nie wypisujesz surowych tabel ani list wszystkich dni. Nie doradzasz w sprawach zdrowia poza oczywistą higieną snu i nauki. Zwracasz zwykły tekst, bez markdown i bez JSON.
+PAMIĘĆ: dostajesz całą dotychczasową rozmowę. Pamiętaj, co użytkownik już mówił o sobie (plany, terminy, samopoczucie, ustalenia) i nie pytaj drugi raz o to samo. Komplet danych dostajesz w pierwszym bloku rozmowy; jeśli później pojawi się „AKTUALIZACJA DANYCH", to ona jest nowsza i ma pierwszeństwo przed tym blokiem.`;
+// system zostaje malutki — reguły i dane siedzą w cache'owanym bloku wiadomości, a nie tutaj
+const AS_SYSTEM_KROTKI="Jesteś asystentem w aplikacji Day Menu. Trzymasz się reguł i danych podanych w pierwszej wiadomości rozmowy.";
+const AS_DNI_TYG=["poniedziałek","wtorek","środa","czwartek","piątek","sobota","niedziela"];
+const AS_SZCZEGOLOWO=60;   // ile ostatnich dni dostaje model dzień po dniu; starsze idą tygodniami
 function asSrednia(tab){const n=tab.filter(x=>x!=null);return n.length?Math.round(n.reduce((a,x)=>a+x,0)/n.length*10)/10:null}
+function asSuma(tab){return tab.reduce((a,x)=>a+(x||0),0)}
+/* Indeks po dacie — bez niego każdy z ~300 dni skanowałby całą tablicę sesji od nowa. */
+function asIndeks(){
+  const nauka={},sen={},las={},sesje={};
+  (S.matura.sessions||[]).forEach(s=>{if(s&&isYmd(s.date)){nauka[s.date]=(nauka[s.date]||0)+(s.minutes||0);sesje[s.date]=(sesje[s.date]||0)+1}});
+  (S.sleep||[]).forEach(s=>{if(s&&isYmd(s.date)&&s.bed&&s.wake)sen[s.date]=sleepMin(s)});
+  (S.forest||[]).forEach(t=>{if(t&&isYmd(t.date)&&t.status==="alive")las[t.date]=(las[t.date]||0)+1});
+  return{nauka,sen,las,sesje};
+}
+function asRekordy(idx){
+  const klucze=[...Object.keys(idx.nauka),...Object.keys(idx.sen),...Object.keys(idx.las)].filter(isYmd).sort();
+  const pierwszy=klucze.length?klucze[0]:today();
+  const dni=[],rek={},k=new Date(pierwszy+"T00:00"),stop=new Date(today()+"T00:00");
+  for(;k<=stop;k.setDate(k.getDate()+1)){
+    const ds=dsLok(k),min=idx.nauka[ds]||0,senMin=idx.sen[ds]||null,p=pctProd(ds);
+    dni.push(ds);
+    rek[ds]={d:ds,min,senH:senMin?Math.round(senMin/60*10)/10:null,prod:p==null?null:Math.round(p),pomo:idx.las[ds]||0};
+  }
+  return{pierwszy,dni,rek};
+}
+function asTygodnie(dni,rek){
+  const map=new Map();
+  dni.forEach(ds=>{
+    const d=new Date(ds+"T00:00");d.setDate(d.getDate()-((d.getDay()+6)%7));
+    const k=dsLok(d);if(!map.has(k))map.set(k,[]);map.get(k).push(rek[ds]);
+  });
+  return[...map.entries()].map(([od,l])=>({od,minLacznie:asSuma(l.map(x=>x.min)),
+    sredniProd:asSrednia(l.map(x=>x.prod)),sredniSenH:asSrednia(l.map(x=>x.senH)),pomo:asSuma(l.map(x=>x.pomo))}));
+}
+function asWgDniaTygodnia(dni,rek){
+  const g=[[],[],[],[],[],[],[]];
+  dni.forEach(ds=>g[(new Date(ds+"T00:00").getDay()+6)%7].push(rek[ds]));
+  return g.map((l,i)=>({dzien:AS_DNI_TYG[i],sredniaMinNauki:Math.round(asSrednia(l.map(x=>x.min))||0),
+    sredniaProd:asSrednia(l.map(x=>x.prod)),dniZNauka:l.filter(x=>x.min>0).length,dniLacznie:l.length}));
+}
+function asSerie(dni,rek){
+  let best=0,cur=0,teraz=0;
+  dni.forEach(ds=>{if(rek[ds].min>0){cur++;best=Math.max(best,cur)}else cur=0});
+  for(let i=dni.length-1;i>=0;i--){if(rek[dni[i]].min>0)teraz++;else break}
+  return{najdluzszaSeriaDniZNauka:best,aktualnaSeria:teraz};
+}
+function asPorySnu(){
+  const sl=(S.sleep||[]).filter(s=>s&&s.bed&&s.wake);
+  if(!sl.length)return null;
+  const mm=t=>{const p=String(t).split(":");return (+p[0])*60+(+p[1]||0)};
+  // pora zaśnięcia zawija przez północ (23:40 i 00:20 to sąsiednie wartości) — liczymy od 18:00
+  const bed=sl.map(s=>{let m=mm(s.bed)-1080;if(m<0)m+=1440;return m});
+  const sr=a=>a.reduce((x,y)=>x+y,0)/a.length;
+  const fmt=m=>String(Math.floor(m/60)%24).padStart(2,"0")+":"+String(Math.round(m%60)).padStart(2,"0");
+  return{sredniaPoraZasniecia:fmt((sr(bed)+1080)%1440),sredniaPobudka:fmt(sr(sl.map(s=>mm(s.wake)))),nocyZapisanych:sl.length};
+}
+function asKorelacjaSenNauka(dni,rek){
+  const b=dni.map(ds=>rek[ds]).filter(x=>x.senH!=null&&x.min>0);
+  const kr=b.filter(x=>x.senH<7),dl=b.filter(x=>x.senH>=7);
+  if(kr.length<3||dl.length<3)return null;
+  return{poNocyKrotszejNiz7h:{dni:kr.length,sredniaMinNauki:Math.round(asSrednia(kr.map(x=>x.min))),sredniaProd:asSrednia(kr.map(x=>x.prod))},
+         poNocy7hLubDluzszej:{dni:dl.length,sredniaMinNauki:Math.round(asSrednia(dl.map(x=>x.min))),sredniaProd:asSrednia(dl.map(x=>x.prod))}};
+}
+function asOkno(dni,rek,ile){
+  const w=dni.slice(-ile).map(ds=>rek[ds]);
+  return{dni:w.length,sredniaMinNaDzien:Math.round(asSrednia(w.map(x=>x.min))||0),
+    sredniProd:asSrednia(w.map(x=>x.prod)),sredniSenH:asSrednia(w.map(x=>x.senH)),
+    dniBezNauki:w.filter(x=>x.min===0).length,dniBezZapisanegoSnu:w.filter(x=>x.senH==null).length};
+}
 function asystentKontekst(){
-  const dni30=rywalDates(30),dzis=today();
-  const moja=asSeria(dni30);
-  const przedmioty=(S.matura.topics||[]).map(t=>({nazwa:t.name,procent:t.percent||0}));
+  const idx=asIndeks(),{pierwszy,dni,rek}=asRekordy(idx);
+  const dniLista=dni.map(ds=>rek[ds]);
+  const wgPrzedmiotu={};
+  (S.matura.sessions||[]).forEach(s=>{
+    const t=(S.matura.topics||[]).find(x=>x.id===s.topicId);
+    const k=t?t.name:"(bez przedmiotu)";
+    if(!wgPrzedmiotu[k])wgPrzedmiotu[k]={godziny:0,sesje:0};
+    wgPrzedmiotu[k].godziny+=(s.minutes||0)/60;wgPrzedmiotu[k].sesje++;
+  });
+  Object.keys(wgPrzedmiotu).forEach(k=>wgPrzedmiotu[k].godziny=Math.round(wgPrzedmiotu[k].godziny*10)/10);
+  const najlepszy=dniLista.filter(x=>x.min>0).sort((a,b)=>b.min-a.min)[0]||null;
   const planPoPrzedmiocie={};
   (S.matura.plan||[]).forEach(b=>{
     const t=(S.matura.topics||[]).find(x=>x.id===b.topicId);
     const k=t?t.name:"(bez przedmiotu)";planPoPrzedmiocie[k]=(planPoPrzedmiocie[k]||0)+1;
   });
-  const sprawdziany=exItems().filter(e=>e.exam).map(e=>({data:e.date,przedmiot:e.subject,typ:e.type,zaDni:exDaysTo(e.date)}))
-    .filter(e=>e.zaDni==null||e.zaDni>=-7).sort((a,b)=>String(a.data).localeCompare(String(b.data))).slice(0,12);
   const freq=S.matura.attendanceFreq||{};
-  const frekwencja=Object.keys(freq).map(s=>({przedmiot:s,obecnosci:freq[s].present||0,nieobecnosci:freq[s].absent||0,
-    procent:frekPct(freq[s])})).sort((a,b)=>(a.procent||0)-(b.procent||0));
-  const materialy=(typeof matsList==="function"?matsList():[]).map(m=>({przedmiot:m.subject,nazwa:m.name,
-    zrobione:(m.done||[]).length,zadan:(m.tasks||[]).length}));
-  const nawyki=(S.habits||[]).map(h=>({nazwa:h.name,zrobioneW30dniach:dni30.filter(ds=>h.days&&h.days[ds]).length}));
   const ctx={
-    dzis,godzina:new Date().getHours(),
+    dzis:today(),godzina:new Date().getHours(),dzienTygodnia:AS_DNI_TYG[(new Date().getDay()+6)%7],
     ja:{imie:(rywalProfile&&rywalProfile.name)||"użytkownik"},
-    nauka:{
-      ostatnie30dni:moja,
-      sredniaMinNaDzien:asSrednia(moja.map(x=>x.min)),
-      sredniProcentProduktywnosci:asSrednia(moja.map(x=>x.prod)),
-      sredniSenH:asSrednia(moja.map(x=>x.senH)),
-      dniBezZapisanegoSnu:moja.filter(x=>x.senH==null).length,
-      lacznieSesjiWHistorii:(S.matura.sessions||[]).length,
-      przedmioty,pomoWorkMin:(S.matura.pomo&&S.matura.pomo.work)||60,
-      blokowWPlanieTygodnia:(S.matura.plan||[]).length,planPoPrzedmiocie,
-      preferencjeDoPlanu:S.matura.prefs||null
+    jakCzytacDane:`Dane obejmują CAŁĄ historię od ${pierwszy}. "poDniach" to ostatnie ${AS_SZCZEGOLOWO} dni dzień po dniu, a "poTygodniach" to KAŻDY tydzień od początku (od = poniedziałek). Starsze dni nie są brakiem danych — są w tygodniach.`,
+    odKiedy:pierwszy,dniOdStartu:dni.length,
+    calaHistoria:{
+      godzinNauki:Math.round(asSuma(dniLista.map(x=>x.min))/60*10)/10,
+      sesjiNauki:(S.matura.sessions||[]).length,
+      drzewPomodoro:asSuma(dniLista.map(x=>x.pomo)),
+      dniZNauka:dniLista.filter(x=>x.min>0).length,
+      nocyZapisanych:dniLista.filter(x=>x.senH!=null).length,
+      sredniaMinNaDzien:Math.round(asSrednia(dniLista.map(x=>x.min))||0),
+      sredniProd:asSrednia(dniLista.map(x=>x.prod)),
+      sredniSenH:asSrednia(dniLista.map(x=>x.senH)),
+      najlepszyDzien:najlepszy?{data:najlepszy.d,min:najlepszy.min}:null,
+      serie:asSerie(dni,rek),porySnu:asPorySnu(),
+      wgPrzedmiotu,wgDniaTygodnia:asWgDniaTygodnia(dni,rek),
+      korelacjaSenNauka:asKorelacjaSenNauka(dni,rek)
     },
-    sprawdziany,frekwencja,
+    porownanieOkresow:{ostatnie7dni:asOkno(dni,rek,7),ostatnie30dni:asOkno(dni,rek,30),calosc:asOkno(dni,rek,dni.length)},
+    poTygodniach:asTygodnie(dni,rek),
+    poDniach:dniLista.slice(-AS_SZCZEGOLOWO),
+    plan:{blokowWTygodniu:(S.matura.plan||[]).length,poPrzedmiocie:planPoPrzedmiocie,
+      pomoWorkMin:(S.matura.pomo&&S.matura.pomo.work)||60,
+      przedmiotyZPriorytetem:(S.matura.topics||[]).map(t=>({nazwa:t.name,procent:t.percent||0})),
+      preferencje:S.matura.prefs||null},
+    sprawdziany:exItems().filter(e=>e.exam).map(e=>({data:e.date,przedmiot:e.subject,typ:e.type,opis:e.desc||null,zaDni:exDaysTo(e.date)}))
+      .sort((a,b)=>String(a.data).localeCompare(String(b.data))),
+    oceny:(Array.isArray(S.matura.grades)?S.matura.grades:[]).filter(Boolean)
+      .map(g=>({przedmiot:g.subject,ocena:g.raw,wartosc:g.value,waga:g.weight,kategoria:g.category,data:g.date,liczySieDoSredniej:g.counts!==false})),
     sredniaOcen:(typeof gradeAvg==="function"&&typeof gradeScope==="function")?gradeAvg(gradeScope()):null,
-    materialy,nawyki,cele:S.goals||[]
+    frekwencja:Object.keys(freq).map(s=>({przedmiot:s,obecnosci:freq[s].present||0,nieobecnosci:freq[s].absent||0,procent:frekPct(freq[s])}))
+      .sort((a,b)=>(a.procent||0)-(b.procent||0)),
+    materialy:(typeof matsList==="function"?matsList():[]).map(m=>({przedmiot:m.subject,nazwa:m.name,zrobione:(m.done||[]).length,zadan:(m.tasks||[]).length})),
+    nawyki:(S.habits||[]).map(h=>({nazwa:h.name,zrobionychDni:Object.keys(h.days||{}).filter(ds=>h.days[ds]).length})),
+    cele:(S.goals||[]).map(g=>({nazwa:g.name||g.text||"(cel)",krokiZrobione:(g.steps||[]).filter(s=>s.done).length,krokiLacznie:(g.steps||[]).length}))
   };
-  // Rywalizacja: punkty liczy ta sama funkcja co zakładka, więc model widzi dokładnie to, co użytkownik.
+  /* Rywalizacja: punkty liczy TA SAMA pktOblicz() co zakładka, więc model widzi dokładnie to,
+     co użytkownik na ekranie — inaczej doradzałby na podstawie innych liczb niż te widoczne. */
   try{
     if(rywalFriends&&rywalFriends.length){
       const w=pktOblicz();
+      const serieZnajomych=rywalFriends.map(f=>{
+        const r={};dni.forEach(ds=>{const d=(f.days||{})[ds]||{};
+          r[ds]={d:ds,min:d.study_min||0,senH:null,prod:d.prod_pct!=null?d.prod_pct:null,pomo:d.pomo_count||0}});
+        return{imie:f.name,poTygodniach:asTygodnie(dni,r),poDniach:dni.slice(-AS_SZCZEGOLOWO).map(ds=>r[ds])};
+      });
       ctx.rywalizacja={
         startRywalizacji:w.od,rozliczoneTygodnie:w.tygodni,rozliczoneMiesiace:w.miesiecy,
         gracze:w.osoby.map(u=>({imie:u.name,toJa:!!u.me,punktyRazem:u.razem,zNauki:u.nauka,
           zTygodni:u.tyg,zMiesiecy:u.mies,zZakladow:u.zaklady,wydaneWSklepie:u.wydane,saldo:u.saldo})),
-        ostatnie30dni:[{imie:"ja",dane:moja.map(x=>({d:x.d,min:x.min,prod:x.prod}))}].concat(
-          rywalFriends.map(f=>({imie:f.name,dane:dni30.map(ds=>({d:ds,
-            min:(f.days&&f.days[ds]&&f.days[ds].study_min)||0,
-            prod:(f.days&&f.days[ds]&&f.days[ds].prod_pct)!=null?f.days[ds].prod_pct:null}))}))),
-        zaklady:(rywalBets||[]).map(b=>({opis:b.opis,stawka:b.stawka,status:b.status,
-          remis:!!b.split,wygral:b.winner_id?betNazwa(b.winner_id):null})),
+        mojeSerie:{poTygodniach:ctx.poTygodniach,poDniach:ctx.poDniach},
+        znajomi:serieZnajomych,
+        zaklady:(rywalBets||[]).map(b=>({opis:b.opis,stawka:b.stawka,status:b.status,remis:!!b.split,
+          wygral:b.winner_id?betNazwa(b.winner_id):null})),
         sklep:(shopItems||[]).map(i=>({nazwa:i.name||i.nazwa,cena:i.cena||i.price}))
       };
     }else ctx.rywalizacja=null;
   }catch(e){ctx.rywalizacja=null}
   return ctx;
 }
-let asChat=[];
+/* Rozmowa żyje w S.asystentChat, a nie w zmiennej — dzięki temu save() wrzuca ją do chmury
+   razem z resztą danych, więc historia przeżywa odświeżenie, restart apki i przesiadkę na
+   telefon. AS_CHAT_MAX ucina najstarsze wiadomości, żeby blob nie puchł w nieskończoność. */
+const AS_CHAT_MAX=400;
+const AS_BUDZET_ZNAKOW=40000;   // ile historii realnie leci do modelu (~10 tys. tokenów)
+/* Zawsze czytamy prosto z S, bez trzymania referencji w zmiennej: applyCloud() podmienia CAŁY
+   obiekt S przy pobraniu danych z chmury, więc zapamiętana tablica wskazywałaby po takiej
+   podmianie na stary, osierocony czat — i pierwszy zapis cofnąłby historię z chmury. */
+function asChatHist(){
+  if(!Array.isArray(S.asystentChat))S.asystentChat=[];
+  return S.asystentChat;
+}
+function asChatZapisz(){
+  const c=asChatHist();
+  if(c.length>AS_CHAT_MAX)c.splice(0,c.length-AS_CHAT_MAX);
+  save();
+}
 $("#asChatSend").onclick=()=>asChatWyslij();
 $("#asChatInput").onkeydown=e=>{if(e.key==="Enter")asChatWyslij()};
-$("#asChatClear").onclick=()=>{asChat=[];asChatRender()};
+$("#asChatClear").onclick=()=>{
+  if(!asChatHist().length)return;
+  if(!confirm("Skasować całą historię rozmowy z asystentem? Tego nie da się cofnąć."))return;
+  S.asystentChat=[];save();asChatRender();
+};
 function asChatRender(){
   const log=$("#asChatLog");
-  log.innerHTML=asChat.length
-    ? asChat.map(m=>`<div class="chat-msg ${m.role==="user"?"me":"ai"}">${esc(m.text)}</div>`).join("")
+  const chat=asChatHist();
+  log.innerHTML=chat.length
+    ? chat.map(m=>`<div class="chat-msg ${m.role==="user"?"me":"ai"}">${esc(m.text)}</div>`).join("")
     : `<div class="empty">Zacznij rozmowę — AI ma już wgląd w Twoje dane i w rywalizację.</div>`;
   log.scrollTop=1e9;
 }
 function renderAsystent(){
   asChatRender();
   const k=asystentKontekst();
-  const ileSpr=`${k.sprawdziany.length} ${matsPlural(k.sprawdziany.length,"sprawdzian","sprawdziany","sprawdzianów")}`;
-  $("#asChatInfo").textContent=k.rywalizacja
-    ? `Widzi: ${k.nauka.ostatnie30dni.length} dni nauki i snu, ${ileSpr}, rywalizację (${k.rywalizacja.gracze.length} ${matsPlural(k.rywalizacja.gracze.length,"gracz","graczy","graczy")}).`
-    : `Widzi: ${k.nauka.ostatnie30dni.length} dni nauki i snu, ${ileSpr}. Rywalizacja: brak znajomego.`;
+  const h=k.calaHistoria;
+  const czesci=[`całą historię od ${fmtDate(k.odKiedy)} (${k.dniOdStartu} ${matsPlural(k.dniOdStartu,"dzień","dni","dni")}, ${h.godzinNauki} h nauki)`];
+  if(k.sprawdziany.length)czesci.push(`${k.sprawdziany.length} ${matsPlural(k.sprawdziany.length,"sprawdzian","sprawdziany","sprawdzianów")}`);
+  if(k.oceny.length)czesci.push(`${k.oceny.length} ${matsPlural(k.oceny.length,"ocenę","oceny","ocen")}`);
+  czesci.push(k.rywalizacja?`rywalizację (${k.rywalizacja.gracze.length} ${matsPlural(k.rywalizacja.gracze.length,"gracz","graczy","graczy")})`:"bez rywalizacji — brak znajomego");
+  $("#asChatInfo").textContent="Widzi "+czesci.join(", ")+".";
+}
+/* OSZCZĘDZANIE TOKENÓW. Model jest bezstanowy — wszystko, co ma „wiedzieć", musi przyjechać
+   w żądaniu. Zamiast budować i wysyłać pełny kontekst (~18 kB) przy KAŻDEJ wiadomości:
+   1. pełne reguły + dane idą RAZ, jako zamrożony pierwszy blok rozmowy (asBlokDanych),
+   2. blok jest oznaczony cache_control — API liczy powtórne użycie ~10% ceny wejścia
+      (funkcja daymenu-ai przekazuje "messages" do Anthropic bez zmian, więc nie trzeba jej ruszać),
+   3. jeśli dane zmienią się w trakcie rozmowy, dosyłamy KRÓTKĄ aktualizację (~1-2 kB),
+      a nie cały kontekst od nowa.
+   Zamrożenie jest konieczne: cache trafia tylko w IDENTYCZNY prefiks, więc blok przebudowany
+   co wiadomość zawsze byłby chybiony. */
+let asBlokDanych=null,asOstatniaAktualizacja=null;
+function asKrotkiStan(k){
+  return{dzis:k.dzis,godzina:k.godzina,okresy:k.porownanieOkresow,
+    ostatnie7dni:k.poDniach.slice(-7),
+    najblizszeSprawdziany:k.sprawdziany.filter(e=>e.zaDni!=null&&e.zaDni>=0).slice(0,5),
+    punkty:k.rywalizacja?k.rywalizacja.gracze:null};
+}
+function asPrefiks(){
+  const k=asystentKontekst();
+  if(!asBlokDanych){
+    asBlokDanych=AS_OPIS_APKI+"\n\nPEŁNE DANE UŻYTKOWNIKA — CAŁA HISTORIA (JSON, stan na "+new Date().toLocaleString("pl-PL")+"):\n"+JSON.stringify(k);
+    asOstatniaAktualizacja=JSON.stringify(asKrotkiStan(k));
+    return{blok:asBlokDanych,aktualizacja:null};
+  }
+  const teraz=JSON.stringify(asKrotkiStan(k));
+  const zmiana=teraz!==asOstatniaAktualizacja?teraz:null;
+  if(zmiana)asOstatniaAktualizacja=teraz;
+  return{blok:asBlokDanych,aktualizacja:zmiana};
 }
 async function asChatWyslij(){
   const inp=$("#asChatInput"),msg=inp.value.trim();
   if(!msg)return;
   inp.value="";$("#asChatSend").disabled=true;
-  asChat.push({role:"user",text:msg});
-  asChat.push({role:"ai",text:"…"});asChatRender();
+  const chat=asChatHist();
+  chat.push({role:"user",text:msg});
+  chat.push({role:"ai",text:"…"});asChatRender();
   try{
-    const sys=AS_OPIS_APKI+"\n\nDANE UŻYTKOWNIKA (JSON, stan na teraz):\n"+JSON.stringify(asystentKontekst());
-    // komunikaty o błędach (m.err) zostają na ekranie, ale NIE idą do modelu — inaczej
-    // „Zaloguj się…" trafiałoby do historii jako wypowiedź asystenta
-    const hist=asChat.filter(m=>m.text!=="…"&&!m.err).slice(-10).map(m=>({role:m.role==="user"?"user":"assistant",content:m.text}));
+    /* Cała rozmowa idzie do modelu, przycinana od NAJSTARSZYCH tylko wtedy, gdy przekroczy
+       budżet znaków — przy krótkich rozmowach (czyli zwykle) model widzi wszystko od początku.
+       Komunikaty o błędach (m.err) zostają na ekranie, ale nie idą do modelu — inaczej
+       „Zaloguj się…" trafiałoby do historii jako jego własna wypowiedź. */
+    const pelna=chat.filter(m=>m.text!=="…"&&!m.err).map(m=>({role:m.role==="user"?"user":"assistant",content:m.text}));
+    let znaki=0,odKtorej=pelna.length;
+    while(odKtorej>0&&znaki+pelna[odKtorej-1].content.length<=AS_BUDZET_ZNAKOW){odKtorej--;znaki+=pelna[odKtorej].content.length}
+    const hist=pelna.slice(odKtorej);
     while(hist.length&&hist[0].role!=="user")hist.shift();
-    const text=await aiCall(sys,hist,1500);
-    asChat[asChat.length-1]={role:"ai",text:text||"(pusta odpowiedź)"};
+    const{blok,aktualizacja}=asPrefiks();
+    // cache_control na bloku danych: kolejne wiadomości w rozmowie trafiają w cache zamiast
+    // płacić pełną stawkę za te same ~18 kB
+    const wiadomosci=[{role:"user",content:[{type:"text",text:blok,cache_control:{type:"ephemeral"}}]},
+                      {role:"assistant",content:"Mam komplet danych i reguł. Pytaj."}].concat(hist);
+    if(aktualizacja)wiadomosci[wiadomosci.length-1]={role:"user",
+      content:"AKTUALIZACJA DANYCH (zmieniło się od czasu bloku powyżej):\n"+aktualizacja+"\n\n"+hist[hist.length-1].content};
+    const text=await aiCall(AS_SYSTEM_KROTKI,wiadomosci,1500);
+    chat[chat.length-1]={role:"ai",text:text||"(pusta odpowiedź)"};
   }catch(e){
     const m=(e&&e.message)||"";
-    asChat[asChat.length-1]={role:"ai",err:true,text:
+    chat[chat.length-1]={role:"ai",err:true,text:
       m==="NO_AI_ACCESS"?"To konto nie ma dostępu do AI."
       :m==="NOLOGIN"?"Zaloguj się do konta w chmurze — bez tego AI nie zadziała."
       :/missing_api_key_secret/.test(m)?"Brakuje klucza API po stronie serwera (ANTHROPIC_API_KEY w sekretach Supabase)."
       :"Nie udało się pobrać odpowiedzi: "+(m||"błąd")};
   }finally{
-    $("#asChatSend").disabled=false;asChatRender();
+    $("#asChatSend").disabled=false;asChatZapisz();asChatRender();
   }
 }
 
