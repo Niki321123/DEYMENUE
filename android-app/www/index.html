@@ -29,7 +29,7 @@
 <link rel="dns-prefetch" href="https://jkpwboekztpkfxivueql.supabase.co">
 <!-- ?v= podbija publish.js razem z numerem buildu. Bez tego przegladarka trzyma
      stary manifest (max-age=600) i po zmianie nazwy nadal proponuje poprzednia. -->
-<link rel="manifest" href="/manifest.webmanifest?v=138">
+<link rel="manifest" href="/manifest.webmanifest?v=139">
 <!-- iOS: ikona ekranu glownego MUSI byc w PNG. Przy SVG telefon pokazuje zrzut strony
      zamiast logo. Te trzy meta wlaczaja tryb pelnoekranowy po dodaniu do ekranu. -->
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -3992,6 +3992,16 @@ body {
     </div>
   </div>
 
+  <div class="card" id="profRaport" hidden>
+    <h2 style="margin:0 0 2px">Raport okresu</h2>
+    <p class="muted" style="margin:0 0 var(--sp-3)">Podsumowanie zdaniami, nie tylko liczbami. Możesz je wygenerować w każdej chwili, dla dowolnego zakresu.</p>
+    <div class="row" style="gap:var(--sp-2);align-items:center">
+      <select id="rapZakres" style="flex:none;width:auto"></select>
+      <button class="btn accent" id="rapBtn" style="flex:none">Wygeneruj raport</button>
+    </div>
+    <div id="rapWynik"></div>
+  </div>
+
   <div class="card">
     <h2 style="margin-bottom:var(--sp-3)">Twoje liczby</h2>
     <div class="grid4" id="profStaty"></div>
@@ -4071,7 +4081,7 @@ body {
    nowsza wersja, powłoka zatrzymuje własne skrypty (window.stop) i uruchamia
    ją w pełnoekranowej ramce (osobne środowisko JS — bez konfliktu zmiennych).
    Każda uruchomiona wersja sprawdza w tle serwer i pobiera nowsze wydania. */
-const DM_BUILD=138;
+const DM_BUILD=139;
 /* Adres sprawdzania aktualizacji. MUSI wskazywac na daymenu.pl, a NIE na stary adres
    github.io: ten od podpiecia domeny zwraca przekierowanie 301 bez naglowka CORS, wiec
    przegladarka blokuje zadanie na etapie przekierowania i aktualizacje przestaja dzialac.
@@ -9802,8 +9812,169 @@ $("#profRecapBtn").onclick=()=>{
   const o=S.wrapOstatni;
   if(o&&o.data===dsLok(new Date())&&Array.isArray(o.okresy)&&o.okresy.length)wrapPokaz(o.okresy);
 };
+/* ================= RAPORT OKRESU =================
+   Podsumowanie („wrapped") pokazuje się samo i tylko w wyznaczone dni. Raport jest jego
+   odpowiednikiem na żądanie: dowolny zakres, w każdej chwili, tyle razy, ile trzeba.
+   Liczby są te same co w podsumowaniu — liczy je wrapMoje(), nie model.
+
+   ZASADA: model NIE dostaje danych do liczenia i nie wolno mu napisać ani jednej cyfry.
+   Każdą wartość wstawia jako {{klucz}}, a podstawia ją rapPodstaw() z gotowych statystyk.
+   Dzięki temu walidacja jest trywialna (żadnej cyfry poza placeholderem = raport nie może
+   skłamać liczbą), a model robi to, co robi dobrze: pisze zdania. Ta sama lekcja co przy
+   planerze nauki — tłumaczenie języka na strukturę model ogarnia, arytmetyki nie.
+
+   Bez dostępu do AI (albo po dwóch nieudanych generacjach) powstaje raport zapasowy
+   złożony z samych faktów. Suchy raport jest lepszy niż raport z wymyśloną liczbą. */
+const RAP_ZAKRESY=[
+  {id:"d7",nazwa:"Ostatnie 7 dni"},
+  {id:"d30",nazwa:"Ostatnie 30 dni"},
+  {id:"tydz",nazwa:"Poprzedni tydzień"},
+  {id:"mies",nazwa:"Poprzedni miesiąc"},
+  {id:"rok",nazwa:"Rok szkolny"}
+];
+/* Zakresy kroczące ("ostatnie N dni") są tu po to, żeby raport miał sens także w środku
+   tygodnia. Rok szkolny liczymy DO DZIŚ, a nie do 30 kwietnia jak w podsumowaniu —
+   inaczej przez osiem miesięcy raport roczny obejmowałby przyszłość. */
+function rapZakres(id){
+  const dz=new Date();dz.setHours(0,0,0,0);
+  if(id==="d7"||id==="d30"){
+    const n=id==="d7"?7:30;
+    const od=new Date(dz);od.setDate(od.getDate()-(n-1));
+    return{od,do:dz,etykieta:"ostatnie "+n+" dni ("+fmtDate(dsLok(od))+" – "+fmtDate(dsLok(dz))+")"};
+  }
+  if(id==="rok"){
+    const rok=dz.getMonth()>=8?dz.getFullYear():dz.getFullYear()-1;
+    return{od:new Date(rok,8,1),do:dz,etykieta:"rok szkolny "+rok+"/"+(rok+1)+" do dziś"};
+  }
+  return wrapZakres(id);
+}
+/* Zestaw wartości, do których model może się odwołać. Klucz = nazwa placeholdera,
+   opis = podpowiedź, o czym ta liczba mówi (model musi wiedzieć, co wstawia). */
+function rapStaty(moje){
+  const p={},dodaj=(k,wartosc,opis)=>{p[k]={wartosc:String(wartosc),opis}};
+  dodaj("czas_nauki",fmtMin(moje.minuty),"łączny czas nauki w okresie");
+  dodaj("liczba_sesji",moje.sesji,"liczba sesji nauki");
+  dodaj("dni_z_nauka",moje.dniZNauka,"w ilu dniach była nauka");
+  dodaj("dni_w_okresie",moje.dniWOkresie,"ile dni liczy cały okres");
+  dodaj("najdluzsza_seria",moje.seria,"najdłuższa seria dni z nauką pod rząd");
+  dodaj("drzewa_zywe",moje.zywe,"ukończone sesje pomodoro (żywe drzewa)");
+  dodaj("drzewa_uschle",moje.uschle,"przerwane sesje pomodoro (uschłe drzewa)");
+  if(moje.poraGodzina!=null)dodaj("ulubiona_pora",moje.poraGodzina+":00","godzina, o której najczęściej zaczynasz naukę");
+  if(moje.najlepszy){
+    dodaj("najlepszy_dzien_czas",fmtMin(moje.najlepszy[1]),"czas nauki w najlepszym dniu");
+    dodaj("najlepszy_dzien_data",fmtDate(moje.najlepszy[0]),"data najlepszego dnia");
+  }
+  if(moje.sen!=null)dodaj("sredni_sen",fmtMin(moje.sen),"średnia długość snu");
+  moje.przedmioty.slice(0,3).forEach(([nazwa,min],i)=>{
+    const n=i+1;
+    dodaj("przedmiot"+n,nazwa,n+". przedmiot pod względem czasu");
+    dodaj("przedmiot"+n+"_czas",fmtMin(min),"czas poświęcony na: "+nazwa);
+    dodaj("przedmiot"+n+"_procent",(moje.minuty?Math.round(min/moje.minuty*100):0)+"%","udział w całym czasie: "+nazwa);
+  });
+  return p;
+}
+const RAP_SYSTEM=`Jesteś redaktorem podsumowań w aplikacji Day Menu. Piszesz krótki, osobisty raport z okresu dla jednej osoby — tej, której dotyczą dane.
+ZASADA NADRZĘDNA — LICZBY: nie wolno Ci napisać ŻADNEJ cyfry ani liczby słownie. Żadnej. Każdą wartość wstawiasz wyłącznie jako placeholder w podwójnych klamrach, dokładnie w formie podanej w sekcji DANE, na przykład {{czas_nauki}}. Nie twórz własnych placeholderów. Nie licz, nie sumuj i nie porównuj wartości, których nie ma w DANYCH. Nie szacuj i nie uogólniaj liczb. Jeśli czegoś nie ma w DANYCH — nie wspominaj o tym w ogóle. Wartości wstawiane w miejsce placeholderów są w mianowniku i NIE odmieniają się przez przypadki, więc buduj zdania tak, żeby odmiany nie wymagały (napisz "na pierwszym miejscu {{przedmiot1}}", a nie "poszło na {{przedmiot1}}").
+TON: po polsku, w drugiej osobie ("masz", "udało Ci się"). Zwięźle i konkretnie, bez coachingowego entuzjazmu, bez wykrzykników, bez emoji, bez metafor o podróży ani o drodze. Stwierdzasz fakty i nazywasz, co z nich wynika. Jeśli okres wypadł słabo, mówisz to wprost, bez pocieszania.
+Odpowiadasz WYŁĄCZNIE poprawnym JSON, bez markdown i bez komentarzy, w formacie: {"tytul":"2-4 słowa nazywające ten okres, bez liczb","story":"jedno zdanie do nałożenia na grafikę, maksymalnie 90 znaków","sekcje":[{"temat":"1-3 słowa","tekst":"2-3 zdania"},{"temat":"1-3 słowa","tekst":"2-3 zdania"},{"temat":"1-3 słowa","tekst":"2-3 zdania"}],"wyroznienie":"jedno zdanie o tym, co wyróżnia ten okres","rada":"jedna konkretna rzecz do zrobienia w następnym okresie, wynikająca wprost z DANYCH"}
+Każda z trzech sekcji dotyczy innego aspektu okresu — nie powtarzaj tej samej obserwacji dwa razy. "rada" musi dać się wykonać w ciągu następnego okresu i odnosić się do konkretnej wartości z DANYCH.`;
+function rapPodstaw(tekst,staty){
+  return String(tekst||"").replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g,(m,k)=>staty[k]?staty[k].wartosc:m);
+}
+/* Cztery sprawdzenia, bez których prompt jest tylko prośbą. Zwraca null = raport do kosza. */
+function rapWaliduj(j,staty){
+  if(!j||typeof j!=="object")return null;
+  const sekcje=(Array.isArray(j.sekcje)?j.sekcje:[]).filter(s=>s&&typeof s.temat==="string"&&typeof s.tekst==="string");
+  if(sekcje.length!==3)return null;                                      // 1. kształt odpowiedzi
+  const pola=[j.tytul,j.story,j.wyroznienie,j.rada].concat(sekcje.map(s=>s.temat),sekcje.map(s=>s.tekst));
+  if(pola.some(x=>typeof x!=="string"||!x.trim()))return null;
+  for(const t of pola){
+    if(/\d/.test(t.replace(/\{\{[^}]*\}\}/g,"")))return null;            // 2. żadnej własnej cyfry
+    for(const u of (t.match(/\{\{\s*[a-zA-Z0-9_]+\s*\}\}/g)||[])){
+      if(!staty[u.replace(/[{}\s]/g,"")])return null;                    // 3. placeholder musi istnieć
+    }
+  }
+  if(rapPodstaw(j.story,staty).length>90)return null;                    // 4. story musi wejść na grafikę
+  return{tytul:j.tytul,story:j.story,sekcje:sekcje.map(s=>({temat:s.temat,tekst:s.tekst})),
+    wyroznienie:j.wyroznienie,rada:j.rada};
+}
+function rapZapasowy(moje,staty){
+  const przedmiot=staty.przedmiot1
+    ?"Na pierwszym miejscu {{przedmiot1}} — {{przedmiot1_czas}}, czyli {{przedmiot1_procent}} całości."
+    :"Nie ma jeszcze podziału na przedmioty.";
+  return{
+    tytul:"Twoje liczby",
+    story:"{{czas_nauki}} nauki w {{dni_z_nauka}} dniach.",
+    sekcje:[
+      {temat:"Czas",tekst:"Łącznie {{czas_nauki}} w {{liczba_sesji}} sesjach. Nauka była w {{dni_z_nauka}} z {{dni_w_okresie}} dni."},
+      {temat:"Rytm",tekst:"Najdłuższa seria dni pod rząd to {{najdluzsza_seria}}."
+        +(staty.ulubiona_pora?" Najczęściej siadasz do nauki około {{ulubiona_pora}}.":"")},
+      {temat:"Przedmioty",tekst:przedmiot}
+    ],
+    wyroznienie:moje.najlepszy?"Najlepszy dzień to {{najlepszy_dzien_data}} — {{najlepszy_dzien_czas}}.":"W tym okresie żaden dzień się nie wyróżnił.",
+    rada:"Raport opisowy wymaga dostępu do AI — to zestawienie powstało z samych danych."
+  };
+}
+let rapTrwa=false;
+async function rapGeneruj(){
+  if(rapTrwa)return;
+  const id=$("#rapZakres").value||"d7";
+  const z=rapZakres(id);
+  const moje=wrapMoje(wrapDni(z));
+  if(!moje.minuty){toast("W tym zakresie nie ma jeszcze danych do raportu");return}
+  const staty=rapStaty(moje);
+  const btn=$("#rapBtn");
+  rapTrwa=true;btn.disabled=true;btn.textContent="Generuję…";
+  let tresc=null;
+  if(aiAccess){
+    const dane=Object.keys(staty).map(k=>k+" = "+staty[k].wartosc+" ("+staty[k].opis+")").join("\n");
+    const pyt="ZAKRES: "+z.etykieta+"\n\nDANE:\n<<<\n"+dane+"\n>>>\n\nNapisz raport z tego okresu.";
+    // jedna powtórka: model bywa niedokładny raz, dwa razy pod rząd już rzadko
+    for(let i=0;i<2&&!tresc;i++){
+      try{tresc=rapWaliduj(aiJson(await aiCall(RAP_SYSTEM,[{role:"user",content:pyt}],900)),staty)}
+      catch(e){if(String(e&&e.message)==="NO_AI_ACCESS")break}
+    }
+  }
+  const zrodlo=tresc?"ai":"dane";
+  if(!tresc)tresc=rapZapasowy(moje,staty);
+  // zapisujemy po podstawieniu — raport ma zostać taki, jaki był w dniu wygenerowania
+  if(!S.raporty)S.raporty={};
+  S.raporty[id]={data:dsLok(new Date()),etykieta:z.etykieta,zrodlo,
+    tytul:rapPodstaw(tresc.tytul,staty),story:rapPodstaw(tresc.story,staty),
+    sekcje:tresc.sekcje.map(s=>({temat:rapPodstaw(s.temat,staty),tekst:rapPodstaw(s.tekst,staty)})),
+    wyroznienie:rapPodstaw(tresc.wyroznienie,staty),rada:rapPodstaw(tresc.rada,staty)};
+  save();
+  rapTrwa=false;btn.disabled=false;btn.textContent="Wygeneruj raport";
+  rapRenderWynik();
+  if(zrodlo==="dane"&&aiAccess)toast("Model nie zmieścił się w regułach — raport z samych danych");
+}
+function rapRenderWynik(){
+  const r=(S.raporty||{})[$("#rapZakres").value];
+  const box=$("#rapWynik");
+  if(!r){box.innerHTML="";return}
+  box.innerHTML=`<div class="ai-box">
+    <strong>${esc(r.tytul)}</strong>
+    <p class="muted" style="margin:2px 0 0;font-size:12px">${esc(r.etykieta)} · wygenerowano ${esc(fmtDate(r.data))}${r.zrodlo==="dane"?" · z danych":""}</p>
+    <p style="margin-top:var(--sp-3)"><em>${esc(r.story)}</em></p>
+    ${r.sekcje.map(s=>`<p style="margin-top:var(--sp-3)"><strong>${esc(s.temat)}</strong><br>${esc(s.tekst)}</p>`).join("")}
+    <p style="margin-top:var(--sp-3)"><strong>Wyróżnienie</strong><br>${esc(r.wyroznienie)}</p>
+    <p style="margin-top:var(--sp-3)"><strong>Na następny raz</strong><br>${esc(r.rada)}</p>
+  </div>`;
+}
+function renderRaport(){
+  $("#profRaport").hidden=!oplacone;
+  const sel=$("#rapZakres");
+  if(!sel.options.length){
+    sel.innerHTML=RAP_ZAKRESY.map(x=>`<option value="${x.id}">${x.nazwa}</option>`).join("");
+    sel.value=S.rapZakres||"d7";
+    sel.onchange=()=>{S.rapZakres=sel.value;save();rapRenderWynik()};
+    $("#rapBtn").onclick=rapGeneruj;
+  }
+  rapRenderWynik();
+}
 function renderProfil(){
   renderRecapOdtworz();
+  renderRaport();
   const zalogowany=!!sbSession;
   const nazwa=(rywalProfile&&rywalProfile.name)||(S.account&&S.account.name)||"";
   const avatar=profAvatarRoboczy!==null?profAvatarRoboczy:(rywalProfile&&rywalProfile.avatar)||"";
